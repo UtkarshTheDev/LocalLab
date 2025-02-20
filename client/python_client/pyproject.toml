@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "locallab-client"
+version = "1.0.1"
+description = "Python client for connecting to LocalLab servers - Interact with AI models running on LocalLab"
+readme = "README.md"
+authors = [{ name = "Utkarsh", email = "utkarshweb2023@gmail.com" }]
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+keywords = ["llm", "ai", "client", "api", "inference"]
+dependencies = [
+    "aiohttp>=3.8.0,<4.0.0",
+    "websockets>=10.0,<11.0",
+    "pydantic>=2.0.0,<3.0.0",
+    "typing-extensions>=4.0.0",
+]
+requires-python = ">=3.7"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-asyncio>=0.15.0",
+    "pytest-cov>=2.0",
+    "black>=22.0",
+    "isort>=5.0",
+    "mypy>=0.900",
+    "flake8>=3.9",
+]
+
+[project.urls]
+Homepage = "https://github.com/Developer-Utkarsh/LocalLab"
+Documentation = "https://github.com/Developer-Utkarsh/LocalLab#readme"
+Repository = "https://github.com/Developer-Utkarsh/LocalLab.git"
+Issues = "https://github.com/Developer-Utkarsh/LocalLab/issues"
+
+[tool.black]
+line-length = 100
+target-version = ["py37"]
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 100
+
+[tool.mypy]
+python_version = "3.7"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --cov=locallab"
+testpaths = ["tests"] 

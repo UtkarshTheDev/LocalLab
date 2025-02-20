@@ -1,0 +1,13 @@
+aiohttp<4.0.0,>=3.8.0
+websockets<11.0,>=10.0
+pydantic<3.0.0,>=2.0.0
+typing-extensions>=4.0.0
+
+[dev]
+pytest>=6.0
+pytest-asyncio>=0.15.0
+pytest-cov>=2.0
+black>=22.0
+isort>=5.0
+mypy>=0.900
+flake8>=3.9

@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+setup.py
+locallab/__init__.py
+locallab/client.py
+locallab_client.egg-info/PKG-INFO
+locallab_client.egg-info/SOURCES.txt
+locallab_client.egg-info/dependency_links.txt
+locallab_client.egg-info/requires.txt
+locallab_client.egg-info/top_level.txt
+tests/test_client.py
+tests/test_package.py

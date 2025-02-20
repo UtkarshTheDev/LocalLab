@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# LocalLab specific
+models/
+cache/
+logs/
+*.log
+.locallab_cache/
+.coverage
+coverage/
+htmlcov/
+
+# Node.js client
+client/node_client/node_modules/
+client/node_client/dist/
+client/node_client/coverage/
+client/node_client/.nyc_output/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# Testing
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+
+# Distribution
+*.tar.gz
+*.whl
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Misc
+*.bak
+*.tmp
+*.temp
+.*.swp
+.DS_Store 
