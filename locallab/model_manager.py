@@ -14,8 +14,9 @@ from .config import (
 from .logger import logger
 from .utils import check_resource_availability, get_device, format_model_size
 import gc
+from colorama import Fore, Style
+import asyncio
 
-# Define quantization settings here since it's model manager specific
 QUANTIZATION_SETTINGS = {
     "fp16": {
         "load_in_8bit": False,
@@ -46,7 +47,6 @@ class ModelManager:
         
         logger.info(f"Using device: {self.device}")
         
-        # Initialize optimizations
         if ENABLE_FLASH_ATTENTION:
             try:
                 import flash_attn
@@ -71,7 +71,6 @@ class ModelManager:
                     f"bitsandbytes version {bnb.__version__} may not support all quantization features. "
                     "Please upgrade to version 0.41.1 or higher."
                 )
-                # Fallback to fp16 if bitsandbytes version is too old
                 return {
                     "torch_dtype": torch.float16,
                     "device_map": "auto"
@@ -114,7 +113,6 @@ class ModelManager:
                 "device_map": "auto"
             }
         
-        # Default to FP16
         return {
             "torch_dtype": torch.float16,
             "device_map": "auto"
@@ -122,87 +120,65 @@ class ModelManager:
     
     def _apply_optimizations(self, model: AutoModelForCausalLM) -> AutoModelForCausalLM:
         """Apply various optimizations to the model"""
-        if ENABLE_ATTENTION_SLICING:
-            model.enable_attention_slicing(1)
-            
-        if ENABLE_CPU_OFFLOADING and hasattr(model, "enable_cpu_offload"):
-            model.enable_cpu_offload()
-            
-        if ENABLE_BETTERTRANSFORMER:
-            try:
-                from optimum.bettertransformer import BetterTransformer
-                model = BetterTransformer.transform(model)
-                logger.info("BetterTransformer optimization applied")
-            except ImportError:
-                logger.warning("BetterTransformer not available")
+        try:
+            if ENABLE_ATTENTION_SLICING and hasattr(model, 'enable_attention_slicing'):
+                model.enable_attention_slicing(1)
+                logger.info("Attention slicing enabled")
                 
-        return model
+            if ENABLE_CPU_OFFLOADING and hasattr(model, "enable_cpu_offload"):
+                model.enable_cpu_offload()
+                logger.info("CPU offloading enabled")
+                
+            if ENABLE_BETTERTRANSFORMER:
+                try:
+                    from optimum.bettertransformer import BetterTransformer
+                    model = BetterTransformer.transform(model)
+                    logger.info("BetterTransformer optimization applied")
+                except ImportError:
+                    logger.warning("BetterTransformer not available")
+                    
+            return model
+        except Exception as e:
+            logger.warning(f"Some optimizations could not be applied: {str(e)}")
+            return model
     
     async def load_model(self, model_id: str) -> bool:
         """Load a model from HuggingFace Hub"""
         try:
-            # Clean up previous model if exists
+            logger.info(f"\n{Fore.CYAN}Loading model: {model_id}{Style.RESET_ALL}")
+            
             if self.model is not None:
+                logger.info("Unloading previous model...")
                 del self.model
                 self.model = None
                 torch.cuda.empty_cache()
                 gc.collect()
             
-            logger.info(f"Loading model: {model_id}")
-            
-            # Get quantization config
+            hf_token = os.getenv("HF_TOKEN")
             config = self._get_quantization_config()
+            
             if config:
                 logger.info(f"Using quantization config: {QUANTIZATION_TYPE}")
             
             try:
-                # Load tokenizer and model
                 self.tokenizer = AutoTokenizer.from_pretrained(
                     model_id,
-                    trust_remote_code=True
+                    trust_remote_code=True,
+                    token=hf_token
                 )
                 
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_id,
                     trust_remote_code=True,
+                    token=hf_token,
                     **config
                 )
                 
-                # Apply optimizations if supported
-                if ENABLE_FLASH_ATTENTION:
-                    try:
-                        self.model.config.use_flash_attention = True
-                        logger.info("Flash Attention enabled")
-                    except Exception as e:
-                        logger.warning(f"Flash Attention not available: {str(e)}")
+                if not ENABLE_QUANTIZATION:
+                    device = "cuda" if torch.cuda.is_available() else "cpu"
+                    self.model = self.model.to(device)
                 
-                if ENABLE_ATTENTION_SLICING:
-                    try:
-                        if hasattr(self.model, 'enable_attention_slicing'):
-                            self.model.enable_attention_slicing()
-                            logger.info("Attention slicing enabled")
-                        else:
-                            logger.warning("Attention slicing not supported by this model")
-                    except Exception as e:
-                        logger.warning(f"Failed to enable attention slicing: {str(e)}")
-                
-                if ENABLE_CPU_OFFLOADING:
-                    try:
-                        if hasattr(self.model, 'enable_cpu_offload'):
-                            self.model.enable_cpu_offload()
-                            logger.info("CPU offloading enabled")
-                        else:
-                            logger.warning("CPU offloading not supported by this model")
-                    except Exception as e:
-                        logger.warning(f"Failed to enable CPU offloading: {str(e)}")
-                
-                if ENABLE_BETTERTRANSFORMER:
-                    try:
-                        from optimum.bettertransformer import BetterTransformer
-                        self.model = BetterTransformer.transform(self.model)
-                        logger.info("BetterTransformer enabled")
-                    except Exception as e:
-                        logger.warning(f"BetterTransformer not available: {str(e)}")
+                self.model = self._apply_optimizations(self.model)
                 
                 self.current_model = model_id
                 if model_id in MODEL_REGISTRY:
@@ -210,28 +186,23 @@ class ModelManager:
                 else:
                     self.model_config = {"max_length": DEFAULT_MAX_LENGTH}
                 
-                # Move model to device
-                device = "cuda" if torch.cuda.is_available() else "cpu"
-                self.model = self.model.to(device)
-                logger.info(f"Model loaded successfully on {device}")
-                
+                logger.info(f"{Fore.GREEN}✓ Model '{model_id}' loaded successfully{Style.RESET_ALL}")
                 return True
                 
             except Exception as e:
-                logger.error(f"Error loading model components: {str(e)}")
+                logger.error(f"{Fore.RED}✗ Error loading model {model_id}: {str(e)}{Style.RESET_ALL}")
                 if self.model is not None:
                     del self.model
                     self.model = None
                     torch.cuda.empty_cache()
                     gc.collect()
                 
-                # Attempt fallback if available
                 fallback_model = None
                 if self.model_config and self.model_config.get("fallback") and self.model_config.get("fallback") != model_id:
                     fallback_model = self.model_config.get("fallback")
                 
                 if fallback_model:
-                    logger.warning(f"Attempting to load fallback model: {fallback_model}")
+                    logger.warning(f"{Fore.YELLOW}! Attempting to load fallback model: {fallback_model}{Style.RESET_ALL}")
                     return await self.load_model(fallback_model)
                 else:
                     raise HTTPException(
@@ -240,7 +211,7 @@ class ModelManager:
                     )
                 
         except Exception as e:
-            logger.error(f"Failed to load model {model_id}: {str(e)}")
+            logger.error(f"{Fore.RED}✗ Failed to load model {model_id}: {str(e)}{Style.RESET_ALL}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to load model: {str(e)}"
@@ -265,7 +236,8 @@ class ModelManager:
         stream: bool = False,
         max_length: Optional[int] = None,
         temperature: float = DEFAULT_TEMPERATURE,
-        top_p: float = DEFAULT_TOP_P
+        top_p: float = DEFAULT_TOP_P,
+        system_instructions: Optional[str] = None
     ) -> str:
         """Generate text from the model"""
         # Check model timeout
@@ -275,15 +247,32 @@ class ModelManager:
             await self.load_model(DEFAULT_MODEL)
         
         self.last_used = time.time()
-        max_length = max_length or (self.model_config.get("max_length", DEFAULT_MAX_LENGTH) if self.model_config else DEFAULT_MAX_LENGTH)
         
         try:
-            inputs = self.tokenizer(prompt, return_tensors="pt")
+            # Get appropriate system instructions
+            from .config import system_instructions
+            instructions = str(system_instructions.get_instructions(self.current_model)) if not system_instructions else str(system_instructions)
+            
+            # Format prompt with system instructions
+            formatted_prompt = f"""<|system|>{instructions}</|system|>\n<|user|>{prompt}</|user|>\n<|assistant|>"""
+            
+            # Handle max_length properly
+            try:
+                if max_length is not None:
+                    max_length = int(max_length)  # Convert to integer if provided
+                else:
+                    max_length = self.model_config.get("max_length", DEFAULT_MAX_LENGTH) if self.model_config else DEFAULT_MAX_LENGTH
+                    max_length = int(max_length)  # Ensure it's an integer
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Invalid max_length value: {max_length}. Using default: {DEFAULT_MAX_LENGTH}")
+                max_length = DEFAULT_MAX_LENGTH
+            
+            inputs = self.tokenizer(formatted_prompt, return_tensors="pt")
             for key in inputs:
                 inputs[key] = inputs[key].to(self.device)
             
             if stream:
-                return self._stream_generate(inputs, max_length, temperature, top_p)
+                return self.async_stream_generate(inputs, max_length, temperature, top_p)
             
             with torch.no_grad():
                 outputs = self.model.generate(
@@ -295,7 +284,10 @@ class ModelManager:
                     pad_token_id=self.tokenizer.eos_token_id
                 )
             
-            return self.tokenizer.decode(outputs[0][len(inputs["input_ids"][0]):], skip_special_tokens=True)
+            response = self.tokenizer.decode(outputs[0][len(inputs["input_ids"][0]):], skip_special_tokens=True)
+            # Clean up response by removing system and user prompts if they got repeated
+            response = response.replace(str(instructions), "").replace(prompt, "").strip()
+            return response
             
         except Exception as e:
             logger.error(f"Generation failed: {str(e)}")
@@ -332,6 +324,12 @@ class ModelManager:
             logger.error(f"Streaming generation failed: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Streaming generation failed: {str(e)}")
     
+    async def async_stream_generate(self, inputs: Dict[str, torch.Tensor], max_length: int, temperature: float, top_p: float):
+        """Convert the synchronous stream generator to an async generator."""
+        for token in self._stream_generate(inputs, max_length, temperature, top_p):
+            yield token
+            await asyncio.sleep(0)
+    
     def get_model_info(self) -> Dict[str, Any]:
         """Get information about the currently loaded model"""
         if not self.current_model:
@@ -340,22 +338,24 @@ class ModelManager:
         memory_used = 0
         if self.model:
             memory_used = sum(p.numel() * p.element_size() for p in self.model.parameters())
+            num_parameters = sum(p.numel() for p in self.model.parameters())
         
-        # Safely retrieve model config values
         model_name = self.model_config.get("name", self.current_model) if isinstance(self.model_config, dict) else self.current_model
         max_length = self.model_config.get("max_length", DEFAULT_MAX_LENGTH) if isinstance(self.model_config, dict) else DEFAULT_MAX_LENGTH
         ram_required = self.model_config.get("ram", "Unknown") if isinstance(self.model_config, dict) else "Unknown"
         vram_required = self.model_config.get("vram", "Unknown") if isinstance(self.model_config, dict) else "Unknown"
         
-        return {
+        model_info = {
             "model_id": self.current_model,
             "model_name": model_name,
+            "parameters": f"{num_parameters/1e6:.1f}M",
+            "architecture": self.model.__class__.__name__ if self.model else "Unknown",
             "device": self.device,
             "max_length": max_length,
             "ram_required": ram_required,
             "vram_required": vram_required,
             "memory_used": f"{memory_used / (1024 * 1024):.2f} MB",
-            "quantization": QUANTIZATION_TYPE,
+            "quantization": QUANTIZATION_TYPE if ENABLE_QUANTIZATION else "None",
             "optimizations": {
                 "attention_slicing": ENABLE_ATTENTION_SLICING,
                 "flash_attention": ENABLE_FLASH_ATTENTION,
@@ -363,30 +363,47 @@ class ModelManager:
             }
         }
 
+        # Log detailed model information
+        logger.info(f"""
+{Fore.CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Style.RESET_ALL}
+{Fore.GREEN}📊 Model Information{Style.RESET_ALL}
+{Fore.CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Style.RESET_ALL}
+
+• Model: {Fore.YELLOW}{model_name}{Style.RESET_ALL}
+• Parameters: {Fore.YELLOW}{model_info['parameters']}{Style.RESET_ALL}
+• Architecture: {Fore.YELLOW}{model_info['architecture']}{Style.RESET_ALL}
+• Device: {Fore.YELLOW}{self.device}{Style.RESET_ALL}
+• Memory Used: {Fore.YELLOW}{model_info['memory_used']}{Style.RESET_ALL}
+• Quantization: {Fore.YELLOW}{model_info['quantization']}{Style.RESET_ALL}
+
+{Fore.GREEN}🔧 Optimizations{Style.RESET_ALL}
+• Attention Slicing: {Fore.YELLOW}{str(ENABLE_ATTENTION_SLICING)}{Style.RESET_ALL}
+• Flash Attention: {Fore.YELLOW}{str(ENABLE_FLASH_ATTENTION)}{Style.RESET_ALL}
+• Better Transformer: {Fore.YELLOW}{str(ENABLE_BETTERTRANSFORMER)}{Style.RESET_ALL}
+""")
+        
+        return model_info
+
     async def load_custom_model(self, model_name: str, fallback_model: Optional[str] = "qwen-0.5b") -> bool:
         """Load a custom model from Hugging Face Hub with resource checks"""
         try:
-            # First, try to get model info from Hugging Face
             from huggingface_hub import model_info
             info = model_info(model_name)
             
-            # Estimate resource requirements (rough estimation)
-            estimated_ram = info.siblings[0].size / (1024 * 1024)  # Convert to MB
-            estimated_vram = estimated_ram * 1.5  # Rough VRAM estimate
+            estimated_ram = info.siblings[0].size / (1024 * 1024)
+            estimated_vram = estimated_ram * 1.5
             
-            # Create temporary model config
             temp_config = {
                 "name": model_name,
                 "ram": estimated_ram,
                 "vram": estimated_vram,
-                "max_length": 2048,  # Default max length
+                "max_length": 2048,
                 "fallback": fallback_model,
                 "description": f"Custom model: {info.description}",
-                "quantization": "int8",  # Default to int8 quantization for custom models
+                "quantization": "int8",
                 "tags": info.tags
             }
             
-            # Check resource availability
             if not check_resource_availability(temp_config["ram"]):
                 if fallback_model:
                     logger.warning(
@@ -400,20 +417,17 @@ class ModelManager:
                     detail=f"Insufficient resources. Model requires ~{format_model_size(temp_config['ram'])} RAM"
                 )
             
-            # Clean up previous model
             if self.model:
                 del self.model
                 torch.cuda.empty_cache()
             
             logger.info(f"Loading custom model: {model_name}")
             
-            # Get quantization config
             quant_config = BitsAndBytesConfig(
                 load_in_8bit=True,
                 llm_int8_threshold=6.0
             )
             
-            # Try to load the model
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
@@ -422,10 +436,8 @@ class ModelManager:
                 quantization_config=quant_config
             )
             
-            # Apply optimizations
             self.model = self._apply_optimizations(self.model)
             
-            # Update model info
             self.current_model = f"custom/{model_name}"
             self.model_config = temp_config
             self.last_used = time.time()

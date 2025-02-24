@@ -335,7 +335,6 @@ response = await debugger.profile_generation("Hello")
 
 ## Additional Resources
 
-- [Colab Pro Guide](./colab-pro.md)
-- [Performance Guide](./performance.md)
+- [Performance Guide](../features/performance.md)
 - [Troubleshooting Guide](./troubleshooting.md)
 - [Examples](./examples.md)

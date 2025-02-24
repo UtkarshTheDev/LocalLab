@@ -5,6 +5,7 @@ import torch
 import psutil
 from huggingface_hub import model_info, HfApi
 import logging
+from pathlib import Path
 
 def get_env_var(key: str, *, default: Any = None, var_type: Type = str) -> Any:
     """Get environment variable with type conversion and validation.
@@ -40,9 +41,9 @@ CORS_ORIGINS = get_env_var("CORS_ORIGINS", default="*").split(",")
 
 # Model settings
 DEFAULT_MODEL = get_env_var("DEFAULT_MODEL", default="microsoft/phi-2")
-DEFAULT_MAX_LENGTH = get_env_var("DEFAULT_MAX_LENGTH", default="2048", var_type=int)
-DEFAULT_TEMPERATURE = get_env_var("DEFAULT_TEMPERATURE", default="0.7", var_type=float)
-DEFAULT_TOP_P = get_env_var("DEFAULT_TOP_P", default="0.9", var_type=float)
+DEFAULT_MAX_LENGTH = get_env_var("DEFAULT_MAX_LENGTH", default=2048, var_type=int)
+DEFAULT_TEMPERATURE = get_env_var("DEFAULT_TEMPERATURE", default=0.7, var_type=float)
+DEFAULT_TOP_P = get_env_var("DEFAULT_TOP_P", default=0.9, var_type=float)
 
 # Optimization settings
 ENABLE_QUANTIZATION = get_env_var("ENABLE_QUANTIZATION", default="true", var_type=bool)
@@ -335,3 +336,79 @@ RATE_LIMIT = {
     "burst_size": 10
 }
 ENABLE_REQUEST_VALIDATION = True
+
+# System instructions configuration
+DEFAULT_SYSTEM_INSTRUCTIONS = """You are a helpful virtual assistant. Your responses should be:
+1. Concise and direct - Get straight to the point
+2. Professional and polite - Maintain a helpful tone
+3. Relevant to the user's question - Stay on topic
+4. Task-focused and practical - Provide actionable information
+
+Keep responses short unless specifically asked for detailed information.
+Respond directly to greetings with simple, friendly responses."""
+
+def get_model_generation_params() -> dict:
+    return {
+        "max_length": get_env_var("LOCALLAB_MODEL_MAX_LENGTH", default=DEFAULT_MAX_LENGTH, var_type=int),
+        "temperature": get_env_var("LOCALLAB_MODEL_TEMPERATURE", default=DEFAULT_TEMPERATURE, var_type=float),
+        "top_p": get_env_var("LOCALLAB_MODEL_TOP_P", default=DEFAULT_TOP_P, var_type=float),
+    }
+
+class SystemInstructions:
+    def __init__(self):
+        self.config_dir = Path.home() / ".locallab"
+        self.config_file = self.config_dir / "system_instructions.json"
+        self.global_instructions = DEFAULT_SYSTEM_INSTRUCTIONS
+        self.model_instructions: Dict[str, str] = {}
+        self.load_config()
+
+    def load_config(self):
+        """Load system instructions from config file"""
+        try:
+            if self.config_file.exists():
+                with open(self.config_file, 'r') as f:
+                    config = json.load(f)
+                    self.global_instructions = config.get('global', DEFAULT_SYSTEM_INSTRUCTIONS)
+                    self.model_instructions = config.get('models', {})
+        except Exception as e:
+            logger.warning(f"Failed to load system instructions: {e}")
+
+    def save_config(self):
+        """Save system instructions to config file"""
+        try:
+            self.config_dir.mkdir(exist_ok=True)
+            with open(self.config_file, 'w') as f:
+                json.dump({
+                    'global': self.global_instructions,
+                    'models': self.model_instructions
+                }, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save system instructions: {e}")
+
+    def get_instructions(self, model_id: Optional[str] = None) -> str:
+        """Get system instructions for a model"""
+        if model_id and model_id in self.model_instructions:
+            return self.model_instructions[model_id]
+        return self.global_instructions
+
+    def set_global_instructions(self, instructions: str):
+        """Set global system instructions"""
+        self.global_instructions = instructions
+        self.save_config()
+
+    def set_model_instructions(self, model_id: str, instructions: str):
+        """Set model-specific system instructions"""
+        self.model_instructions[model_id] = instructions
+        self.save_config()
+
+    def reset_instructions(self, model_id: Optional[str] = None):
+        """Reset instructions to default"""
+        if model_id:
+            self.model_instructions.pop(model_id, None)
+        else:
+            self.global_instructions = DEFAULT_SYSTEM_INSTRUCTIONS
+            self.model_instructions.clear()
+        self.save_config()
+
+# Initialize system instructions
+system_instructions = SystemInstructions()

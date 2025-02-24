@@ -23,20 +23,20 @@ Generate text using the loaded model.
 **Response:**
 ```json
 {
-  "response": "string"
+  "response": "string",
+  "usage": {
+    "prompt_tokens": "integer",
+    "completion_tokens": "integer",
+    "total_tokens": "integer"
+  }
 }
 ```
 
-**Example:**
-```python
-import requests
-
-response = requests.post("http://localhost:8000/generate", json={
-    "prompt": "Write a story about a robot",
-    "temperature": 0.8
-})
-print(response.json()["response"])
-```
+**Error Responses:**
+- `400 Bad Request`: Invalid parameters
+- `413 Payload Too Large`: Input too long
+- `429 Too Many Requests`: Rate limit exceeded
+- `500 Internal Server Error`: Model error
 
 ### Chat Completion
 
@@ -69,9 +69,15 @@ Chat completion endpoint similar to OpenAI's API.
       "message": {
         "role": "assistant",
         "content": "string"
-      }
+      },
+      "finish_reason": "stop"
     }
-  ]
+  ],
+  "usage": {
+    "prompt_tokens": "integer",
+    "completion_tokens": "integer",
+    "total_tokens": "integer"
+  }
 }
 ```
 
@@ -121,6 +127,11 @@ Error responses include a detail message:
 - Burst size of 10 requests
 
 ## Related Documentation
-- [Deployment Guide](./DEPLOYMENT.md)
+- [Getting Started](./getting-started.md)
 - [Features Guide](./features/README.md)
+- [Local Deployment](./local_deployment.md)
 - [Troubleshooting Guide](./TROUBLESHOOTING.md)
+
+---
+Made with ❤️ by Utkarsh Tiwari  
+GitHub: [Developer-Utkarsh](https://github.com/Developer-Utkarsh) | Twitter: [@UtkarshTheDev](https://twitter.com/UtkarshTheDev) | LinkedIn: [utkarshthedev](https://linkedin.com/in/utkarshthedev)

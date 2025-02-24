@@ -7,13 +7,22 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.inmemory import InMemoryBackend
 from pydantic import BaseModel
+from typing import Optional, Dict, Any, List, Tuple, Generator
 import nest_asyncio
-from pyngrok import ngrok
-from typing import Optional, Dict, Any, List, Tuple
+from pyngrok import ngrok, conf
 import time
 import psutil
 import torch
+from colorama import Fore, Style, init
+import asyncio
+import gc
+import signal
+import sys
+from contextlib import contextmanager
+import requests
+import multiprocessing
 
+from . import __version__  # Import version from package
 from .model_manager import ModelManager
 from .config import (
     SERVER_HOST,
@@ -27,7 +36,14 @@ from .config import (
     ENABLE_FLASH_ATTENTION,
     ENABLE_ATTENTION_SLICING,
     ENABLE_CPU_OFFLOADING,
-    ENABLE_BETTERTRANSFORMER
+    ENABLE_BETTERTRANSFORMER,
+    system_instructions,
+    DEFAULT_SYSTEM_INSTRUCTIONS,
+    MODEL_REGISTRY,
+    DEFAULT_MAX_LENGTH,
+    DEFAULT_TEMPERATURE,
+    DEFAULT_TOP_P,
+    get_model_generation_params
 )
 
 # Track server start time
@@ -37,7 +53,7 @@ start_time = time.time()
 app = FastAPI(
     title="LocalLab",
     description="A lightweight AI inference server for running models locally or in Google Colab",
-    version="0.1.9"
+    version="0.3.4"
 )
 
 # Configure logging
@@ -68,6 +84,10 @@ if ENABLE_CORS:
 request_count = 0
 
 # Pydantic models for request validation
+class SystemInstructionsRequest(BaseModel):
+    instructions: str
+    model_id: Optional[str] = None
+
 class GenerateRequest(BaseModel):
     prompt: str
     model_id: Optional[str] = None
@@ -75,6 +95,7 @@ class GenerateRequest(BaseModel):
     max_length: Optional[int] = None
     temperature: float = 0.7
     top_p: float = 0.9
+    system_instructions: Optional[str] = None
 
 class ModelLoadRequest(BaseModel):
     model_id: str
@@ -108,6 +129,35 @@ class SystemInfoResponse(BaseModel):
     request_count: int
 
 # API endpoints
+@app.post("/system/instructions")
+async def update_system_instructions(request: SystemInstructionsRequest) -> Dict[str, str]:
+    """Update system instructions"""
+    try:
+        if request.model_id:
+            system_instructions.set_model_instructions(request.model_id, request.instructions)
+            return {"message": f"Updated system instructions for model {request.model_id}"}
+        else:
+            system_instructions.set_global_instructions(request.instructions)
+            return {"message": "Updated global system instructions"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/system/instructions")
+async def get_system_instructions(model_id: Optional[str] = None) -> Dict[str, Any]:
+    """Get current system instructions"""
+    return {
+        "instructions": system_instructions.get_instructions(model_id),
+        "model_id": model_id if model_id else "global"
+    }
+
+@app.post("/system/instructions/reset")
+async def reset_system_instructions(model_id: Optional[str] = None) -> Dict[str, str]:
+    """Reset system instructions to default"""
+    system_instructions.reset_instructions(model_id)
+    return {
+        "message": f"Reset system instructions for {'model ' + model_id if model_id else 'all models'}"
+    }
+
 @app.post("/generate")
 async def generate_text(request: GenerateRequest) -> Dict[str, Any]:
     """Generate text using the loaded model"""
@@ -116,25 +166,29 @@ async def generate_text(request: GenerateRequest) -> Dict[str, Any]:
             await model_manager.load_model(request.model_id)
         
         if request.stream:
-            return StreamingResponse(
-                model_manager.generate(
+            async def stream_wrapper():
+                # Call generate() with stream=True; do not await it directly.
+                async_gen = await model_manager.generate(
                     request.prompt,
                     stream=True,
                     max_length=request.max_length,
                     temperature=request.temperature,
-                    top_p=request.top_p
-                ),
-                media_type="text/event-stream"
-            )
+                    top_p=request.top_p,
+                    system_instructions=request.system_instructions
+                )
+                async for token in async_gen:
+                    yield token
+            
+            return StreamingResponse(stream_wrapper(), media_type="text/event-stream")
         
         response = await model_manager.generate(
             request.prompt,
             max_length=request.max_length,
             temperature=request.temperature,
-            top_p=request.top_p
+            top_p=request.top_p,
+            system_instructions=request.system_instructions
         )
         return {"response": response}
-    
     except Exception as e:
         logger.error(f"Generation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -157,7 +211,6 @@ async def get_current_model() -> Dict[str, Any]:
 @app.get("/models/available")
 async def list_available_models() -> Dict[str, Any]:
     """List all available models in the registry"""
-    from .config import MODEL_REGISTRY
     return {"models": MODEL_REGISTRY}
 
 @app.get("/health")
@@ -177,16 +230,18 @@ async def chat_completion(request: ChatRequest) -> Dict[str, Any]:
         formatted_prompt = "\n".join([f"{msg.role}: {msg.content}" for msg in request.messages])
         
         if request.stream:
-            return StreamingResponse(
-                model_manager.generate(
+            async def stream_wrapper_chat():
+                async_gen = await model_manager.generate(
                     formatted_prompt,
                     stream=True,
                     max_length=request.max_length,
                     temperature=request.temperature,
                     top_p=request.top_p
-                ),
-                media_type="text/event-stream"
-            )
+                )
+                async for token in async_gen:
+                    yield token
+            
+            return StreamingResponse(stream_wrapper_chat(), media_type="text/event-stream")
         
         response = await model_manager.generate(
             formatted_prompt,
@@ -297,22 +352,224 @@ async def count_requests(request: Request, call_next):
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize the server on startup"""
+    """Initialize server on startup"""
     try:
-        logger.info("Starting LocalLab server...")
-        logger.info(f"Default model: {DEFAULT_MODEL}")
+        import sys
+        # ASCII Art Banner
+        banner = f"""
+{Fore.CYAN}
+    ██╗      ██████╗  ██████╗ █████╗ ██╗     ██╗      █████╗ ██████╗ 
+    ██║     ██╔═══██╗██╔════╝██╔══██╗██║     ██║     ██╔══██╗██╔══██╗
+    ██║     ██║   ██║██║     ███████║██║     ██║     ███████║██████╔╝
+    ██║     ██║   ██║██║     ██╔══██║██║     ██║     ██╔══██║██╔══██╗
+    ███████╗╚██████╔╝╚██████╗██║  ██║███████╗███████╗██║  ██║██████╔╝
+    ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝ 
+{Style.RESET_ALL}"""
         
-        # Load default model
-        await model_manager.load_model(DEFAULT_MODEL)
+        # In Google Colab, explicitly print the banner to ensure visibility
+        print(banner)
+        sys.stdout.flush()
+        logger.info(banner)
+        sys.stdout.flush()
+        logger.info(f"{Fore.GREEN}Version: {__version__}{Style.RESET_ALL}")
+        logger.info(f"{Fore.GREEN}Status: Starting server...{Style.RESET_ALL}")
+        logger.info("\n" + "═" * 80)
+        sys.stdout.flush()
+
+        # Active Model Details
+        hf_model = os.getenv("HUGGINGFACE_MODEL", DEFAULT_MODEL)
+        gen_params = get_model_generation_params()
+        model_details = f"""
+{Fore.CYAN}┌────────────────────── Active Model Details ───────────────────────┐{Style.RESET_ALL}
+│
+│  📚 Model Information:
+│  • Name: {Fore.YELLOW}{hf_model}{Style.RESET_ALL}
+│  • Type: {Fore.YELLOW}{'Custom HuggingFace Model' if hf_model != DEFAULT_MODEL else 'Default Model'}{Style.RESET_ALL}
+│  • Status: {Fore.GREEN}Loading...{Style.RESET_ALL}
+│
+│  ⚙️ Model Settings:
+│  • Max Length: {Fore.YELLOW}{gen_params['max_length']}{Style.RESET_ALL}
+│  • Temperature: {Fore.YELLOW}{gen_params['temperature']}{Style.RESET_ALL}
+│  • Top P: {Fore.YELLOW}{gen_params['top_p']}{Style.RESET_ALL}
+│
+{Fore.CYAN}└───────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
+"""
+        print(model_details)
+        sys.stdout.flush()
+        logger.info(model_details)
+        sys.stdout.flush()
+
+        # Model Configuration with better formatting
+        model_config = f"""
+{Fore.CYAN}┌──────────────────────── Model Configuration ────────────────────────┐{Style.RESET_ALL}
+│
+│  🤖 Available Models:
+│  • Default: {Fore.YELLOW}{DEFAULT_MODEL}{Style.RESET_ALL}
+│  • Registry: {Fore.YELLOW}{', '.join(MODEL_REGISTRY.keys())}{Style.RESET_ALL}
+│
+│  🔧 Optimizations:
+│  • Quantization: {Fore.GREEN if ENABLE_COMPRESSION else Fore.RED}{QUANTIZATION_TYPE if ENABLE_COMPRESSION else 'Disabled'}{Style.RESET_ALL}
+│  • Flash Attention: {Fore.GREEN if ENABLE_FLASH_ATTENTION else Fore.RED}{str(ENABLE_FLASH_ATTENTION)}{Style.RESET_ALL}
+│  • Attention Slicing: {Fore.GREEN if ENABLE_ATTENTION_SLICING else Fore.RED}{str(ENABLE_ATTENTION_SLICING)}{Style.RESET_ALL}
+│  • CPU Offloading: {Fore.GREEN if ENABLE_CPU_OFFLOADING else Fore.RED}{str(ENABLE_CPU_OFFLOADING)}{Style.RESET_ALL}
+│
+{Fore.CYAN}└────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
+"""
+        print(model_config)
+        sys.stdout.flush()
+        logger.info(model_config)
+        sys.stdout.flush()
+
+        # Load model with progress indicator
+        logger.info(f"\n{Fore.YELLOW}⚡ Loading model: {hf_model}{Style.RESET_ALL}")
+        await model_manager.load_model(hf_model)
+        logger.info(f"{Fore.GREEN}✓ Model loaded successfully!{Style.RESET_ALL}\n")
+        sys.stdout.flush()
+
+        # System Resources with box drawing
+        resources = f"""
+{Fore.CYAN}┌──────────────────────── System Resources ──────────────────────────┐{Style.RESET_ALL}
+│
+│  💻 Hardware:
+│  • CPU Cores: {Fore.YELLOW}{psutil.cpu_count()}{Style.RESET_ALL}
+│  • CPU Usage: {Fore.YELLOW}{psutil.cpu_percent()}%{Style.RESET_ALL}
+│  • Memory: {Fore.YELLOW}{psutil.virtual_memory().percent}% used{Style.RESET_ALL}
+│  • GPU: {Fore.YELLOW}{torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'Not Available'}{Style.RESET_ALL}
+│
+{Fore.CYAN}└────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
+"""
+        print(resources)
+        sys.stdout.flush()
+        logger.info(resources)
+        sys.stdout.flush()
+
+        # API Documentation with better formatting
+        api_docs = f"""
+{Fore.CYAN}┌────────────────────────── API Overview ─────────────────────────────┐{Style.RESET_ALL}
+│
+│  🔤 Text Generation:
+│   • POST /generate     - Generate text from prompt
+│   • POST /chat        - Interactive chat completion
+│   • POST /batch       - Batch text generation
+│
+│  🔄 Model Management:
+│   • GET  /models      - List available models
+│   • GET  /model       - Get current model info
+│   • POST /model/load  - Load a specific model
+│
+│  📊 System:
+│   • GET  /health      - Check server health
+│   • GET  /system      - Get system statistics
+│
+{Fore.CYAN}└────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
+"""
+        print(api_docs)
+        sys.stdout.flush()
+        logger.info(api_docs)
+        sys.stdout.flush()
+
+        # Quick Start Guide
+        quickstart = f"""
+{Fore.CYAN}┌─────────────────────── Quick Start Guide ───────────────────────────┐{Style.RESET_ALL}
+│
+│  🚀 Example Usage:
+│
+│  1. Generate Text:
+│     curl -X POST "https://<NGROK_PUBLIC_URL>/generate" \\
+│     -H "Content-Type: application/json" \\
+│     -d '{{"prompt": "Once upon a time"}}'
+│
+│  2. Chat Completion:
+│     curl -X POST "https://<NGROK_PUBLIC_URL>/chat" \\
+│     -H "Content-Type: application/json" \\
+│     -d '{{"messages": [{{"role": "user", "content": "Hello!"}}]}}'
+│
+│  🔗 Replace <NGROK_PUBLIC_URL> with the public URL shown in the Server URLs section
+│
+{Fore.CYAN}└────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
+"""
+        print(quickstart)
+        sys.stdout.flush()
+        logger.info(quickstart)
+        sys.stdout.flush()
+
+        # Footer with social links and ASCII art
+        footer = f"""
+{Fore.CYAN}
+    ╔════════════════════════════════════════════════════════════════════╗
+    ║                                                                  ║
+    ║  {Fore.GREEN}LocalLab - Your Local AI Inference Server{Fore.CYAN}                    ║
+    ║  {Fore.GREEN}Made with ❤️  by Utkarsh Tiwari{Fore.CYAN}                             ║
+    ║                                                                  ║
+    ╚══════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
+
+{Fore.YELLOW}🔗 Connect & Contribute:{Style.RESET_ALL}
+• GitHub:   {Fore.CYAN}https://github.com/Developer-Utkarsh{Style.RESET_ALL}
+• Twitter:  {Fore.CYAN}https://twitter.com/UtkarshTheDev{Style.RESET_ALL}
+• LinkedIn: {Fore.CYAN}https://linkedin.com/in/utkarshthedev{Style.RESET_ALL}
+
+{Fore.GREEN}✨ Server is ready! Happy generating! 🚀{Style.RESET_ALL}
+"""
+        print(footer)
+        sys.stdout.flush()
+        logger.info(footer)
+        sys.stdout.flush()
+
+    except Exception as e:
+        error_msg = f"""
+{Fore.RED}╔══════════════════════════════════════════════════════════════════╗{Style.RESET_ALL}
+{Fore.RED}║                              ERROR                                   ║{Style.RESET_ALL}
+{Fore.RED}╚══════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
+
+{str(e)}
+
+{Fore.YELLOW}💡 Need help? Check the documentation or open an issue on GitHub.{Style.RESET_ALL}
+"""
+        print(error_msg)
+        sys.stdout.flush()
+        logger.error(error_msg)
+        raise
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup resources on server shutdown"""
+    try:
+        # Display goodbye message
+        print("\n" + "=" * 80)
+        print("👋 Shutting down LocalLab server...")
         
-        model_info = model_manager.get_model_info()
-        logger.info(f"Model loaded successfully: {model_info['model_name']}")
-        logger.info(f"Device: {model_info['device']}")
-        logger.info(f"Memory used: {model_info['memory_used']}")
+        # Clean up ngrok tunnels with improved error handling
+        if ngrok.get_tunnels():
+            for tunnel in ngrok.get_tunnels():
+                try:
+                    ngrok.disconnect(tunnel.public_url)
+                except Exception as e:
+                    if "ERR_NGROK_4018" in str(e):
+                        logger.warning("Ngrok auth token not set or invalid. Skipping ngrok cleanup.")
+                    else:
+                        logger.warning("Failed to disconnect ngrok tunnel: " + str(e))
+        
+        # Clean up model resources
+        if model_manager.model is not None:
+            try:
+                del model_manager.model
+                del model_manager.tokenizer
+                model_manager.model = None
+                model_manager.tokenizer = None
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                gc.collect()
+            except Exception as e:
+                logger.warning("Failed to clean up model resources: " + str(e))
+        
+        print("✅ Cleanup completed successfully")
+        print("=" * 80 + "\n")
         
     except Exception as e:
-        logger.error(f"Startup failed: {str(e)}")
-        raise
+        logger.error("Error during cleanup: " + str(e))
+        print("\n" + "=" * 80)
+        print("❌ Error during cleanup: " + str(e))
+        print("=" * 80 + "\n")
 
 def get_system_resources() -> Dict[str, Any]:
     """Get system resource information"""
@@ -337,75 +594,217 @@ def get_system_resources() -> Dict[str, Any]:
     
     return resources
 
-def start_server(use_ngrok: bool = False):
-    """Start the FastAPI server"""
+@contextmanager
+def handle_shutdown():
+    """Context manager for graceful shutdown"""
     try:
-        # Log system information
-        resources = get_system_resources()
-        logger.info("System Information:")
-        logger.info(f"CPU Cores: {resources['cpu_count']}")
-        logger.info(f"Total RAM: {resources['ram_total']:.2f} MB")
-        logger.info(f"Available RAM: {resources['ram_available']:.2f} MB")
-        
-        if resources['gpu_available']:
-            logger.info("GPU Information:")
-            for i, gpu in enumerate(resources['gpu_info']):
-                logger.info(f"GPU {i}: {gpu['name']}")
-                logger.info(f"GPU Memory: {gpu['total_memory']:.2f} MB")
-        else:
-            logger.warning("No GPU detected, running in CPU mode")
-
-        # Log configuration
-        logger.info("\nConfiguration:")
-        logger.info(f"Default Model: {DEFAULT_MODEL}")
-        logger.info(f"Quantization: {QUANTIZATION_TYPE}")
-        logger.info(f"Flash Attention: {ENABLE_FLASH_ATTENTION}")
-        logger.info(f"Attention Slicing: {ENABLE_ATTENTION_SLICING}")
-        logger.info(f"CPU Offloading: {ENABLE_CPU_OFFLOADING}")
-        logger.info(f"BetterTransformer: {ENABLE_BETTERTRANSFORMER}")
-        
-        if use_ngrok:
-            # Configure ngrok
-            if not NGROK_AUTH_TOKEN:
-                error_msg = (
-                    "NGROK_AUTH_TOKEN not set. Please set it using:\n"
-                    "import os\n"
-                    "os.environ['NGROK_AUTH_TOKEN'] = 'your_token_here'\n"
-                    "before calling start_server()"
-                )
-                logger.error(error_msg)
-                raise ValueError("NGROK_AUTH_TOKEN is required when use_ngrok=True")
-            
-            logger.info("\nConfiguring ngrok...")
-            ngrok.set_auth_token(NGROK_AUTH_TOKEN)
-            public_url = ngrok.connect(SERVER_PORT).public_url
-            logger.info(f"Public URL: {public_url}")
-        
-        # Enable asyncio event loop in Jupyter/Colab
-        nest_asyncio.apply()
-        
-        # Log server settings
-        logger.info("\nServer Settings:")
-        logger.info(f"Host: {SERVER_HOST}")
-        logger.info(f"Port: {SERVER_PORT}")
-        logger.info(f"CORS Enabled: {ENABLE_CORS}")
-        if ENABLE_CORS:
-            logger.info(f"CORS Origins: {CORS_ORIGINS}")
-        
-        # Start the server
-        logger.info("\nStarting server...")
-        uvicorn.run(
-            app,
-            host=SERVER_HOST,
-            port=SERVER_PORT,
-            log_level="info"
-        )
-    
+        yield
+    except KeyboardInterrupt:
+        print(f"\n{Fore.YELLOW}Received keyboard interrupt, shutting down...{Style.RESET_ALL}")
     except Exception as e:
-        error_msg = f"Server startup failed: {str(e)}"
-        logger.error(error_msg)
-        logger.exception("Full traceback:")
-        raise RuntimeError(error_msg) from e
+        print(f"\n{Fore.RED}Error: {str(e)}{Style.RESET_ALL}")
+    finally:
+        try:
+            # Run shutdown cleanup
+            loop = asyncio.get_event_loop()
+            if not loop.is_closed():
+                loop.run_until_complete(shutdown_event())
+        except Exception as e:
+            logger.error(f"Error during cleanup: {str(e)}")
+
+def signal_handler(signum, frame):
+    """Handle system signals"""
+    print(f"\n{Fore.YELLOW}Received signal {signum}, shutting down...{Style.RESET_ALL}")
+    # Don't call sys.exit directly in Colab
+    if "COLAB_GPU" in os.environ:
+        # Graceful shutdown for Colab
+        asyncio.get_event_loop().stop()
+    else:
+        sys.exit(0)
+
+def setup_ngrok(port: int = 8000, max_retries: int = 3) -> Optional[str]:
+    """Setup ngrok tunnel with retry logic and validation"""
+    ngrok_token = os.getenv("NGROK_AUTH_TOKEN")
+    
+    if not ngrok_token:
+        logger.error("NGROK_AUTH_TOKEN environment variable not set")
+        return None
+        
+    # Validate token format
+    if not isinstance(ngrok_token, str) or len(ngrok_token) < 30:
+        logger.error("Invalid NGROK_AUTH_TOKEN format")
+        return None
+    
+    for attempt in range(max_retries):
+        try:
+            # Configure ngrok
+            conf.get_default().auth_token = ngrok_token
+            conf.get_default().region = "us"  # or other region as needed
+            
+            # Kill any existing ngrok processes
+            ngrok.kill()
+            time.sleep(2)  # Added delay to allow previous tunnels to close
+            
+            # Start new tunnel
+            tunnel = ngrok.connect(port, "http")
+            
+            # Verify tunnel
+            public_url = tunnel.public_url
+            if not public_url.startswith("http"):
+                raise ValueError("Invalid tunnel URL")
+                
+            # Test connection
+            response = requests.get(f"{public_url}/health", timeout=5)
+            if response.status_code != 200:
+                raise ConnectionError("Tunnel health check failed")
+                
+            logger.info(f"Ngrok tunnel established: {public_url}")
+            return public_url
+            
+        except Exception as e:
+            logger.warning(f"Ngrok connection attempt {attempt + 1} failed: {str(e)}")
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)  # Exponential backoff
+                continue
+            logger.error("Failed to establish ngrok tunnel after all retries")
+            raise
+
+def run_server_proc():
+    try:
+        # Redirect stdout and stderr to 'server.log' to capture all printed output
+        log_file = "server.log"
+        sys.stdout = open(log_file, "a", buffering=1)
+        sys.stderr = open(log_file, "a", buffering=1)
+
+        if "COLAB_GPU" in os.environ:
+            import nest_asyncio
+            nest_asyncio.apply()
+            # Set reload to False in COLAB
+            config = uvicorn.Config(app, host="0.0.0.0", port=8000, reload=False)
+            server = uvicorn.Server(config)
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(server.serve())
+        else:
+            # Disable reload and force single worker to avoid multiple processes
+            uvicorn.run(app, host="127.0.0.1", port=8000, reload=False, workers=1)
+    except Exception as e:
+        logger.error(f"Server startup failed: {str(e)}")
+        raise
+
+def start_server(use_ngrok: bool = False):
+    import time
+    import requests
+
+    # Start the server in a separate process using spawn context with module-level run_server_proc
+    ctx = multiprocessing.get_context("spawn")
+    p = ctx.Process(target=run_server_proc)
+    p.start()
+
+    # Wait until the /health endpoint returns 200 or timeout
+    timeout = 30
+    start_time_loop = time.time()
+    health_url = "http://127.0.0.1:8000/health"
+    server_ready = False
+    while time.time() - start_time_loop < timeout:
+        try:
+            response = requests.get(health_url, timeout=5)
+            if response.status_code == 200:
+                server_ready = True
+                break
+        except Exception:
+            pass
+        time.sleep(1)
+
+    if not server_ready:
+        raise Exception("Server did not become healthy in time.")
+
+    if use_ngrok:
+        public_url = setup_ngrok(port=8000)
+        ngrok_section = f"\n{Fore.CYAN}┌────────────────────────── Ngrok Tunnel Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🚀 Ngrok Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
+        logger.info(ngrok_section)
+        print(ngrok_section)
+
+    # Wait indefinitely until a KeyboardInterrupt is received
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt received. Shutting down server...")
+        p.terminate()
+        p.join()
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log API requests with detailed information"""
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = (time.time() - start_time) * 1000
+
+    # Get current resource usage
+    cpu_percent = psutil.cpu_percent()
+    memory = psutil.virtual_memory()
+    gpu_mem = torch.cuda.memory_allocated(0) / 1024**2 if torch.cuda.is_available() else 0
+
+    # Create status color based on response code
+    status_color = Fore.GREEN if response.status_code < 300 else Fore.RED if response.status_code >= 400 else Fore.YELLOW
+
+    # Get endpoint description and other details
+    endpoint_desc = {
+        "/generate": "Text Generation",
+        "/chat": "Chat Completion",
+        "/generate/batch": "Batch Generation",
+        "/models/current": "Current Model Info",
+        "/models/available": "Available Models",
+        "/system/info": "System Status"
+    }.get(request.url.path, "API Request")
+
+    # Format request log with additional active model info
+    log_message = f"""
+{Fore.CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Style.RESET_ALL}
+{Fore.CYAN}{endpoint_desc}{Style.RESET_ALL}
+{Fore.CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Style.RESET_ALL}
+
+• Time: {Fore.GREEN}{time.strftime('%H:%M:%S')}{Style.RESET_ALL}
+• Method: {Fore.MAGENTA}{request.method}{Style.RESET_ALL}
+• Path: {Fore.YELLOW}{request.url.path}{Style.RESET_ALL}
+• Status: {status_color}{response.status_code}{Style.RESET_ALL}
+• Duration: {Fore.GREEN}{process_time:.2f}ms{Style.RESET_ALL}
+
+{Fore.YELLOW}Resource Usage:{Style.RESET_ALL}
+• CPU: {Fore.YELLOW}{cpu_percent}%{Style.RESET_ALL}
+• RAM: {Fore.YELLOW}{memory.percent}%{Style.RESET_ALL}
+• Active Model: {Fore.YELLOW}{model_manager.current_model}{Style.RESET_ALL}
+"""
+    logger.info(log_message)
+    return response
+
+# Define a helper function to tail the log file and print its content to stdout
+import time
+import threading
+
+def tail_log_file(filepath):
+    last_pos = 0
+    while True:
+        try:
+            with open(filepath, 'r') as f:
+                f.seek(last_pos)
+                new_content = f.read()
+                if new_content:
+                    print(new_content, end='')
+                    last_pos = f.tell()
+        except Exception as e:
+            pass
+        time.sleep(1)
 
 if __name__ == "__main__":
-    start_server()
+    import multiprocessing
+    try:
+        multiprocessing.set_start_method("spawn", force=True)
+    except RuntimeError as e:
+        logger.warning("multiprocessing start method already set: " + str(e))
+    
+    import threading
+    tail_thread = threading.Thread(target=tail_log_file, args=("server.log",), daemon=True)
+    tail_thread.start()
+
+    start_server(use_ngrok=True)

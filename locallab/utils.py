@@ -1,7 +1,7 @@
 import os
 import psutil
 import torch
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any
 from .logger import logger
 from .config import MIN_FREE_MEMORY
 
@@ -65,3 +65,28 @@ def format_model_size(size_in_bytes: int) -> str:
             return f"{size_in_bytes:.2f} {unit}"
         size_in_bytes /= 1024
     return f"{size_in_bytes:.2f} TB"
+
+def get_system_resources() -> Dict[str, Any]:
+    """Get system resource information"""
+    resources = {
+        'cpu_count': psutil.cpu_count(),
+        'cpu_usage': psutil.cpu_percent(),  # Added CPU usage
+        'ram_total': psutil.virtual_memory().total / (1024 * 1024),
+        'ram_available': psutil.virtual_memory().available / (1024 * 1024),
+        'memory_usage': psutil.virtual_memory().percent,  # Added memory usage percentage
+        'gpu_available': torch.cuda.is_available(),
+        'gpu_info': []
+    }
+    
+    if resources['gpu_available']:
+        gpu_count = torch.cuda.device_count()
+        for i in range(gpu_count):
+            gpu_mem = get_gpu_memory()
+            if gpu_mem:
+                total_mem, _ = gpu_mem
+                resources['gpu_info'].append({
+                    'name': torch.cuda.get_device_name(i),
+                    'total_memory': total_mem
+                })
+    
+    return resources

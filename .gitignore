@@ -19,12 +19,16 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+Instructions/
 
 # Virtual Environment
 venv/
 env/
 ENV/
 .env
+test_env/
+
+
 
 # IDE
 .idea/

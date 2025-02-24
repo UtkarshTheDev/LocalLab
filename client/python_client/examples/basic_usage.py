@@ -2,11 +2,17 @@ import asyncio
 import os
 from locallab.client import LocalLabClient
 
+# Get the server URL from environment or user input
+SERVER_URL = os.getenv("LOCALLAB_SERVER_URL") or input("Enter the ngrok URL from your Colab notebook: ").strip()
+if not SERVER_URL:
+    raise ValueError("Server URL is required. Get it from your Colab notebook after starting the server.")
+
 async def main():
-    # Initialize client
+    # Initialize client with ngrok URL
     client = LocalLabClient({
-        "base_url": "http://localhost:8000",
+        "base_url": SERVER_URL,  # Use the ngrok URL from Colab
         "api_key": os.getenv("LOCALLAB_API_KEY"),
+        "timeout": 30.0  # Increased timeout for Colab
     })
 
     try:

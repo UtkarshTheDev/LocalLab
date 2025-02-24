@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="locallab",
-    version="0.1.9.5",
+    version="0.0",
     packages=find_packages(include=["locallab", "locallab.*"]),
     install_requires=[
         "fastapi>=0.68.0,<1.0.0",
@@ -20,12 +20,17 @@ setup(
         "fastapi-cache2>=0.1.8",
         "colorama>=0.4.4",
         "pydantic>=2.0.0",
+        "typing-extensions>=4.0.0",  # Added for better type support
         "torch>=2.0.0",
         "websockets>=10.0",
         "huggingface-hub>=0.19.0",
         "optimum>=1.16.0",
         "bitsandbytes>=0.41.1",
         "packaging>=21.0",
+        "rich>=13.0.0",
+        "termcolor>=2.3.0",
+        "tqdm>=4.65.0",
+        "requests>=2.31.0",
     ],
     author="Utkarsh",
     author_email="utkarshweb2023@gmail.com",
@@ -53,4 +58,4 @@ setup(
     package_data={
         "locallab": ["py.typed"],
     },
-) 
+)
