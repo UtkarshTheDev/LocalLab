@@ -726,33 +726,50 @@ def start_server(use_ngrok: bool = False, log_queue=None):
     # If using ngrok, set environment variable to trigger colab branch in run_server_proc
     if use_ngrok:
         os.environ["COLAB_GPU"] = "1"
-        timeout = 60
+        timeout = 120  # Increased timeout for Colab environments
     else:
-        timeout = 30
+        timeout = 60  # Increased timeout for local environments
 
     # Start the server in a separate process using spawn context with module-level run_server_proc
     ctx = multiprocessing.get_context("spawn")
     p = ctx.Process(target=run_server_proc, args=(log_queue,))
     p.start()
 
+    # Allow the server some time to initialize before starting health check
+    logger.info(f"{Fore.YELLOW}Waiting for server to initialize (15 seconds)...{Style.RESET_ALL}")
+    time.sleep(15)  # Increased from 5 to 15 seconds
+
     # Wait until the /health endpoint returns 200 or timeout
+    logger.info(f"{Fore.YELLOW}Starting health checks (timeout: {timeout}s)...{Style.RESET_ALL}")
     start_time_loop = time.time()
     health_url = "http://127.0.0.1:8000/health"
     server_ready = False
     while time.time() - start_time_loop < timeout:
         try:
+            logger.info(f"{Fore.CYAN}Checking server health at {health_url}...{Style.RESET_ALL}")
             response = requests.get(health_url, timeout=5)
             if response.status_code == 200:
                 server_ready = True
+                logger.info(f"{Fore.GREEN}Server is healthy!{Style.RESET_ALL}")
                 break
-        except Exception:
-            pass
-        time.sleep(1)
+            else:
+                logger.warning(f"{Fore.YELLOW}Server returned status code {response.status_code}{Style.RESET_ALL}")
+        except requests.exceptions.ConnectionError:
+            logger.warning(f"{Fore.YELLOW}Connection refused - server not ready yet{Style.RESET_ALL}")
+        except Exception as e:
+            logger.warning(f"{Fore.YELLOW}Health check error: {str(e)}{Style.RESET_ALL}")
+        
+        time.sleep(2)
 
     if not server_ready:
-        raise Exception("Server did not become healthy in time.")
+        logger.error(f"{Fore.RED}Server did not become healthy in time (timeout: {timeout}s).{Style.RESET_ALL}")
+        # Terminate the server process
+        p.terminate()
+        p.join()
+        raise Exception(f"Server did not become healthy in time (timeout: {timeout}s). Check logs for errors.")
 
     if use_ngrok:
+        logger.info(f"{Fore.CYAN}Setting up ngrok tunnel...{Style.RESET_ALL}")
         public_url = setup_ngrok(port=8000)
         ngrok_section = f"\n{Fore.CYAN}┌────────────────────────── Ngrok Tunnel Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🚀 Ngrok Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
         logger.info(ngrok_section)

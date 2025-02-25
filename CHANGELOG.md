@@ -2,6 +2,14 @@
 
 All notable changes for version updates.
 
+## [0.1.5] - 2024-03-01
+
+### Changed
+
+- Extended the initial wait time in start_server from 5 to 15 seconds to allow the server ample time to initialize, especially in Google Colab environments.
+- Increased health check timeout to 120 seconds for ngrok mode and 60 seconds for local mode to accommodate slower startups.
+- Added detailed logging during health checks to aid in debugging startup issues.
+
 ## [0.1.4] - 2024-02-25
 
 ### Changed
