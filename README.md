@@ -51,11 +51,11 @@ Below is a high-level diagram of LocalLab's architecture.
 
 ```mermaid
 graph TD;
-    A[User] --> B["LocalLab Client (Python and Node.js)"];
+    A["User"] --> B["LocalLab Client (Python/Node.js)"];
     B --> C["LocalLab Server"];
     C --> D["Model Manager"];
     D --> E["Hugging Face Models"];
-    C --> F[Optimizations];
+    C --> F["Optimizations"];
     C --> G["Resource Monitoring"];
 ```
 
