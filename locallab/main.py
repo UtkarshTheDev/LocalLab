@@ -14,6 +14,7 @@ import time
 import psutil
 import torch
 from colorama import Fore, Style, init
+init(autoreset=True)
 import asyncio
 import gc
 import signal
@@ -21,16 +22,37 @@ import sys
 from contextlib import contextmanager
 import requests
 import multiprocessing
+import traceback
+import socket
+import queue
+import threading
 
 # New: Define a LogQueueWriter to redirect writes to a multiprocessing.Queue
 class LogQueueWriter:
     def __init__(self, queue):
         self.queue = queue
+        self.buffer = ""
+    
     def write(self, msg):
         if msg.strip() != "":
-            self.queue.put(msg)
+            # Add timestamp if it's a new line
+            if self.buffer == "" and not msg.startswith(("20", "19")):  # Check if it already has timestamp
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                msg = f"{timestamp} - {msg}"
+            
+            # Buffer the message until we get a newline
+            self.buffer += msg
+            if '\n' in self.buffer:
+                lines = self.buffer.split('\n')
+                for line in lines[:-1]:
+                    if line.strip():
+                        self.queue.put(line + '\n')
+                self.buffer = lines[-1]
+    
     def flush(self):
-        pass
+        if self.buffer:
+            self.queue.put(self.buffer)
+            self.buffer = ""
 
 from . import __version__  # Import version from package
 from .model_manager import ModelManager
@@ -63,7 +85,7 @@ start_time = time.time()
 app = FastAPI(
     title="LocalLab",
     description="A lightweight AI inference server for running models locally or in Google Colab",
-    version="0.3.4"
+    version=__version__
 )
 
 # Configure logging
@@ -79,6 +101,8 @@ FastAPICache.init(InMemoryBackend())
 
 # Initialize model manager
 model_manager = ModelManager()
+# Global flag to indicate if model is loading
+model_loading = False
 
 # Configure CORS
 if ENABLE_CORS:
@@ -226,7 +250,22 @@ async def list_available_models() -> Dict[str, Any]:
 @app.get("/health")
 async def health_check() -> Dict[str, str]:
     """Check the health status of the server"""
-    return {"status": "healthy"}
+    # Always return healthy to ensure the server can respond during startup
+    # Even if model is still loading
+    global model_loading
+    status = "initializing" if model_loading else "healthy"
+    return {"status": status}
+
+@app.get("/startup-status")
+async def startup_status() -> Dict[str, Any]:
+    """Get detailed startup status including model loading progress"""
+    global model_loading
+    return {
+        "server_ready": True,
+        "model_loading": model_loading,
+        "current_model": model_manager.current_model,
+        "uptime": time.time() - start_time
+    }
 
 # Additional endpoints
 @app.post("/chat")
@@ -383,18 +422,16 @@ async def startup_event():
         logger.info(f"{Fore.GREEN}Version: {__version__}{Style.RESET_ALL}")
         logger.info(f"{Fore.GREEN}Status: Starting server...{Style.RESET_ALL}")
         logger.info("\n" + "═" * 80)
-        sys.stdout.flush()
-
-        # Active Model Details
-        hf_model = os.getenv("HUGGINGFACE_MODEL", DEFAULT_MODEL)
-        gen_params = get_model_generation_params()
-        model_details = f"""
+        sys.stdout.flush()# Active Model Details
+hf_model = os.getenv("HUGGINGFACE_MODEL", DEFAULT_MODEL)
+gen_params = get_model_generation_params()
+model_details = f"""
 {Fore.CYAN}┌────────────────────── Active Model Details ───────────────────────┐{Style.RESET_ALL}
 │
 │  📚 Model Information:
 │  • Name: {Fore.YELLOW}{hf_model}{Style.RESET_ALL}
 │  • Type: {Fore.YELLOW}{'Custom HuggingFace Model' if hf_model != DEFAULT_MODEL else 'Default Model'}{Style.RESET_ALL}
-│  • Status: {Fore.GREEN}Loading...{Style.RESET_ALL}
+│  • Status: {Fore.GREEN}Loading in background...{Style.RESET_ALL}
 │
 │  ⚙️ Model Settings:
 │  • Max Length: {Fore.YELLOW}{gen_params['max_length']}{Style.RESET_ALL}
@@ -403,10 +440,10 @@ async def startup_event():
 │
 {Fore.CYAN}└───────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
 """
-        print(model_details)
-        sys.stdout.flush()
-        logger.info(model_details)
-        sys.stdout.flush()
+print(model_details)
+sys.stdout.flush()
+logger.info(model_details)
+sys.stdout.flush()
 
         # Model Configuration with better formatting
         model_config = f"""
@@ -430,9 +467,10 @@ async def startup_event():
         sys.stdout.flush()
 
         # Load model with progress indicator (start in background to not block startup)
-        logger.info(f"\n{Fore.YELLOW}⚡ Loading model: {hf_model}{Style.RESET_ALL}")
-        asyncio.create_task(model_manager.load_model(hf_model))
-        logger.info(f"{Fore.GREEN}Model loading started in background!{Style.RESET_ALL}\n")
+        # This ensures the health endpoint can respond immediately
+        logger.info(f"\n{Fore.YELLOW}⚡ Loading model: {hf_model} in background...{Style.RESET_ALL}")
+        asyncio.create_task(load_model_in_background(hf_model))
+        logger.info(f"{Fore.GREEN}Server is ready! Model will continue loading in background.{Style.RESET_ALL}\n")
         sys.stdout.flush()
 
         # System Resources with box drawing
@@ -680,7 +718,7 @@ def setup_ngrok(port: int = 8000, max_retries: int = 3) -> Optional[str]:
 
 # Modify run_server_proc to accept a log_queue and redirect stdout/stderr
 
-def run_server_proc(log_queue):
+def run_server_proc(log_queue, port=8000):
     import logging
     # Create a new logger for the spawned process to avoid inheriting fork-context locks
     logger = logging.getLogger("locallab.spawn")
@@ -698,68 +736,109 @@ def run_server_proc(log_queue):
     logger.addHandler(handler)
 
     try:
+        # Check if port is already in use
+        if is_port_in_use(port):
+            logger.warning(f"Port {port} is already in use. Trying to find another port...")
+            for p in range(port+1, port+100):
+                if not is_port_in_use(p):
+                    port = p
+                    logger.info(f"Using alternative port: {port}")
+                    break
+            else:
+                raise RuntimeError(f"Could not find an available port in range {port}-{port+100}")
+
         if "COLAB_GPU" in os.environ:
             import nest_asyncio
             nest_asyncio.apply()
             # Set reload to False in COLAB
-            config = uvicorn.Config(app, host="0.0.0.0", port=8000, reload=False)
+            logger.info(f"Starting server on port {port} (Colab mode)")
+            config = uvicorn.Config(app, host="0.0.0.0", port=port, reload=False, log_level="info")
             server = uvicorn.Server(config)
             loop = asyncio.get_event_loop()
             loop.run_until_complete(server.serve())
         else:
             # Disable reload and force single worker to avoid multiple processes
-            uvicorn.run(app, host="127.0.0.1", port=8000, reload=False, workers=1)
+            logger.info(f"Starting server on port {port} (local mode)")
+            uvicorn.run(app, host="127.0.0.1", port=port, reload=False, workers=1, log_level="info")
     except Exception as e:
         logger.error(f"Server startup failed: {str(e)}")
+        logger.error(traceback.format_exc())
         raise
 
 # Modify start_server function
-def start_server(use_ngrok: bool = False, log_queue=None):
+def start_server(use_ngrok: bool = False, log_queue=None, port=8000):
     import time
     import requests
     
     # If no log_queue provided, create one (though normally parent supplies it)
     if log_queue is None:
+        startup_banner = f"""
+{Fore.CYAN}
+╔══════════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+║  {Fore.GREEN}LocalLab Server v{__version__} - Starting Up{Fore.CYAN}                          ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
+
+{Fore.YELLOW}⏳ Initializing server process...{Style.RESET_ALL}
+"""
+        print(startup_banner, flush=True)
         ctx = multiprocessing.get_context("spawn")
         log_queue = ctx.Queue()
 
     # If using ngrok, set environment variable to trigger colab branch in run_server_proc
     if use_ngrok:
         os.environ["COLAB_GPU"] = "1"
-        timeout = 120  # Increased timeout for Colab environments
+        timeout = 180  # Increased timeout for Colab environments
     else:
-        timeout = 60  # Increased timeout for local environments
+        timeout = 120  # Increased timeout for local environments
 
     # Start the server in a separate process using spawn context with module-level run_server_proc
     ctx = multiprocessing.get_context("spawn")
-    p = ctx.Process(target=run_server_proc, args=(log_queue,))
+    p = ctx.Process(target=run_server_proc, args=(log_queue, port))
+    p.daemon = True  # Make process daemon so it exits when parent exits
     p.start()
 
     # Allow the server some time to initialize before starting health check
-    logger.info(f"{Fore.YELLOW}Waiting for server to initialize (15 seconds)...{Style.RESET_ALL}")
-    time.sleep(15)  # Increased from 5 to 15 seconds
+    print(f"{Fore.YELLOW}🔄 Server process started (PID: {p.pid}){Style.RESET_ALL}", flush=True)
+    print(f"{Fore.YELLOW}⏳ Waiting for server to initialize (30 seconds)...{Style.RESET_ALL}", flush=True)
+    time.sleep(30)  # Increased from 15 to 30 seconds
 
     # Wait until the /health endpoint returns 200 or timeout
-    logger.info(f"{Fore.YELLOW}Starting health checks (timeout: {timeout}s)...{Style.RESET_ALL}")
     start_time_loop = time.time()
-    health_url = "http://127.0.0.1:8000/health"
+    health_url = f"http://127.0.0.1:{port}/health"
     server_ready = False
+    
+    logger.info(f"{Fore.YELLOW}Starting health checks (timeout: {timeout}s)...{Style.RESET_ALL}")
+    
+    # Try multiple health check paths in case the server is running but on a different port
+    port_check_list = [port] + [p for p in range(port+1, port+10)]
+    
     while time.time() - start_time_loop < timeout:
-        try:
-            logger.info(f"{Fore.CYAN}Checking server health at {health_url}...{Style.RESET_ALL}")
-            response = requests.get(health_url, timeout=5)
-            if response.status_code == 200:
-                server_ready = True
-                logger.info(f"{Fore.GREEN}Server is healthy!{Style.RESET_ALL}")
-                break
-            else:
-                logger.warning(f"{Fore.YELLOW}Server returned status code {response.status_code}{Style.RESET_ALL}")
-        except requests.exceptions.ConnectionError:
-            logger.warning(f"{Fore.YELLOW}Connection refused - server not ready yet{Style.RESET_ALL}")
-        except Exception as e:
-            logger.warning(f"{Fore.YELLOW}Health check error: {str(e)}{Style.RESET_ALL}")
+        server_ready = False
         
-        time.sleep(2)
+        for check_port in port_check_list:
+            health_url = f"http://127.0.0.1:{check_port}/health"
+            try:
+                logger.info(f"{Fore.CYAN}Checking server health at {health_url}...{Style.RESET_ALL}")
+                response = requests.get(health_url, timeout=5)
+                if response.status_code == 200:
+                    server_ready = True
+                    port = check_port  # Update the port if found on a different one
+                    logger.info(f"{Fore.GREEN}Server is healthy on port {port}!{Style.RESET_ALL}")
+                    break
+                else:
+                    logger.warning(f"{Fore.YELLOW}Server returned status code {response.status_code}{Style.RESET_ALL}")
+            except requests.exceptions.ConnectionError:
+                logger.warning(f"{Fore.YELLOW}Connection refused on port {check_port} - server not ready yet{Style.RESET_ALL}")
+            except Exception as e:
+                logger.warning(f"{Fore.YELLOW}Health check error on port {check_port}: {str(e)}{Style.RESET_ALL}")
+        
+        if server_ready:
+            break
+            
+        # Add a small delay between health checks
+        time.sleep(5)
 
     if not server_ready:
         logger.error(f"{Fore.RED}Server did not become healthy in time (timeout: {timeout}s).{Style.RESET_ALL}")
@@ -769,13 +848,21 @@ def start_server(use_ngrok: bool = False, log_queue=None):
         raise Exception(f"Server did not become healthy in time (timeout: {timeout}s). Check logs for errors.")
 
     if use_ngrok:
-        logger.info(f"{Fore.CYAN}Setting up ngrok tunnel...{Style.RESET_ALL}")
-        public_url = setup_ngrok(port=8000)
-        ngrok_section = f"\n{Fore.CYAN}┌────────────────────────── Ngrok Tunnel Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🚀 Ngrok Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
-        logger.info(ngrok_section)
-        print(ngrok_section)
+        logger.info(f"{Fore.CYAN}Setting up ngrok tunnel to port {port}...{Style.RESET_ALL}")
+        public_url = setup_ngrok(port=port)
+        if public_url:
+            ngrok_section = f"\n{Fore.CYAN}┌────────────────────────── Ngrok Tunnel Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🚀 Ngrok Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
+            logger.info(ngrok_section)
+            print(ngrok_section)
+        else:
+            logger.error(f"{Fore.RED}Failed to create ngrok tunnel. Check your ngrok token.{Style.RESET_ALL}")
+            logger.info(f"{Fore.YELLOW}Server is still running locally on port {port}.{Style.RESET_ALL}")
     
     # Wait indefinitely until a KeyboardInterrupt is received
+    # Server info section
+    server_section = f"\n{Fore.CYAN}┌────────────────────────── Server Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🖥️ Local URL: {Fore.GREEN}http://localhost:{port}{Style.RESET_ALL}\n│  ⚙️ Status: {Fore.GREEN}Running{Style.RESET_ALL}\n│  🔄 Model Loading: {Fore.YELLOW}In Progress{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
+    print(server_section, flush=True)
+    
     try:
         while True:
             time.sleep(1)
@@ -787,14 +874,21 @@ def start_server(use_ngrok: bool = False, log_queue=None):
 # Define a log listener function in the parent to print messages from the log queue
 
 def log_listener(queue):
-    while True:
-        try:
-            msg = queue.get()
-            if msg is None:
-                break
-            print(msg, end='')
-        except Exception as e:
-            pass
+    """Process and print log messages from the queue"""
+    try:
+        while True:
+            try:
+                msg = queue.get(timeout=0.5)  # Use timeout to allow for graceful shutdown
+                if msg is None:
+                    break
+                # Print directly to stdout to ensure it appears in the notebook
+                print(msg, end='', flush=True)
+            except queue.Empty:
+                continue  # Just continue if queue is empty
+            except Exception as e:
+                print(f"Error in log listener: {str(e)}", flush=True)
+    except KeyboardInterrupt:
+        print("Log listener interrupted", flush=True)
 
 if __name__ == "__main__":
     import multiprocessing

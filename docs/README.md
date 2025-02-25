@@ -13,13 +13,13 @@ LocalLab empowers you to run AI inference servers either locally or through Goog
 This diagram illustrates the overall architecture of LocalLab:
 
 ```mermaid
-graph TD
-    A[User] --> B[LocalLab Client (Python/Node.js)]
-    B --> C[LocalLab Server]
-    C --> D[Model Manager]
-    D --> E[Hugging Face Models]
-    C --> F[Optimizations]
-    C --> G[Resource Monitoring]
+graph TD;
+    A["User"] --> B["LocalLab Client (Python/Node.js)"];
+    B --> C["LocalLab Server"];
+    C --> D["Model Manager"];
+    D --> E["Hugging Face Models"];
+    C --> F["Optimizations"];
+    C --> G["Resource Monitoring"];
 ```
 
 ### Google Colab Workflow
@@ -69,6 +69,7 @@ docs/
 ## 🚀 Quick Navigation
 
 ### For New Users
+
 1. Start with our [Getting Started Guide](./guides/getting-started.md)
 2. Choose your client: [Python](./clients/python/README.md) or [Node.js](./clients/nodejs/README.md)
 3. Pick your deployment: [Local](./deployment/local.md) or [Google Colab](./colab/README.md)
@@ -89,6 +90,7 @@ graph TD
 ```
 
 ### Model Loading States
+
 ```mermaid
 stateDiagram-v2
     [*] --> Initializing
@@ -105,11 +107,13 @@ stateDiagram-v2
 ## 📖 How to Read This Documentation
 
 1. **New Users**
+
    - Start with [Getting Started](./guides/getting-started.md)
    - Check [FAQ](./guides/faq.md) for common questions
    - Use [Troubleshooting](./guides/troubleshooting.md) when stuck
 
 2. **Developers**
+
    - Review [API Reference](./guides/api.md)
    - Choose your [Client Library](./clients/README.md)
    - Follow [Deployment Guide](./deployment/README.md)
