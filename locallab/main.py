@@ -682,20 +682,23 @@ def setup_ngrok(port: int = 8000, max_retries: int = 3) -> Optional[str]:
 # Modify run_server_proc to accept a log_queue and redirect stdout/stderr
 
 def run_server_proc(log_queue):
+    import logging
+    # Create a new logger for the spawned process to avoid inheriting fork-context locks
+    logger = logging.getLogger("locallab.spawn")
+    logger.setLevel(logging.INFO)
+    logger.handlers.clear()
+
+    # Redirect stdout and stderr to the log queue
+    log_writer = LogQueueWriter(log_queue)
+    sys.stdout = log_writer
+    sys.stderr = log_writer
+
+    # Attach a logging handler to send log messages to the queue
+    handler = logging.StreamHandler(log_writer)
+    handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    logger.addHandler(handler)
+
     try:
-        # Redirect stdout and stderr to the log queue
-        log_writer = LogQueueWriter(log_queue)
-        sys.stdout = log_writer
-        sys.stderr = log_writer
-        
-        # Clear any existing logger handlers to avoid sharing SemLocks from a fork context
-        logger.handlers.clear()
-        
-        # Attach a logging handler to send log messages to the queue
-        handler = logging.StreamHandler(log_writer)
-        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        logger.addHandler(handler)
-        
         if "COLAB_GPU" in os.environ:
             import nest_asyncio
             nest_asyncio.apply()
@@ -719,7 +722,8 @@ def start_server(use_ngrok: bool = False, log_queue=None):
     
     # If no log_queue provided, create one (though normally parent supplies it)
     if log_queue is None:
-        log_queue = multiprocessing.Queue()
+        ctx = multiprocessing.get_context("spawn")
+        log_queue = ctx.Queue()
     
     # Start the server in a separate process using spawn context with module-level run_server_proc
     ctx = multiprocessing.get_context("spawn")
@@ -779,8 +783,9 @@ if __name__ == "__main__":
         logger.warning("multiprocessing start method already set: " + str(e))
     
     import threading
-    # Create a log queue and start the listener thread
-    log_queue = multiprocessing.Queue()
+    # Create a log queue using the spawn context and start the listener thread
+    ctx = multiprocessing.get_context("spawn")
+    log_queue = ctx.Queue()
     listener_thread = threading.Thread(target=log_listener, args=(log_queue,), daemon=True)
     listener_thread.start()
     
