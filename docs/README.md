@@ -13,13 +13,13 @@ LocalLab empowers you to run AI inference servers either locally or through Goog
 This diagram illustrates the overall architecture of LocalLab:
 
 ```mermaid
-graph TD;
-    A[User] --> B[LocalLab Client (Python/Node.js)];
-    B --> C[LocalLab Server];
-    C --> D[Model Manager];
-    D --> E[Hugging Face Models];
-    C --> F[Optimizations];
-    C --> G[Resource Monitoring];
+graph TD
+    A[User] --> B[LocalLab Client (Python/Node.js)]
+    B --> C[LocalLab Server]
+    C --> D[Model Manager]
+    D --> E[Hugging Face Models]
+    C --> F[Optimizations]
+    C --> G[Resource Monitoring]
 ```
 
 ### Google Colab Workflow
@@ -76,16 +76,16 @@ docs/
 ### Deployment Decision Guide
 
 ```mermaid
-graph TD;
-    A[Start] --> B{Have GPU?};
-    B -->|Yes| C[Local Deployment];
-    B -->|No| D{Need GPU?};
-    D -->|Yes| E[Google Colab];
-    D -->|No| F{RAM > 8GB?};
-    F -->|Yes| C;
-    F -->|No| E;
-    C --> G[Follow Local Guide];
-    E --> H[Follow Colab Guide];
+graph TD
+    A[Start] --> B{Have GPU?}
+    B -->|Yes| C[Local Deployment]
+    B -->|No| D{Need GPU?}
+    D -->|Yes| E[Google Colab]
+    D -->|No| F{RAM > 8GB?}
+    F -->|Yes| C
+    F -->|No| E
+    C --> G[Follow Local Guide]
+    E --> H[Follow Colab Guide]
 ```
 
 ### Model Loading States
