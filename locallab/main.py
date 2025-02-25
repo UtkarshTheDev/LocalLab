@@ -688,6 +688,9 @@ def run_server_proc(log_queue):
         sys.stdout = log_writer
         sys.stderr = log_writer
         
+        # Clear any existing logger handlers to avoid sharing SemLocks from a fork context
+        logger.handlers.clear()
+        
         # Attach a logging handler to send log messages to the queue
         handler = logging.StreamHandler(log_writer)
         handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))

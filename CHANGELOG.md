@@ -1,6 +1,14 @@
 # Changelog
 
-All notable changes for the version update from 0.0 to 0.1.0.
+All notable changes for version updates.
+
+## [0.1.1] - 2024-02-25
+
+### Fixed
+
+- Fixed RuntimeError related to SemLock sharing in multiprocessing by clearing logger handlers in run_server_proc.
+- Updated Mermaid diagrams in README.md and docs/colab/README.md to wrap node labels in double quotes, improving compatibility with GitHub rendering.
+- Improved build status badge aesthetics in the README.
 
 ## [0.1.0] - 2024-02-23
 

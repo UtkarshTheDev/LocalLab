@@ -51,39 +51,39 @@ Below is an illustration of LocalLab's architecture:
 
 ```mermaid
 graph TD;
-    A[User] --> B[LocalLab Client (Python and Node.js)];
-    B --> C[LocalLab Server];
-    C --> D[Model Manager];
-    D --> E[Hugging Face Models];
+    A[User] --> B["LocalLab Client (Python and Node.js)"];
+    B --> C["LocalLab Server"];
+    C --> D["Model Manager"];
+    D --> E["Hugging Face Models"];
     C --> F[Optimizations];
-    C --> G[Resource Monitoring];
+    C --> G["Resource Monitoring"];
 ```
 
 ### Model Loading & Optimization Flow
 
 ```mermaid
 graph TD;
-    A[Load Model Request] --> B{Check Resources};
-    B -->|Sufficient| C[Load Model];
-    B -->|Insufficient| D[Apply Optimizations];
+    A["Load Model Request"] --> B[{"Check Resources"}];
+    B -->|Sufficient| C["Load Model"];
+    B -->|Insufficient| D["Apply Optimizations"];
     D --> E[Quantization];
-    D --> F[Attention Slicing];
-    D --> G[CPU Offloading];
-    E & F & G --> H[Load Optimized Model];
-    C & H --> I[Ready for Inference];
+    D --> F["Attention Slicing"];
+    D --> G["CPU Offloading"];
+    E & F & G --> H["Load Optimized Model"];
+    C & H --> I["Ready for Inference"];
 ```
 
 ### Resource Management Flow
 
 ```mermaid
 graph TD;
-    A[Client Request] --> B[Resource Monitor];
-    B --> C{Check Resources};
-    C -->|OK| D[Process Request];
-    C -->|Low Memory| E[Optimize/Unload];
-    C -->|GPU Full| F[CPU Fallback];
-    E & F --> G[Continue Processing];
-    D & G --> H[Return Response];
+    A["Client Request"] --> B["Resource Monitor"];
+    B --> C[{"Check Resources"}];
+    C -->|OK| D["Process Request"];
+    C -->|Low Memory| E["Optimize/Unload"];
+    C -->|GPU Full| F["CPU Fallback"];
+    E & F --> G["Continue Processing"];
+    D & G --> H["Return Response"];
 ```
 
 ## Google Colab Workflow
@@ -92,9 +92,9 @@ When deploying on Google Colab, LocalLab uses ngrok to create a public tunnel. T
 
 ```mermaid
 sequenceDiagram
-    participant U as User (Colab)
-    participant S as LocalLab Server
-    participant N as Ngrok Tunnel
+    participant U as "User (Colab)"
+    participant S as "LocalLab Server"
+    participant N as "Ngrok Tunnel"
     U->>S: Run start_server(ngrok=True)
     S->>N: Establish public tunnel
     N->>U: Return public URL
