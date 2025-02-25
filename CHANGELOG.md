@@ -2,7 +2,15 @@
 
 All notable changes for version updates.
 
-## [0.1.5] - 2024-03-01
+## [0.1.6] - 2025-02-25
+
+### Added
+
+- Added utility function is_port_in_use(port: int) → bool to check if a port is already in use.
+- Added async utility function load_model_in_background(model_id: str) to load the model asynchronously in the background while managing the global loading flag.
+- Updated server startup functions to incorporate these utilities, ensuring proper port management and asynchronous model loading.
+
+## [0.1.5] - 2025-02-25
 
 ### Changed
 
@@ -10,7 +18,7 @@ All notable changes for version updates.
 - Increased health check timeout to 120 seconds for ngrok mode and 60 seconds for local mode to accommodate slower startups.
 - Added detailed logging during health checks to aid in debugging startup issues.
 
-## [0.1.4] - 2024-02-25
+## [0.1.4] - 2025-02-25
 
 ### Changed
 
@@ -18,7 +26,7 @@ All notable changes for version updates.
 - Updated the start_server function to extend the health check timeout to 60 seconds in Google Colab (when using ngrok) and to set an environment variable to trigger the Colab branch in run_server_proc.
 - Modified startup_event to load the model in the background, ensuring that the server's /health endpoint becomes available in time and that logging output is complete.
 
-## [0.1.3] - 2024-02-25
+## [0.1.3] - 2025-02-25
 
 ### Changed
 
@@ -32,7 +40,7 @@ All notable changes for version updates.
 - Removed duplicate architecture diagrams from the root `README.md` to streamline documentation.
 - Minor improvements to logging and error handling.
 
-## [0.1.2] - 2024-02-25
+## [0.1.2] - 2025-02-25
 
 ### Changed
 
@@ -44,7 +52,7 @@ All notable changes for version updates.
 - Updated Mermaid diagrams to wrap node labels in double quotes, improving compatibility with GitHub rendering.
 - Improved build status badge aesthetics in the README.
 
-## [0.1.1] - 2024-02-25
+## [0.1.1] - 2025-02-25
 
 ### Fixed
 
@@ -52,7 +60,7 @@ All notable changes for version updates.
 - Updated Mermaid diagrams to wrap node labels in double quotes, improving compatibility with GitHub rendering.
 - Improved build status badge aesthetics in the README.
 
-## [0.1.0] - 2024-02-24
+## [0.1.0] - 2025-02-24
 
 ### Added
 

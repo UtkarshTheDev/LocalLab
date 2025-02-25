@@ -406,15 +406,15 @@ async def startup_event():
         import sys
         # ASCII Art Banner
         banner = f"""
-{Fore.CYAN}
-    ██╗      ██████╗  ██████╗ █████╗ ██╗     ██╗      █████╗ ██████╗ 
-    ██║     ██╔═══██╗██╔════╝██╔══██╗██║     ██║     ██╔══██╗██╔══██╗
-    ██║     ██║   ██║██║     ███████║██║     ██║     ███████║██████╔╝
-    ██║     ██║   ██║██║     ██╔══██║██║     ██║     ██╔══██║██╔══██╗
-    ███████╗╚██████╔╝╚██████╗██║  ██║███████╗███████╗██║  ██║██████╔╝
-    ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝ 
-{Style.RESET_ALL}"""
-        
+        {Fore.CYAN}
+            ██╗      ██████╗  ██████╗ █████╗ ██╗     ██╗      █████╗ ██████╗ 
+            ██║     ██╔═══██╗██╔════╝██╔══██╗██║     ██║     ██╔══██╗██╔══██╗
+            ██║     ██║   ██║██║     ███████║██║     ██║     ███████║██████╔╝
+            ██║     ██║   ██║██║     ██╔══██║██║     ██║     ██╔══██║██╔══██╗
+            ███████╗╚██████╔╝╚██████╗██║  ██║███████╗███████╗██║  ██║██████╔╝
+            ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝ 
+        {Style.RESET_ALL}"""
+
         print(banner)
         sys.stdout.flush()
         logger.info(banner)
@@ -423,44 +423,44 @@ async def startup_event():
         logger.info(f"{Fore.GREEN}Status: Starting server...{Style.RESET_ALL}")
         logger.info("\n" + "═" * 80)
         sys.stdout.flush()# Active Model Details
-hf_model = os.getenv("HUGGINGFACE_MODEL", DEFAULT_MODEL)
-gen_params = get_model_generation_params()
-model_details = f"""
-{Fore.CYAN}┌────────────────────── Active Model Details ───────────────────────┐{Style.RESET_ALL}
-│
-│  📚 Model Information:
-│  • Name: {Fore.YELLOW}{hf_model}{Style.RESET_ALL}
-│  • Type: {Fore.YELLOW}{'Custom HuggingFace Model' if hf_model != DEFAULT_MODEL else 'Default Model'}{Style.RESET_ALL}
-│  • Status: {Fore.GREEN}Loading in background...{Style.RESET_ALL}
-│
-│  ⚙️ Model Settings:
-│  • Max Length: {Fore.YELLOW}{gen_params['max_length']}{Style.RESET_ALL}
-│  • Temperature: {Fore.YELLOW}{gen_params['temperature']}{Style.RESET_ALL}
-│  • Top P: {Fore.YELLOW}{gen_params['top_p']}{Style.RESET_ALL}
-│
-{Fore.CYAN}└───────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
-"""
-print(model_details)
-sys.stdout.flush()
-logger.info(model_details)
-sys.stdout.flush()
+        hf_model = os.getenv("HUGGINGFACE_MODEL", DEFAULT_MODEL)
+        gen_params = get_model_generation_params()
+        model_details = f"""
+        {Fore.CYAN}┌────────────────────── Active Model Details ───────────────────────┐{Style.RESET_ALL}
+        │
+        │  📚 Model Information:
+        │  • Name: {Fore.YELLOW}{hf_model}{Style.RESET_ALL}
+        │  • Type: {Fore.YELLOW}{'Custom HuggingFace Model' if hf_model != DEFAULT_MODEL else 'Default Model'}{Style.RESET_ALL}
+        │  • Status: {Fore.GREEN}Loading in background...{Style.RESET_ALL}
+        │
+        │  ⚙️ Model Settings:
+        │  • Max Length: {Fore.YELLOW}{gen_params['max_length']}{Style.RESET_ALL}
+        │  • Temperature: {Fore.YELLOW}{gen_params['temperature']}{Style.RESET_ALL}
+        │  • Top P: {Fore.YELLOW}{gen_params['top_p']}{Style.RESET_ALL}
+        │
+        {Fore.CYAN}└───────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
+        """
+        print(model_details)
+        sys.stdout.flush()
+        logger.info(model_details)
+        sys.stdout.flush()
 
         # Model Configuration with better formatting
         model_config = f"""
-{Fore.CYAN}┌──────────────────────── Model Configuration ────────────────────────┐{Style.RESET_ALL}
-│
-│  🤖 Available Models:
-│  • Default: {Fore.YELLOW}{DEFAULT_MODEL}{Style.RESET_ALL}
-│  • Registry: {Fore.YELLOW}{', '.join(MODEL_REGISTRY.keys())}{Style.RESET_ALL}
-│
-│  🔧 Optimizations:
-│  • Quantization: {Fore.GREEN if ENABLE_COMPRESSION else Fore.RED}{QUANTIZATION_TYPE if ENABLE_COMPRESSION else 'Disabled'}{Style.RESET_ALL}
-│  • Flash Attention: {Fore.GREEN if ENABLE_FLASH_ATTENTION else Fore.RED}{str(ENABLE_FLASH_ATTENTION)}{Style.RESET_ALL}
-│  • Attention Slicing: {Fore.GREEN if ENABLE_ATTENTION_SLICING else Fore.RED}{str(ENABLE_ATTENTION_SLICING)}{Style.RESET_ALL}
-│  • CPU Offloading: {Fore.GREEN if ENABLE_CPU_OFFLOADING else Fore.RED}{str(ENABLE_CPU_OFFLOADING)}{Style.RESET_ALL}
-│
-{Fore.CYAN}└────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
-"""
+        {Fore.CYAN}┌──────────────────────── Model Configuration ────────────────────────┐{Style.RESET_ALL}
+        │
+        │  🤖 Available Models:
+        │  • Default: {Fore.YELLOW}{DEFAULT_MODEL}{Style.RESET_ALL}
+        │  • Registry: {Fore.YELLOW}{', '.join(MODEL_REGISTRY.keys())}{Style.RESET_ALL}
+        │
+        │  🔧 Optimizations:
+        │  • Quantization: {Fore.GREEN if ENABLE_COMPRESSION else Fore.RED}{QUANTIZATION_TYPE if ENABLE_COMPRESSION else 'Disabled'}{Style.RESET_ALL}
+        │  • Flash Attention: {Fore.GREEN if ENABLE_FLASH_ATTENTION else Fore.RED}{str(ENABLE_FLASH_ATTENTION)}{Style.RESET_ALL}
+        │  • Attention Slicing: {Fore.GREEN if ENABLE_ATTENTION_SLICING else Fore.RED}{str(ENABLE_ATTENTION_SLICING)}{Style.RESET_ALL}
+        │  • CPU Offloading: {Fore.GREEN if ENABLE_CPU_OFFLOADING else Fore.RED}{str(ENABLE_CPU_OFFLOADING)}{Style.RESET_ALL}
+        │
+        {Fore.CYAN}└────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
+        """
         print(model_config)
         sys.stdout.flush()
         logger.info(model_config)
@@ -475,16 +475,16 @@ sys.stdout.flush()
 
         # System Resources with box drawing
         resources = f"""
-{Fore.CYAN}┌──────────────────────── System Resources ──────────────────────────┐{Style.RESET_ALL}
-│
-│  💻 Hardware:
-│  • CPU Cores: {Fore.YELLOW}{psutil.cpu_count()}{Style.RESET_ALL}
-│  • CPU Usage: {Fore.YELLOW}{psutil.cpu_percent()}%{Style.RESET_ALL}
-│  • Memory: {Fore.YELLOW}{psutil.virtual_memory().percent}% used{Style.RESET_ALL}
-│  • GPU: {Fore.YELLOW}{torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'Not Available'}{Style.RESET_ALL}
-│
-{Fore.CYAN}└────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
-"""
+        {Fore.CYAN}┌──────────────────────── System Resources ──────────────────────────┐{Style.RESET_ALL}
+        │
+        │  💻 Hardware:
+        │  • CPU Cores: {Fore.YELLOW}{psutil.cpu_count()}{Style.RESET_ALL}
+        │  • CPU Usage: {Fore.YELLOW}{psutil.cpu_percent()}%{Style.RESET_ALL}
+        │  • Memory: {Fore.YELLOW}{psutil.virtual_memory().percent}% used{Style.RESET_ALL}
+        │  • GPU: {Fore.YELLOW}{torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'Not Available'}{Style.RESET_ALL}
+        │
+        {Fore.CYAN}└────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
+        """
         print(resources)
         sys.stdout.flush()
         logger.info(resources)
@@ -492,24 +492,24 @@ sys.stdout.flush()
 
         # API Documentation with better formatting
         api_docs = f"""
-{Fore.CYAN}┌────────────────────────── API Overview ─────────────────────────────┐{Style.RESET_ALL}
-│
-│  🔤 Text Generation:
-│   • POST /generate     - Generate text from prompt
-│   • POST /chat        - Interactive chat completion
-│   • POST /batch       - Batch text generation
-│
-│  🔄 Model Management:
-│   • GET  /models      - List available models
-│   • GET  /model       - Get current model info
-│   • POST /model/load  - Load a specific model
-│
-│  📊 System:
-│   • GET  /health      - Check server health
-│   • GET  /system      - Get system statistics
-│
-{Fore.CYAN}└────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
-"""
+        {Fore.CYAN}┌────────────────────────── API Overview ─────────────────────────────┐{Style.RESET_ALL}
+        │
+        │  🔤 Text Generation:
+        │   • POST /generate     - Generate text from prompt
+        │   • POST /chat        - Interactive chat completion
+        │   • POST /batch       - Batch text generation
+        │
+        │  🔄 Model Management:
+        │   • GET  /models      - List available models
+        │   • GET  /model       - Get current model info
+        │   • POST /model/load  - Load a specific model
+        │
+        │  📊 System:
+        │   • GET  /health      - Check server health
+        │   • GET  /system      - Get system statistics
+        │
+        {Fore.CYAN}└────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
+        """
         print(api_docs)
         sys.stdout.flush()
         logger.info(api_docs)
@@ -517,24 +517,24 @@ sys.stdout.flush()
 
         # Quick Start Guide
         quickstart = f"""
-{Fore.CYAN}┌─────────────────────── Quick Start Guide ───────────────────────────┐{Style.RESET_ALL}
-│
-│  🚀 Example Usage:
-│
-│  1. Generate Text:
-│     curl -X POST "https://<NGROK_PUBLIC_URL>/generate" \\
-│     -H "Content-Type: application/json" \\
-│     -d '{{"prompt": "Once upon a time"}}'
-│
-│  2. Chat Completion:
-│     curl -X POST "https://<NGROK_PUBLIC_URL>/chat" \\
-│     -H "Content-Type: application/json" \\
-│     -d '{{"messages": [{{"role": "user", "content": "Hello!"}}]}}'
-│
-│  🔗 Replace <NGROK_PUBLIC_URL> with the public URL shown in the Server URLs section
-│
-{Fore.CYAN}└────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
-"""
+        {Fore.CYAN}┌─────────────────────── Quick Start Guide ───────────────────────────┐{Style.RESET_ALL}
+        │
+        │  🚀 Example Usage:
+        │
+        │  1. Generate Text:
+        │     curl -X POST "https://<NGROK_PUBLIC_URL>/generate" \\
+        │     -H "Content-Type: application/json" \\
+        │     -d '{{"prompt": "Once upon a time"}}'
+        │
+        │  2. Chat Completion:
+        │     curl -X POST "https://<NGROK_PUBLIC_URL>/chat" \\
+        │     -H "Content-Type: application/json" \\
+        │     -d '{{"messages": [{{"role": "user", "content": "Hello!"}}]}}'
+        │
+        │  🔗 Replace <NGROK_PUBLIC_URL> with the public URL shown in the Server URLs section
+        │
+        {Fore.CYAN}└────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
+        """
         print(quickstart)
         sys.stdout.flush()
         logger.info(quickstart)
@@ -542,21 +542,21 @@ sys.stdout.flush()
 
         # Footer with social links and ASCII art
         footer = f"""
-{Fore.CYAN}
-    ╔════════════════════════════════════════════════════════════════════╗
-    ║                                                                  ║
-    ║  {Fore.GREEN}LocalLab - Your Local AI Inference Server{Fore.CYAN}                    ║
-    ║  {Fore.GREEN}Made with ❤️  by Utkarsh{Fore.CYAN}                             ║
-    ║                                                                  ║
-    ╚══════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
+        {Fore.CYAN}
+            ╔════════════════════════════════════════════════════════════════════╗
+            ║                                                                  ║
+            ║  {Fore.GREEN}LocalLab - Your Local AI Inference Server{Fore.CYAN}                    ║
+            ║  {Fore.GREEN}Made with ❤️  by Utkarsh{Fore.CYAN}                             ║
+            ║                                                                  ║
+            ╚══════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
 
-{Fore.YELLOW}🔗 Connect & Contribute:{Style.RESET_ALL}
-• GitHub:   {Fore.CYAN}https://github.com/Developer-Utkarsh{Style.RESET_ALL}
-• Twitter:  {Fore.CYAN}https://twitter.com/UtkarshTheDev{Style.RESET_ALL}
-• LinkedIn: {Fore.CYAN}https://linkedin.com/in/utkarshthedev{Style.RESET_ALL}
+        {Fore.YELLOW}🔗 Connect & Contribute:{Style.RESET_ALL}
+        • GitHub:   {Fore.CYAN}https://github.com/Developer-Utkarsh{Style.RESET_ALL}
+        • Twitter:  {Fore.CYAN}https://twitter.com/UtkarshTheDev{Style.RESET_ALL}
+        • LinkedIn: {Fore.CYAN}https://linkedin.com/in/utkarshthedev{Style.RESET_ALL}
 
-{Fore.GREEN}✨ Server is ready! Happy generating! 🚀{Style.RESET_ALL}
-"""
+        {Fore.GREEN}✨ Server is ready! Happy generating! 🚀{Style.RESET_ALL}
+        """
         print(footer)
         sys.stdout.flush()
         logger.info(footer)
@@ -564,14 +564,14 @@ sys.stdout.flush()
 
     except Exception as e:
         error_msg = f"""
-{Fore.RED}╔══════════════════════════════════════════════════════════════════╗{Style.RESET_ALL}
-{Fore.RED}║                              ERROR                                   ║{Style.RESET_ALL}
-{Fore.RED}╚══════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
-
-{str(e)}
-
-{Fore.YELLOW}💡 Need help? Check the documentation or open an issue on GitHub.{Style.RESET_ALL}
-"""
+        {Fore.RED}╔══════════════════════════════════════════════════════════════════╗{Style.RESET_ALL}
+        {Fore.RED}║                              ERROR                                   ║{Style.RESET_ALL}
+        {Fore.RED}╚══════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
+    
+        {str(e)}
+        
+        {Fore.YELLOW}💡 Need help? Check the documentation or open an issue on GitHub.{Style.RESET_ALL}
+        """
         print(error_msg)
         sys.stdout.flush()
         logger.error(error_msg)
@@ -716,7 +716,24 @@ def setup_ngrok(port: int = 8000, max_retries: int = 3) -> Optional[str]:
             logger.error("Failed to establish ngrok tunnel after all retries")
             raise
 
-# Modify run_server_proc to accept a log_queue and redirect stdout/stderr
+# New utility functions added to fix undefined errors
+
+def is_port_in_use(port: int) -> bool:
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('127.0.0.1', port)) == 0
+
+
+async def load_model_in_background(model_id: str):
+    global model_loading
+    model_loading = True
+    try:
+        await model_manager.load_model(model_id)
+    finally:
+        model_loading = False
+
+
+# Existing function: run_server_proc
 
 def run_server_proc(log_queue, port=8000):
     import logging
