@@ -2,6 +2,12 @@
 
 All notable changes for version updates.
 
+## [0.1.3] - 2024-02-27
+
+### Changed
+
+- Updated GitHub Actions workflow to use the --no-cache-dir flag in pip install commands, which prevents disk space issues during dependency installation (e.g., for large packages like torch).
+
 ## [0.1.2] - 2024-02-25
 
 ### Changed
