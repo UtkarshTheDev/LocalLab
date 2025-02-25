@@ -1,7 +1,6 @@
 # 🚀 LocalLab
 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/Developer-Utkarsh/LocalLab/ci.yml?style=flat-square)](https://github.com/Developer-Utkarsh/LocalLab/actions)
-[![Coverage Status](https://coveralls.io/repos/github/Developer-Utkarsh/LocalLab/badge.svg?branch=main&style=flat-square)](https://coveralls.io/github/Developer-Utkarsh/LocalLab?branch=main)
 [![LocalLab Version](https://img.shields.io/pypi/v/locallab.svg?style=flat-square)](https://pypi.org/project/locallab/)
 [![Python Version](https://img.shields.io/pypi/pyversions/locallab.svg?style=flat-square)](https://pypi.org/project/locallab/)
 [![License](https://img.shields.io/github/license/Developer-Utkarsh/LocalLab.svg?style=flat-square)](https://github.com/Developer-Utkarsh/LocalLab/blob/main/LICENSE)
@@ -50,13 +49,13 @@ LocalLab is a powerful, lightweight AI inference server designed to deliver cutt
 Below is a high-level diagram of LocalLab's architecture.
 
 ```mermaid
-graph TD;
-    A["User"] --> B["LocalLab Client (Python/Node.js)"];
-    B --> C["LocalLab Server"];
-    C --> D["Model Manager"];
-    D --> E["Hugging Face Models"];
-    C --> F["Optimizations"];
-    C --> G["Resource Monitoring"];
+graph TD
+    A["User"] --> B["LocalLab Client (Python/Node.js)"]
+    B --> C["LocalLab Server"]
+    C --> D["Model Manager"]
+    D --> E["Hugging Face Models"]
+    C --> F["Optimizations"]
+    C --> G["Resource Monitoring"]
 ```
 
 ## Google Colab Workflow

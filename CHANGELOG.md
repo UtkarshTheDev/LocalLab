@@ -2,13 +2,15 @@
 
 All notable changes for version updates.
 
-## [0.1.3] - 2024-02-27
+## [0.1.4] - 2024-02-25
 
 ### Changed
 
-- Updated GitHub Actions workflow to use the --no-cache-dir flag in pip install commands, which prevents disk space issues during dependency installation (e.g., for large packages like torch).
+- Improved logging across startup: the banner, model details, configuration, system resources, API documentation, quick start guide, and footer are now fully logged and printed.
+- Updated the start_server function to extend the health check timeout to 60 seconds in Google Colab (when using ngrok) and to set an environment variable to trigger the Colab branch in run_server_proc.
+- Modified startup_event to load the model in the background, ensuring that the server's /health endpoint becomes available in time and that logging output is complete.
 
-## [0.1.2] - 2024-02-25
+## [0.1.3] - 2024-02-25
 
 ### Changed
 
@@ -22,23 +24,28 @@ All notable changes for version updates.
 - Removed duplicate architecture diagrams from the root `README.md` to streamline documentation.
 - Minor improvements to logging and error handling.
 
+## [0.1.2] - 2024-02-25
+
+### Changed
+
+- Updated GitHub Actions workflow to install the Locallab package along with its runtime dependencies in CI.
+
+### Fixed
+
+- Fixed RuntimeError related to SemLock sharing in multiprocessing by clearing logger handlers in `run_server_proc`.
+- Updated Mermaid diagrams to wrap node labels in double quotes, improving compatibility with GitHub rendering.
+- Improved build status badge aesthetics in the README.
+
 ## [0.1.1] - 2024-02-25
 
 ### Fixed
 
 - Fixed RuntimeError related to SemLock sharing in multiprocessing by clearing logger handlers in `run_server_proc`.
-- Updated Mermaid diagrams in `README.md` and `docs/colab/README.md` to wrap node labels in double quotes, improving compatibility with GitHub rendering.
+- Updated Mermaid diagrams to wrap node labels in double quotes, improving compatibility with GitHub rendering.
 - Improved build status badge aesthetics in the README.
 
 ## [0.1.0] - 2024-02-24
 
 ### Added
 
-- Upgraded package version from 0.0 to 0.1.0.
-- Initial release as a Python package with full Google Colab integration.
-- Basic API functionality including dynamic model loading and inference endpoints.
-- Enhanced logging with ASCII art banners, detailed model and system resource information, and robust error handling.
-- Ngrok tunnel management for public URL access in Colab.
-- Comprehensive documentation with absolute URLs for smooth navigation.
-- GitHub Actions workflow for automated PyPI publishing.
-- MIT License introduced.
+- Initial release as a Python package with full Google Colab integration, dynamic model loading, robust logging (with ASCII art banners), API endpoints for text generation and system monitoring, Ngrok tunnel management, and comprehensive documentation.

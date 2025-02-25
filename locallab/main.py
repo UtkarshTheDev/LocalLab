@@ -376,7 +376,6 @@ async def startup_event():
     ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝ 
 {Style.RESET_ALL}"""
         
-        # In Google Colab, explicitly print the banner to ensure visibility
         print(banner)
         sys.stdout.flush()
         logger.info(banner)
@@ -430,10 +429,10 @@ async def startup_event():
         logger.info(model_config)
         sys.stdout.flush()
 
-        # Load model with progress indicator
+        # Load model with progress indicator (start in background to not block startup)
         logger.info(f"\n{Fore.YELLOW}⚡ Loading model: {hf_model}{Style.RESET_ALL}")
-        await model_manager.load_model(hf_model)
-        logger.info(f"{Fore.GREEN}✓ Model loaded successfully!{Style.RESET_ALL}\n")
+        asyncio.create_task(model_manager.load_model(hf_model))
+        logger.info(f"{Fore.GREEN}Model loading started in background!{Style.RESET_ALL}\n")
         sys.stdout.flush()
 
         # System Resources with box drawing
@@ -509,7 +508,7 @@ async def startup_event():
     ╔════════════════════════════════════════════════════════════════════╗
     ║                                                                  ║
     ║  {Fore.GREEN}LocalLab - Your Local AI Inference Server{Fore.CYAN}                    ║
-    ║  {Fore.GREEN}Made with ❤️  by Utkarsh Tiwari{Fore.CYAN}                             ║
+    ║  {Fore.GREEN}Made with ❤️  by Utkarsh{Fore.CYAN}                             ║
     ║                                                                  ║
     ╚══════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
 
@@ -714,8 +713,7 @@ def run_server_proc(log_queue):
         logger.error(f"Server startup failed: {str(e)}")
         raise
 
-# Modify start_server to accept a log_queue parameter and pass it to the child process
-
+# Modify start_server function
 def start_server(use_ngrok: bool = False, log_queue=None):
     import time
     import requests
@@ -724,14 +722,20 @@ def start_server(use_ngrok: bool = False, log_queue=None):
     if log_queue is None:
         ctx = multiprocessing.get_context("spawn")
         log_queue = ctx.Queue()
-    
+
+    # If using ngrok, set environment variable to trigger colab branch in run_server_proc
+    if use_ngrok:
+        os.environ["COLAB_GPU"] = "1"
+        timeout = 60
+    else:
+        timeout = 30
+
     # Start the server in a separate process using spawn context with module-level run_server_proc
     ctx = multiprocessing.get_context("spawn")
     p = ctx.Process(target=run_server_proc, args=(log_queue,))
     p.start()
-    
+
     # Wait until the /health endpoint returns 200 or timeout
-    timeout = 30
     start_time_loop = time.time()
     health_url = "http://127.0.0.1:8000/health"
     server_ready = False
@@ -744,10 +748,10 @@ def start_server(use_ngrok: bool = False, log_queue=None):
         except Exception:
             pass
         time.sleep(1)
-    
+
     if not server_ready:
         raise Exception("Server did not become healthy in time.")
-    
+
     if use_ngrok:
         public_url = setup_ngrok(port=8000)
         ngrok_section = f"\n{Fore.CYAN}┌────────────────────────── Ngrok Tunnel Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🚀 Ngrok Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
