@@ -3,6 +3,7 @@
 ## Quick Start
 
 The fastest way to get started is to use our [Interactive Colab Guide](./locallab_colab_guide.ipynb). This notebook provides:
+
 - Step-by-step setup
 - Interactive configuration
 - Usage examples
@@ -36,3 +37,13 @@ The fastest way to get started is to use our [Interactive Colab Guide](./localla
 - Check our [Troubleshooting Guide](./troubleshooting.md)
 - Visit our [FAQ](./faq.md)
 - Open an [Issue](https://github.com/Developer-Utkarsh/LocalLab/issues)
+
+```mermaid
+graph TD;
+    A[User] --> B[LocalLab Client (Python and Node.js)];
+    B --> C[LocalLab Server];
+    C --> D[Model Manager];
+    D --> E[Hugging Face Models];
+    C --> F[Optimizations];
+    C --> G[Resource Monitoring];
+```

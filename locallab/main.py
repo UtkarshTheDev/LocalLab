@@ -22,6 +22,16 @@ from contextlib import contextmanager
 import requests
 import multiprocessing
 
+# New: Define a LogQueueWriter to redirect writes to a multiprocessing.Queue
+class LogQueueWriter:
+    def __init__(self, queue):
+        self.queue = queue
+    def write(self, msg):
+        if msg.strip() != "":
+            self.queue.put(msg)
+    def flush(self):
+        pass
+
 from . import __version__  # Import version from package
 from .model_manager import ModelManager
 from .config import (
@@ -669,13 +679,20 @@ def setup_ngrok(port: int = 8000, max_retries: int = 3) -> Optional[str]:
             logger.error("Failed to establish ngrok tunnel after all retries")
             raise
 
-def run_server_proc():
-    try:
-        # Redirect stdout and stderr to 'server.log' to capture all printed output
-        log_file = "server.log"
-        sys.stdout = open(log_file, "a", buffering=1)
-        sys.stderr = open(log_file, "a", buffering=1)
+# Modify run_server_proc to accept a log_queue and redirect stdout/stderr
 
+def run_server_proc(log_queue):
+    try:
+        # Redirect stdout and stderr to the log queue
+        log_writer = LogQueueWriter(log_queue)
+        sys.stdout = log_writer
+        sys.stderr = log_writer
+        
+        # Attach a logging handler to send log messages to the queue
+        handler = logging.StreamHandler(log_writer)
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        logger.addHandler(handler)
+        
         if "COLAB_GPU" in os.environ:
             import nest_asyncio
             nest_asyncio.apply()
@@ -691,15 +708,21 @@ def run_server_proc():
         logger.error(f"Server startup failed: {str(e)}")
         raise
 
-def start_server(use_ngrok: bool = False):
+# Modify start_server to accept a log_queue parameter and pass it to the child process
+
+def start_server(use_ngrok: bool = False, log_queue=None):
     import time
     import requests
-
+    
+    # If no log_queue provided, create one (though normally parent supplies it)
+    if log_queue is None:
+        log_queue = multiprocessing.Queue()
+    
     # Start the server in a separate process using spawn context with module-level run_server_proc
     ctx = multiprocessing.get_context("spawn")
-    p = ctx.Process(target=run_server_proc)
+    p = ctx.Process(target=run_server_proc, args=(log_queue,))
     p.start()
-
+    
     # Wait until the /health endpoint returns 200 or timeout
     timeout = 30
     start_time_loop = time.time()
@@ -714,16 +737,16 @@ def start_server(use_ngrok: bool = False):
         except Exception:
             pass
         time.sleep(1)
-
+    
     if not server_ready:
         raise Exception("Server did not become healthy in time.")
-
+    
     if use_ngrok:
         public_url = setup_ngrok(port=8000)
         ngrok_section = f"\n{Fore.CYAN}┌────────────────────────── Ngrok Tunnel Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🚀 Ngrok Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
         logger.info(ngrok_section)
         print(ngrok_section)
-
+    
     # Wait indefinitely until a KeyboardInterrupt is received
     try:
         while True:
@@ -733,68 +756,17 @@ def start_server(use_ngrok: bool = False):
         p.terminate()
         p.join()
 
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    """Log API requests with detailed information"""
-    start_time = time.time()
-    response = await call_next(request)
-    process_time = (time.time() - start_time) * 1000
+# Define a log listener function in the parent to print messages from the log queue
 
-    # Get current resource usage
-    cpu_percent = psutil.cpu_percent()
-    memory = psutil.virtual_memory()
-    gpu_mem = torch.cuda.memory_allocated(0) / 1024**2 if torch.cuda.is_available() else 0
-
-    # Create status color based on response code
-    status_color = Fore.GREEN if response.status_code < 300 else Fore.RED if response.status_code >= 400 else Fore.YELLOW
-
-    # Get endpoint description and other details
-    endpoint_desc = {
-        "/generate": "Text Generation",
-        "/chat": "Chat Completion",
-        "/generate/batch": "Batch Generation",
-        "/models/current": "Current Model Info",
-        "/models/available": "Available Models",
-        "/system/info": "System Status"
-    }.get(request.url.path, "API Request")
-
-    # Format request log with additional active model info
-    log_message = f"""
-{Fore.CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Style.RESET_ALL}
-{Fore.CYAN}{endpoint_desc}{Style.RESET_ALL}
-{Fore.CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Style.RESET_ALL}
-
-• Time: {Fore.GREEN}{time.strftime('%H:%M:%S')}{Style.RESET_ALL}
-• Method: {Fore.MAGENTA}{request.method}{Style.RESET_ALL}
-• Path: {Fore.YELLOW}{request.url.path}{Style.RESET_ALL}
-• Status: {status_color}{response.status_code}{Style.RESET_ALL}
-• Duration: {Fore.GREEN}{process_time:.2f}ms{Style.RESET_ALL}
-
-{Fore.YELLOW}Resource Usage:{Style.RESET_ALL}
-• CPU: {Fore.YELLOW}{cpu_percent}%{Style.RESET_ALL}
-• RAM: {Fore.YELLOW}{memory.percent}%{Style.RESET_ALL}
-• Active Model: {Fore.YELLOW}{model_manager.current_model}{Style.RESET_ALL}
-"""
-    logger.info(log_message)
-    return response
-
-# Define a helper function to tail the log file and print its content to stdout
-import time
-import threading
-
-def tail_log_file(filepath):
-    last_pos = 0
+def log_listener(queue):
     while True:
         try:
-            with open(filepath, 'r') as f:
-                f.seek(last_pos)
-                new_content = f.read()
-                if new_content:
-                    print(new_content, end='')
-                    last_pos = f.tell()
+            msg = queue.get()
+            if msg is None:
+                break
+            print(msg, end='')
         except Exception as e:
             pass
-        time.sleep(1)
 
 if __name__ == "__main__":
     import multiprocessing
@@ -804,7 +776,9 @@ if __name__ == "__main__":
         logger.warning("multiprocessing start method already set: " + str(e))
     
     import threading
-    tail_thread = threading.Thread(target=tail_log_file, args=("server.log",), daemon=True)
-    tail_thread.start()
-
-    start_server(use_ngrok=True)
+    # Create a log queue and start the listener thread
+    log_queue = multiprocessing.Queue()
+    listener_thread = threading.Thread(target=log_listener, args=(log_queue,), daemon=True)
+    listener_thread.start()
+    
+    start_server(use_ngrok=True, log_queue=log_queue)
