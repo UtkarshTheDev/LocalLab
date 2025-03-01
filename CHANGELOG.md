@@ -2,6 +2,16 @@
 
 All notable changes for version updates.
 
+## [0.1.8] - 2025-03-01
+
+### Fixed
+
+- Completely removed health checks and validation when setting up ngrok tunnels
+- Fixed issue with logs not appearing correctly due to server starting in a separate process
+- Simplified ngrok setup process to run without validation, preventing connection errors during startup
+- Improved server startup flow to be more direct, without background health checks or API validation
+- Reorganized startup sequence to work properly with ngrok, improving Colab compatibility
+
 ## [0.1.7] - 2025-03-01
 
 ### Changed

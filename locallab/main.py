@@ -221,8 +221,6 @@ async def list_available_models() -> Dict[str, Any]:
 @app.get("/health")
 async def health_check() -> Dict[str, str]:
     """Check the health status of the server"""
-    # Always return healthy to ensure the server can respond during startup
-    # Even if model is still loading
     global model_loading
     status = "initializing" if model_loading else "healthy"
     return {"status": status}
@@ -649,52 +647,24 @@ def signal_handler(signum, frame):
         
     threading.Thread(target=delayed_exit, daemon=True).start()
 
-def setup_ngrok(port: int = 8000, max_retries: int = 3) -> Optional[str]:
-    """Setup ngrok tunnel with retry logic and validation"""
+def setup_ngrok(port: int = 8000) -> Optional[str]:
+    """Simple ngrok tunnel setup without any validation or health checks"""
     ngrok_token = os.getenv("NGROK_AUTH_TOKEN")
     
     if not ngrok_token:
         logger.error("NGROK_AUTH_TOKEN environment variable not set")
         return None
         
-    # Validate token format
-    if not isinstance(ngrok_token, str) or len(ngrok_token) < 30:
-        logger.error("Invalid NGROK_AUTH_TOKEN format")
+    try:
+        # Configure and start tunnel
+        conf.get_default().auth_token = ngrok_token
+        tunnel = ngrok.connect(port, "http")
+        public_url = tunnel.public_url
+        logger.info(f"Ngrok tunnel established: {public_url}")
+        return public_url
+    except Exception as e:
+        logger.error(f"Failed to establish ngrok tunnel: {str(e)}")
         return None
-    
-    for attempt in range(max_retries):
-        try:
-            # Configure ngrok
-            conf.get_default().auth_token = ngrok_token
-            conf.get_default().region = "us"  # or other region as needed
-            
-            # Kill any existing ngrok processes
-            ngrok.kill()
-            time.sleep(2)  # Added delay to allow previous tunnels to close
-            
-            # Start new tunnel
-            tunnel = ngrok.connect(port, "http")
-            
-            # Verify tunnel
-            public_url = tunnel.public_url
-            if not public_url.startswith("http"):
-                raise ValueError("Invalid tunnel URL")
-                
-            # Test connection
-            response = requests.get(f"{public_url}/health", timeout=5)
-            if response.status_code != 200:
-                raise ConnectionError("Tunnel health check failed")
-                
-            logger.info(f"Ngrok tunnel established: {public_url}")
-            return public_url
-            
-        except Exception as e:
-            logger.warning(f"Ngrok connection attempt {attempt + 1} failed: {str(e)}")
-            if attempt < max_retries - 1:
-                time.sleep(2 ** attempt)  # Exponential backoff
-                continue
-            logger.error("Failed to establish ngrok tunnel after all retries")
-            raise
 
 # New utility functions added to fix undefined errors
 
@@ -716,9 +686,8 @@ async def load_model_in_background(model_id: str):
 # Simplified start_server function that runs directly in the main process
 def start_server(use_ngrok: bool = False, port=8000):
     """Start the LocalLab server directly in the main process"""
-    try:
-        # Display startup banner
-        startup_banner = f"""
+    # Display startup banner
+    startup_banner = f"""
 {Fore.CYAN}
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                                                                      ║
@@ -728,40 +697,41 @@ def start_server(use_ngrok: bool = False, port=8000):
 
 {Fore.YELLOW}⏳ Initializing server...{Style.RESET_ALL}
 """
-        print(startup_banner, flush=True)
-        
-        # Check if port is already in use
-        if is_port_in_use(port):
-            logger.warning(f"Port {port} is already in use. Trying to find another port...")
-            for p in range(port+1, port+100):
-                if not is_port_in_use(p):
-                    port = p
-                    logger.info(f"Using alternative port: {port}")
-                    break
-            else:
-                raise RuntimeError(f"Could not find an available port in range {port}-{port+100}")
-        
-        # If using ngrok, set up the tunnel before starting the server
-        if use_ngrok:
-            logger.info(f"{Fore.CYAN}Setting up ngrok tunnel to port {port}...{Style.RESET_ALL}")
-            public_url = setup_ngrok(port=port)
-            if public_url:
-                ngrok_section = f"\n{Fore.CYAN}┌────────────────────────── Ngrok Tunnel Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🚀 Ngrok Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
-                logger.info(ngrok_section)
-                print(ngrok_section)
-            else:
-                logger.error(f"{Fore.RED}Failed to create ngrok tunnel. Check your ngrok token.{Style.RESET_ALL}")
-                logger.info(f"{Fore.YELLOW}Server will run locally on port {port}.{Style.RESET_ALL}")
-        
-        # Server info section
-        server_section = f"\n{Fore.CYAN}┌────────────────────────── Server Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🖥️ Local URL: {Fore.GREEN}http://localhost:{port}{Style.RESET_ALL}\n│  ⚙️ Status: {Fore.GREEN}Running{Style.RESET_ALL}\n│  🔄 Model Loading: {Fore.YELLOW}In Progress{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
-        print(server_section, flush=True)
-        
-        # Set up signal handlers for graceful shutdown
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-        
-        # Start uvicorn server directly in the main process
+    print(startup_banner, flush=True)
+    
+    # Check if port is already in use
+    if is_port_in_use(port):
+        logger.warning(f"Port {port} is already in use. Trying to find another port...")
+        for p in range(port+1, port+100):
+            if not is_port_in_use(p):
+                port = p
+                logger.info(f"Using alternative port: {port}")
+                break
+        else:
+            raise RuntimeError(f"Could not find an available port in range {port}-{port+100}")
+    
+    # Server info section
+    server_section = f"\n{Fore.CYAN}┌────────────────────────── Server Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🖥️ Local URL: {Fore.GREEN}http://localhost:{port}{Style.RESET_ALL}\n│  ⚙️ Status: {Fore.GREEN}Running{Style.RESET_ALL}\n│  🔄 Model Loading: {Fore.YELLOW}In Progress{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
+    print(server_section, flush=True)
+    
+    # Set up ngrok before starting server if requested
+    public_url = None
+    if use_ngrok:
+        logger.info(f"{Fore.CYAN}Setting up ngrok tunnel to port {port}...{Style.RESET_ALL}")
+        public_url = setup_ngrok(port=port)
+        if public_url:
+            ngrok_section = f"\n{Fore.CYAN}┌────────────────────────── Ngrok Tunnel Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🚀 Ngrok Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
+            logger.info(ngrok_section)
+            print(ngrok_section)
+        else:
+            logger.warning(f"{Fore.YELLOW}Failed to set up ngrok tunnel. Server will run locally on port {port}.{Style.RESET_ALL}")
+    
+    # Set up signal handlers for graceful shutdown
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Start uvicorn server directly in the main process
+    try:
         if use_ngrok:
             # Colab environment setup
             import nest_asyncio
@@ -774,17 +744,19 @@ def start_server(use_ngrok: bool = False, port=8000):
             # Local environment
             logger.info(f"Starting server on port {port} (local mode)")
             uvicorn.run(app, host="127.0.0.1", port=port, reload=False, workers=1, log_level="info")
-            
     except Exception as e:
+        # Clean up ngrok if server fails to start
+        if use_ngrok and public_url:
+            try:
+                ngrok.disconnect(public_url)
+            except:
+                pass
         logger.error(f"Server startup failed: {str(e)}")
         logger.error(traceback.format_exc())
         raise
 
 if __name__ == "__main__":
-    # Setup signal handlers
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-    
-    # Start the server with ngrok if in Colab
+    # Start the server with ngrok if requested via environment variable
     use_ngrok = os.getenv("ENABLE_NGROK", "false").lower() == "true"
-    start_server(use_ngrok=use_ngrok)
+    port = int(os.getenv("SERVER_PORT", "8000"))
+    start_server(use_ngrok=use_ngrok, port=port)
