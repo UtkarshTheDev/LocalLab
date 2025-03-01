@@ -4,7 +4,11 @@ System utilities for LocalLab
 
 import os
 import psutil
-import torch
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
 from typing import Optional, Tuple, Dict, Any
 
 from ..logger import get_logger
@@ -24,7 +28,7 @@ def get_system_memory() -> Tuple[int, int]:
 
 def get_gpu_memory() -> Optional[Tuple[int, int]]:
     """Get GPU memory information in MB if available"""
-    if not torch.cuda.is_available():
+    if not TORCH_AVAILABLE or not torch.cuda.is_available():
         return None
     
     try:
@@ -53,7 +57,7 @@ def check_resource_availability(required_memory: int) -> bool:
         return False
     
     # If GPU is available, check GPU memory
-    if torch.cuda.is_available():
+    if TORCH_AVAILABLE and torch.cuda.is_available():
         gpu_memory = get_gpu_memory()
         if gpu_memory:
             total_gpu, free_gpu = gpu_memory
@@ -64,11 +68,11 @@ def check_resource_availability(required_memory: int) -> bool:
     return True
 
 
-def get_device() -> torch.device:
+def get_device() -> str:
     """Get the best available device for computation"""
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    return torch.device("cpu")
+    if TORCH_AVAILABLE and torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
 
 
 def format_model_size(size_in_bytes: int) -> str:
@@ -88,19 +92,22 @@ def get_system_resources() -> Dict[str, Any]:
         'ram_total': psutil.virtual_memory().total / (1024 * 1024),
         'ram_available': psutil.virtual_memory().available / (1024 * 1024),
         'memory_usage': psutil.virtual_memory().percent,
-        'gpu_available': torch.cuda.is_available(),
+        'gpu_available': False,
         'gpu_info': []
     }
     
-    if resources['gpu_available']:
-        gpu_count = torch.cuda.device_count()
-        for i in range(gpu_count):
-            gpu_mem = get_gpu_memory()
-            if gpu_mem:
-                total_mem, _ = gpu_mem
-                resources['gpu_info'].append({
-                    'name': torch.cuda.get_device_name(i),
-                    'total_memory': total_mem
-                })
+    # Update GPU availability only if torch is available
+    if TORCH_AVAILABLE:
+        resources['gpu_available'] = torch.cuda.is_available()
+        if resources['gpu_available']:
+            gpu_count = torch.cuda.device_count()
+            for i in range(gpu_count):
+                gpu_mem = get_gpu_memory()
+                if gpu_mem:
+                    total_mem, _ = gpu_mem
+                    resources['gpu_info'].append({
+                        'name': torch.cuda.get_device_name(i),
+                        'total_memory': total_mem
+                    })
     
     return resources 

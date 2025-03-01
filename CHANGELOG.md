@@ -28,6 +28,8 @@ All notable changes for version updates.
 
 - Fixed circular import issues between core/app.py and routes modules
 - Fixed ngrok authentication flow to properly use auth token from environment variables
+- Fixed error with missing torch import in the server.py file
+- Added graceful handling of missing torch module to prevent startup failures
 - Improved error messages when server fails to start
 - Better exception handling throughout the codebase
 
@@ -108,31 +110,4 @@ All notable changes for version updates.
 - Refactored `run_server_proc` in the spawned process to initialize a dedicated logger ("locallab.spawn") to avoid inheriting SemLock objects from a fork context.
 - Ensured that the log queue is created using the multiprocessing spawn context, preventing runtime errors in Google Colab.
 - Updated Mermaid diagrams in `README.md` and `docs/colab/README.md` to enclose node labels in double quotes, resolving parse errors in GitHub rendering.
-- Removed duplicate architecture diagrams from the root `README.md` to streamline documentation.
-- Minor improvements to logging and error handling.
-
-## [0.1.2] - 2025-02-25
-
-### Changed
-
-- Updated GitHub Actions workflow to install the Locallab package along with its runtime dependencies in CI.
-
-### Fixed
-
-- Fixed RuntimeError related to SemLock sharing in multiprocessing by clearing logger handlers in `run_server_proc`.
-- Updated Mermaid diagrams to wrap node labels in double quotes, improving compatibility with GitHub rendering.
-- Improved build status badge aesthetics in the README.
-
-## [0.1.1] - 2025-02-25
-
-### Fixed
-
-- Fixed RuntimeError related to SemLock sharing in multiprocessing by clearing logger handlers in `run_server_proc`.
-- Updated Mermaid diagrams to wrap node labels in double quotes, improving compatibility with GitHub rendering.
-- Improved build status badge aesthetics in the README.
-
-## [0.1.0] - 2025-02-24
-
-### Added
-
-- Initial release as a Python package with full Google Colab integration, dynamic model loading, robust logging (with ASCII art banners), API endpoints for text generation and system monitoring, Ngrok tunnel management, and comprehensive documentation.
+- Removed duplicate architecture diagrams from the root `

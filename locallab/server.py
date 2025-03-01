@@ -22,6 +22,13 @@ from .logger import get_logger
 from .logger.logger import set_server_status, log_request
 from .utils.system import get_gpu_memory
 
+# Import torch - handle import error gracefully
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
 # Get the logger instance
 logger = get_logger("locallab.server")
 
@@ -61,16 +68,21 @@ def check_environment() -> List[Tuple[str, str, bool]]:
             ))
         
         # Check Colab runtime type for GPU
-        if not torch.cuda.is_available():
+        if TORCH_AVAILABLE and not torch.cuda.is_available():
             issues.append((
                 "Running in Colab without GPU acceleration",
                 "Change runtime type to GPU: Runtime > Change runtime type > Hardware accelerator > GPU",
                 True
             ))
+        elif not TORCH_AVAILABLE:
+            issues.append((
+                "PyTorch is not installed",
+                "Install PyTorch with: pip install torch",
+                True
+            ))
     
     # Check for CUDA and GPU availability
-    try:
-        import torch
+    if TORCH_AVAILABLE:
         if not torch.cuda.is_available():
             issues.append((
                 "CUDA is not available - using CPU for inference",
@@ -86,40 +98,33 @@ def check_environment() -> List[Tuple[str, str, bool]]:
                     if free_mem < 2000:  # Less than 2GB free
                         issues.append((
                             f"Low GPU memory: Only {free_mem}MB available",
-                            "Consider using a smaller model or enabling quantization with LOCALLAB_ENABLE_QUANTIZATION=true",
+                            "Models may require 2-6GB of GPU memory. Consider closing other applications or using a smaller model",
                             True if free_mem < 1000 else False
                         ))
             except Exception as e:
-                issues.append((
-                    f"Failed to check GPU memory: {str(e)}",
-                    "This may indicate driver issues. Consider updating your GPU drivers",
-                    False
-                ))
-    except ImportError:
+                logger.warning(f"Failed to check GPU memory: {str(e)}")
+    else:
         issues.append((
             "PyTorch is not installed",
             "Install PyTorch with: pip install torch",
             True
         ))
     
-    # Check available system memory
+    # Check system memory
     try:
         import psutil
         memory = psutil.virtual_memory()
+        total_gb = memory.total / (1024 * 1024 * 1024)
         available_gb = memory.available / (1024 * 1024 * 1024)
         
         if available_gb < 2.0:  # Less than 2GB available
             issues.append((
                 f"Low system memory: Only {available_gb:.1f}GB available",
-                "Consider closing other applications or using a system with more RAM",
-                True if available_gb < 1.0 else False
+                "Models may require 2-8GB of system memory. Consider closing other applications",
+                True
             ))
     except Exception as e:
-        issues.append((
-            f"Failed to check system memory: {str(e)}",
-            "This may affect model loading and performance",
-            False
-        ))
+        pass  # Skip if psutil isn't available
     
     # Check for required dependencies
     try:

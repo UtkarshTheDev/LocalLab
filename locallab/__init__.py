@@ -2,7 +2,7 @@
 LocalLab - A lightweight AI inference server
 """
 
-__version__ = "0.2.0" 
+__version__ = "0.2.1" 
 
 from typing import Dict, Any, Optional
 
