@@ -2,6 +2,15 @@
 
 All notable changes for version updates.
 
+## [0.2.2] - 2025-03-03
+
+### Fixed
+
+- Fixed circular import issue between core/app.py and routes/system.py by updating system.py to use get_request_count from logger module directly
+- Made Flash Attention warning less alarming by changing it from a warning to an info message with better explanation
+- Enhanced get_system_info endpoint with cleaner code and better organization
+- Fixed potential issues with GPU info retrieval through better error handling
+
 ## [0.2.0] - 2025-03-02
 
 ### Added

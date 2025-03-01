@@ -52,7 +52,7 @@ class ModelManager:
                 import flash_attn
                 logger.info("Flash Attention enabled")
             except ImportError:
-                logger.warning("Flash Attention not available")
+                logger.info("Flash Attention not available - this is optional and won't affect basic functionality")
     
     def _get_quantization_config(self) -> Optional[Dict[str, Any]]:
         """Get quantization configuration based on settings"""

@@ -10,7 +10,8 @@ import psutil
 import torch
 
 from ..logger import get_logger
-from ..core.app import model_manager, request_count, start_time
+from ..logger.logger import get_request_count, get_uptime_seconds
+from ..core.app import model_manager, start_time
 from ..ui.banners import print_system_resources
 from ..config import system_instructions
 
@@ -50,6 +51,24 @@ def get_gpu_memory() -> Optional[Tuple[int, int]]:
         return None
 
 
+def get_gpu_info() -> Optional[Dict[str, Any]]:
+    """Get detailed GPU information including memory and device name"""
+    try:
+        gpu_mem = get_gpu_memory()
+        if gpu_mem:
+            total_gpu, free_gpu = gpu_mem
+            return {
+                "total_memory": total_gpu,
+                "free_memory": free_gpu,
+                "used_memory": total_gpu - free_gpu,
+                "device": torch.cuda.get_device_name(0)
+            }
+        return None
+    except Exception as e:
+        logger.debug(f"Failed to get GPU info: {str(e)}")
+        return None
+
+
 @router.post("/system/instructions")
 async def update_system_instructions(request: SystemInstructionsRequest) -> Dict[str, str]:
     """Update system instructions"""
@@ -84,35 +103,32 @@ async def reset_system_instructions(model_id: Optional[str] = None) -> Dict[str,
 
 
 @router.get("/system/info", response_model=SystemInfoResponse)
-async def system_info() -> SystemInfoResponse:
-    """Get detailed system information"""
+async def get_system_info():
+    """Get system information including CPU, memory, GPU usage, and server stats"""
     try:
-        cpu_usage = psutil.cpu_percent()
+        # Get CPU and memory usage
+        cpu_percent = psutil.cpu_percent()
         memory = psutil.virtual_memory()
-        gpu_info = None
+        memory_percent = memory.percent
         
-        if torch.cuda.is_available():
-            gpu_mem = get_gpu_memory()
-            if gpu_mem:
-                total_gpu, free_gpu = gpu_mem
-                gpu_info = {
-                    "total_memory": total_gpu,
-                    "free_memory": free_gpu,
-                    "used_memory": total_gpu - free_gpu,
-                    "device": torch.cuda.get_device_name(0)
-                }
+        # Get GPU info if available
+        gpu_info = get_gpu_info() if torch.cuda.is_available() else None
         
+        # Get server stats
+        uptime = time.time() - start_time
+        
+        # Return combined info
         return SystemInfoResponse(
-            cpu_usage=cpu_usage,
-            memory_usage=memory.percent,
+            cpu_usage=cpu_percent,
+            memory_usage=memory_percent,
             gpu_info=gpu_info,
             active_model=model_manager.current_model,
-            uptime=time.time() - start_time,
-            request_count=request_count
+            uptime=uptime,
+            request_count=get_request_count()  # Use the function from logger.logger instead
         )
     except Exception as e:
-        logger.error(f"Failed to get system info: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error getting system info: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting system info: {str(e)}")
 
 
 @router.get("/health")
