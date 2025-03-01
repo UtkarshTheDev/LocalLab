@@ -2,6 +2,13 @@
 
 All notable changes for version updates.
 
+## [0.1.7] - 2025-03-01
+
+### Changed
+
+- Removed the background process workflow for server startup. The server now runs directly in the main process, ensuring that all logs (banner, model details, system resources, etc.) are displayed properly.
+- Simplified the startup process by directly calling uvicorn.run(), with optional ngrok setup if the server is run in Google Colab.
+
 ## [0.1.6] - 2025-02-25
 
 ### Added
