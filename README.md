@@ -40,6 +40,7 @@ LocalLab is a powerful, lightweight AI inference server designed to deliver cutt
 
 - **Multiple Model Support:** Pre-configured models along with the ability to load custom ones on demand.
 - **Advanced Optimizations:** Support for FP16, INT8, and INT4 quantization, Flash Attention, and attention slicing.
+- **Comprehensive Logging System:** Colorized console output with server status tracking, request monitoring, and performance metrics.
 - **Robust Resource Monitoring:** Real-time insights into system performance and resource usage.
 - **Flexible Client Libraries:** Comprehensive clients available for both Python and Node.js.
 - **Google Colab Friendly:** Dedicated workflow for deploying via Google Colab with public URL access.

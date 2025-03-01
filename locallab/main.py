@@ -686,7 +686,8 @@ async def load_model_in_background(model_id: str):
 # Simplified start_server function that runs directly in the main process
 def start_server(use_ngrok: bool = False, port=8000):
     """Start the LocalLab server directly in the main process"""
-    # Display startup banner
+    
+    # Display startup banner with INITIALIZING status
     startup_banner = f"""
 {Fore.CYAN}
 ╔══════════════════════════════════════════════════════════════════════╗
@@ -695,7 +696,23 @@ def start_server(use_ngrok: bool = False, port=8000):
 ║                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
 
-{Fore.YELLOW}⏳ Initializing server...{Style.RESET_ALL}
+{Fore.YELLOW}
+ ██▓ ███▄    █  ██▓▄▄▄█████▓ ██▓ ▄▄▄       ██▓     ██▓▒███████▒ ██▓ ███▄    █   ▄████ 
+▓██▒ ██ ▀█   █ ▓██▒▓  ██▒ ▓▒▓██▒▒████▄    ▓██▒    ▓██▒▒ ▒ ▒ ▄▀░▓██▒ ██ ▀█   █  ██▒ ▀█▒
+▒██▒▓██  ▀█ ██▒▒██▒▒ ▓██░ ▒░▒██▒▒██  ▀█▄  ▒██░    ▒██▒░ ▒ ▄▀▒░ ▒██▒▓██  ▀█ ██▒▒██░▄▄▄░
+░██░▓██▒  ▐▌██▒░██░░ ▓██▓ ░ ░██░░██▄▄▄▄██ ▒██░    ░██░  ▄▀▒   ░░██░▓██▒  ▐▌██▒░▓█  ██▓
+░██░▒██░   ▓██░░██░  ▒██▒ ░ ░██░ ▓█   ▓██▒░██████▒░██░▒███████▒░██░▒██░   ▓██░░▒▓███▀▒
+░▓  ░ ▒░   ▒ ▒ ░▓    ▒ ░░   ░▓   ▒▒   ▓▒█░░ ░░▓  ░░▓  ░▒▒ ▓░▒░▒░▓  ░ ▒░   ▒ ▒  ░▒   ▒ 
+ ▒ ░░ ░░   ░ ▒░ ▒ ░    ░     ▒ ░  ▒   ▒▒ ░░ ░ ▒  ░ ▒ ░░░▒ ▒ ░ ▒ ▒ ░░ ░░   ░ ▒░  ░   ░ 
+ ▒ ░   ░   ░ ░  ▒ ░  ░       ▒ ░  ░   ▒     ░ ░    ▒ ░░ ░ ░ ░ ░ ▒ ░   ░   ░ ░ ░ ░   ░ 
+ ░           ░  ░            ░        ░  ░    ░  ░ ░    ░ ░     ░           ░       ░ 
+                                                      ░                             
+{Style.RESET_ALL}
+
+{Fore.RED}⚠️  PLEASE WAIT! Server is initializing. DO NOT make API requests yet. ⚠️{Style.RESET_ALL}
+{Fore.RED}⚠️  Wait for the RUNNING banner to appear before making requests.     ⚠️{Style.RESET_ALL}
+
+{Fore.YELLOW}⏳ Initializing server components...{Style.RESET_ALL}
 """
     print(startup_banner, flush=True)
     
@@ -710,10 +727,6 @@ def start_server(use_ngrok: bool = False, port=8000):
         else:
             raise RuntimeError(f"Could not find an available port in range {port}-{port+100}")
     
-    # Server info section
-    server_section = f"\n{Fore.CYAN}┌────────────────────────── Server Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🖥️ Local URL: {Fore.GREEN}http://localhost:{port}{Style.RESET_ALL}\n│  ⚙️ Status: {Fore.GREEN}Running{Style.RESET_ALL}\n│  🔄 Model Loading: {Fore.YELLOW}In Progress{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
-    print(server_section, flush=True)
-    
     # Set up ngrok before starting server if requested
     public_url = None
     if use_ngrok:
@@ -726,9 +739,42 @@ def start_server(use_ngrok: bool = False, port=8000):
         else:
             logger.warning(f"{Fore.YELLOW}Failed to set up ngrok tunnel. Server will run locally on port {port}.{Style.RESET_ALL}")
     
+    # Server info section
+    server_section = f"\n{Fore.CYAN}┌────────────────────────── Server Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🖥️ Local URL: {Fore.GREEN}http://localhost:{port}{Style.RESET_ALL}\n│  ⚙️ Status: {Fore.GREEN}Starting{Style.RESET_ALL}\n│  🔄 Model Loading: {Fore.YELLOW}In Progress{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
+    print(server_section, flush=True)
+    
     # Set up signal handlers for graceful shutdown
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Create a function to display the Running banner when the server is ready
+    def on_startup():
+        running_banner = f"""
+{Fore.GREEN}
+██████╗ ██╗   ██╗███╗   ██╗███╗   ██╗██╗███╗   ██╗ ██████╗ 
+██╔══██╗██║   ██║████╗  ██║████╗  ██║██║████╗  ██║██╔════╝ 
+██████╔╝██║   ██║██╔██╗ ██║██╔██╗ ██║██║██╔██╗ ██║██║  ███╗
+██╔══██╗██║   ██║██║╚██╗██║██║╚██╗██║██║██║╚██╗██║██║   ██║
+██║  ██║╚██████╔╝██║ ╚████║██║ ╚████║██║██║ ╚████║╚██████╔╝
+╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚═════╝ 
+{Style.RESET_ALL}
+
+{Fore.GREEN}✅ SERVER IS READY! You can now make API requests.{Style.RESET_ALL}
+{Fore.GREEN}✅ Model will continue loading in the background if not already loaded.{Style.RESET_ALL}
+
+"""
+        print(running_banner, flush=True)
+        
+        # Show connection details again for convenience
+        endpoint_info = f"""
+{Fore.CYAN}┌────────────────────────── Connection Details ────────────────────────┐{Style.RESET_ALL}
+│
+│  🖥️ Local URL: {Fore.GREEN}http://localhost:{port}{Style.RESET_ALL}
+"""
+        if public_url:
+            endpoint_info += f"│  🌐 Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}\n"
+        endpoint_info += f"│\n{Fore.CYAN}└─────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
+        print(endpoint_info, flush=True)
     
     # Start uvicorn server directly in the main process
     try:
@@ -737,13 +783,47 @@ def start_server(use_ngrok: bool = False, port=8000):
             import nest_asyncio
             nest_asyncio.apply()
             logger.info(f"Starting server on port {port} (Colab mode)")
-            config = uvicorn.Config(app, host="0.0.0.0", port=port, reload=False, log_level="info")
+            config = uvicorn.Config(
+                app, 
+                host="0.0.0.0", 
+                port=port, 
+                reload=False, 
+                log_level="info",
+                # Add callback to print the RUNNING banner when server starts
+                callback_notify=[on_startup]
+            )
             server = uvicorn.Server(config)
             asyncio.get_event_loop().run_until_complete(server.serve())
         else:
             # Local environment
             logger.info(f"Starting server on port {port} (local mode)")
-            uvicorn.run(app, host="127.0.0.1", port=port, reload=False, workers=1, log_level="info")
+            # For local environment, we'll need a custom callback
+            # We'll use a custom Server subclass for this
+            class ServerWithCallback(uvicorn.Server):
+                def install_signal_handlers(self):
+                    # Override to prevent uvicorn from installing its own handlers
+                    pass
+                
+                async def serve(self, sockets=None):
+                    self.config.setup_event_loop()
+                    await self.startup(sockets=sockets)
+                    # Call our callback before processing requests
+                    for callback in self.config.callback_notify:
+                        callback()
+                    await self.main_loop()
+                    await self.shutdown()
+            
+            config = uvicorn.Config(
+                app, 
+                host="127.0.0.1", 
+                port=port, 
+                reload=False, 
+                workers=1, 
+                log_level="info",
+                callback_notify=[on_startup]
+            )
+            server = ServerWithCallback(config)
+            asyncio.run(server.serve())
     except Exception as e:
         # Clean up ngrok if server fails to start
         if use_ngrok and public_url:

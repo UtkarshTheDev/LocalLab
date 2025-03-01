@@ -1,9 +1,18 @@
+"""
+System utilities for LocalLab
+"""
+
 import os
 import psutil
 import torch
 from typing import Optional, Tuple, Dict, Any
-from .logger import logger
-from .config import MIN_FREE_MEMORY
+
+from ..logger import get_logger
+from ..config import MIN_FREE_MEMORY
+
+# Get logger
+logger = get_logger("locallab.utils.system")
+
 
 def get_system_memory() -> Tuple[int, int]:
     """Get system memory information in MB"""
@@ -11,6 +20,7 @@ def get_system_memory() -> Tuple[int, int]:
     total_memory = vm.total // (1024 * 1024)  # Convert to MB
     free_memory = vm.available // (1024 * 1024)  # Convert to MB
     return total_memory, free_memory
+
 
 def get_gpu_memory() -> Optional[Tuple[int, int]]:
     """Get GPU memory information in MB if available"""
@@ -32,6 +42,7 @@ def get_gpu_memory() -> Optional[Tuple[int, int]]:
         logger.warning(f"Failed to get GPU memory info: {str(e)}")
         return None
 
+
 def check_resource_availability(required_memory: int) -> bool:
     """Check if system has enough resources for the requested operation"""
     _, free_memory = get_system_memory()
@@ -52,11 +63,13 @@ def check_resource_availability(required_memory: int) -> bool:
     
     return True
 
+
 def get_device() -> torch.device:
     """Get the best available device for computation"""
     if torch.cuda.is_available():
         return torch.device("cuda")
     return torch.device("cpu")
+
 
 def format_model_size(size_in_bytes: int) -> str:
     """Format model size in human-readable format"""
@@ -66,14 +79,15 @@ def format_model_size(size_in_bytes: int) -> str:
         size_in_bytes /= 1024
     return f"{size_in_bytes:.2f} TB"
 
+
 def get_system_resources() -> Dict[str, Any]:
     """Get system resource information"""
     resources = {
         'cpu_count': psutil.cpu_count(),
-        'cpu_usage': psutil.cpu_percent(),  # Added CPU usage
+        'cpu_usage': psutil.cpu_percent(),
         'ram_total': psutil.virtual_memory().total / (1024 * 1024),
         'ram_available': psutil.virtual_memory().available / (1024 * 1024),
-        'memory_usage': psutil.virtual_memory().percent,  # Added memory usage percentage
+        'memory_usage': psutil.virtual_memory().percent,
         'gpu_available': torch.cuda.is_available(),
         'gpu_info': []
     }
@@ -89,4 +103,4 @@ def get_system_resources() -> Dict[str, Any]:
                     'total_memory': total_mem
                 })
     
-    return resources
+    return resources 

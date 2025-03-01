@@ -2,15 +2,40 @@
 
 All notable changes for version updates.
 
-## [0.1.8] - 2025-03-01
+## [0.1.9] - 2025-03-01
+
+### Added
+
+- Clear ASCII art status indicators ("INITIALIZING" and "RUNNING") showing server state
+- Warning messages that prevent users from making API requests before the server is ready
+- Callback mechanism to display the "RUNNING" banner only when the server is fully operational
+- New dedicated logger module with comprehensive features:
+  - Colorized console output for different log levels
+  - Server status tracking (initializing, running, error, shutting_down)
+  - Request tracking with detailed metrics
+  - Model loading/unloading metrics
+  - Performance monitoring for slow requests
+- API documentation for logger module with usage examples
+
+### Changed
+
+- Completely refactored the codebase into a more modular structure:
+  - Split main.py into smaller, focused modules
+  - Created separate directories for routes, UI components, utilities, and core functionality
+  - Improved import structure to prevent circular dependencies
+  - Better organization of server startup and API functionality
+- Enhanced model loading process with proper timing and status updates
+- Improved error handling throughout the application
+- Better request metrics in response headers
+- Removed old logger.py in favor of the new dedicated logger module
 
 ### Fixed
 
-- Completely removed health checks and validation when setting up ngrok tunnels
-- Fixed issue with logs not appearing correctly due to server starting in a separate process
-- Simplified ngrok setup process to run without validation, preventing connection errors during startup
-- Improved server startup flow to be more direct, without background health checks or API validation
-- Reorganized startup sequence to work properly with ngrok, improving Colab compatibility
+- Complete removal of health checks and validation when setting up ngrok tunnels
+- Fixed issue where logs did not appear correctly due to server starting in a separate process
+- Simplified ngrok setup process to run without validation to prevent connection errors during startup
+- Improved server startup flow to be more direct without background health checks or API validation
+- Reorganized startup sequence to work properly with ngrok, enhancing compatibility with Colab
 
 ## [0.1.7] - 2025-03-01
 

@@ -11,7 +11,7 @@ from .config import (
     ENABLE_BETTERTRANSFORMER, ENABLE_QUANTIZATION, QUANTIZATION_TYPE, UNLOAD_UNUSED_MODELS, MODEL_TIMEOUT,
     ENABLE_COMPRESSION
 )
-from .logger import logger
+from .logger.logger import logger, log_model_loaded, log_model_unloaded
 from .utils import check_resource_availability, get_device, format_model_size
 import gc
 from colorama import Fore, Style
@@ -145,14 +145,17 @@ class ModelManager:
     async def load_model(self, model_id: str) -> bool:
         """Load a model from HuggingFace Hub"""
         try:
+            start_time = time.time()
             logger.info(f"\n{Fore.CYAN}Loading model: {model_id}{Style.RESET_ALL}")
             
             if self.model is not None:
-                logger.info("Unloading previous model...")
+                prev_model = self.current_model
+                logger.info(f"Unloading previous model: {prev_model}")
                 del self.model
                 self.model = None
                 torch.cuda.empty_cache()
                 gc.collect()
+                log_model_unloaded(prev_model)
             
             hf_token = os.getenv("HF_TOKEN")
             config = self._get_quantization_config()
@@ -186,7 +189,9 @@ class ModelManager:
                 else:
                     self.model_config = {"max_length": DEFAULT_MAX_LENGTH}
                 
-                logger.info(f"{Fore.GREEN}✓ Model '{model_id}' loaded successfully{Style.RESET_ALL}")
+                load_time = time.time() - start_time
+                log_model_loaded(model_id, load_time)
+                logger.info(f"{Fore.GREEN}✓ Model '{model_id}' loaded successfully in {load_time:.2f} seconds{Style.RESET_ALL}")
                 return True
                 
             except Exception as e:
@@ -224,11 +229,13 @@ class ModelManager:
             
         if time.time() - self.last_used > MODEL_TIMEOUT:
             logger.info(f"Unloading model {self.current_model} due to inactivity")
+            model_id = self.current_model
             del self.model
             self.model = None
             self.current_model = None
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+            log_model_unloaded(model_id)
     
     async def generate(
         self,
