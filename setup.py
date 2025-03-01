@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="locallab",
-    version="0.1.9",
+    version="0.2.0",
     packages=find_packages(include=["locallab", "locallab.*"]),
     install_requires=[
         "fastapi>=0.68.0,<1.0.0",
@@ -52,7 +52,7 @@ setup(
     python_requires=">=3.8",
     entry_points={
         "console_scripts": [
-            "locallab=locallab.main:start_server",
+            "locallab=locallab.server:start_server",
         ],
     },
     package_data={

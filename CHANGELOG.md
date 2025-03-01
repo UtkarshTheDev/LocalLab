@@ -2,6 +2,35 @@
 
 All notable changes for version updates.
 
+## [0.2.0] - 2025-03-02
+
+### Added
+
+- Comprehensive environment check system that validates:
+  - Python version compatibility
+  - CUDA/GPU availability and configuration
+  - Ngrok token presence when running in Google Colab
+- Improved error handling with detailed error messages and suggestions
+- Clear instructions for setting up ngrok authentication token
+
+### Changed
+
+- Complete removal of the deprecated monolithic `main.py` file
+- Enhanced ngrok setup process with better authentication handling:
+  - Automatic detection of auth token from environment variables
+  - Clear error messages when auth token is missing
+  - Improved token validation and connection process
+- Parameter renamed from `ngrok` to `use_ngrok` for clarity
+- More readable ASCII art for initializing banner
+- Improved documentation about ngrok requirements for Google Colab
+
+### Fixed
+
+- Fixed circular import issues between core/app.py and routes modules
+- Fixed ngrok authentication flow to properly use auth token from environment variables
+- Improved error messages when server fails to start
+- Better exception handling throughout the codebase
+
 ## [0.1.9] - 2025-03-01
 
 ### Added

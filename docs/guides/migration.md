@@ -109,6 +109,30 @@ log_model_loaded("gpt2", 3.5)  # Model loaded in 3.5 seconds
 log_model_unloaded("gpt2")
 ```
 
+## Ngrok Usage Changes
+
+When using ngrok for public URL access in Google Colab, you now need to provide an authentication token:
+
+### Before (< 0.1.9):
+
+```python
+from locallab.main import start_server
+start_server(ngrok=True)
+```
+
+### After (>= 0.1.9):
+
+```python
+import os
+# Set your ngrok auth token (REQUIRED)
+os.environ["NGROK_AUTH_TOKEN"] = "your_token_here"  # Get from dashboard.ngrok.com
+
+from locallab import start_server
+start_server(use_ngrok=True)  # Parameter renamed from 'ngrok' to 'use_ngrok'
+```
+
+Note that the parameter has been renamed from `ngrok` to `use_ngrok` for clarity, and an auth token is now required for public URL access.
+
 ## Need Help?
 
 If you encounter any issues during migration, please:

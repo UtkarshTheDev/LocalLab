@@ -102,16 +102,32 @@ For full documentation and detailed guides, please visit our [documentation page
 
    ```python
    !pip install locallab
+
+   # Set up your ngrok auth token (REQUIRED for public access)
+   # Get your free token from: https://dashboard.ngrok.com/get-started/your-authtoken
    import os
    os.environ["NGROK_AUTH_TOKEN"] = "your_token_here"
+
+   # Optional: Configure model and optimizations
+   os.environ["HUGGINGFACE_MODEL"] = "microsoft/phi-2"  # Choose your preferred model
+   os.environ["LOCALLAB_ENABLE_QUANTIZATION"] = "true"  # Enable model optimizations
+
+   # Start the server with ngrok for public access
    from locallab import start_server
-   start_server(ngrok=True)
+   start_server(use_ngrok=True)  # Creates a public URL accessible from anywhere
    ```
 
 4. **Connecting your Client:**
+
    ```python
    from locallab.client import LocalLabClient
-   client = LocalLabClient("http://localhost:8000")  # Use ngrok URL for Colab deployment
+
+   # Use the ngrok URL displayed in the output above
+   client = LocalLabClient("https://xxxx-xxx-xxx-xxx.ngrok.io")
+
+   # Test the connection
+   response = client.generate("Hello, how are you?")
+   print(response)
    ```
 
 ## Join the Community

@@ -8,7 +8,8 @@ from pydantic import BaseModel, Field
 from typing import Dict, List, Any, Optional, Generator, Tuple
 
 from ..logger import get_logger
-from ..core.app import model_manager, request_count
+from ..logger.logger import get_request_count
+from ..core.app import model_manager
 from ..config import (
     DEFAULT_SYSTEM_INSTRUCTIONS,
     DEFAULT_MAX_LENGTH,

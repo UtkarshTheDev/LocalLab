@@ -16,27 +16,28 @@ def print_initializing_banner(version: str):
 {Fore.CYAN}
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                                                                      ║
-║  {Fore.GREEN}LocalLab Server v{version} - Starting Up{Fore.CYAN}                          ║
+║  {Fore.GREEN}LocalLab Server v{version}{Fore.CYAN}                                      ║
 ║                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
 
 {Fore.YELLOW}
- ██▓ ███▄    █  ██▓▄▄▄█████▓ ██▓ ▄▄▄       ██▓     ██▓▒███████▒ ██▓ ███▄    █   ▄████ 
-▓██▒ ██ ▀█   █ ▓██▒▓  ██▒ ▓▒▓██▒▒████▄    ▓██▒    ▓██▒▒ ▒ ▒ ▄▀░▓██▒ ██ ▀█   █  ██▒ ▀█▒
-▒██▒▓██  ▀█ ██▒▒██▒▒ ▓██░ ▒░▒██▒▒██  ▀█▄  ▒██░    ▒██▒░ ▒ ▄▀▒░ ▒██▒▓██  ▀█ ██▒▒██░▄▄▄░
-░██░▓██▒  ▐▌██▒░██░░ ▓██▓ ░ ░██░░██▄▄▄▄██ ▒██░    ░██░  ▄▀▒   ░░██░▓██▒  ▐▌██▒░▓█  ██▓
-░██░▒██░   ▓██░░██░  ▒██▒ ░ ░██░ ▓█   ▓██▒░██████▒░██░▒███████▒░██░▒██░   ▓██░░▒▓███▀▒
-░▓  ░ ▒░   ▒ ▒ ░▓    ▒ ░░   ░▓   ▒▒   ▓▒█░░ ▒░▓  ░░▓  ░▒▒ ▓░▒░▒░▓  ░ ▒░   ▒ ▒  ░▒   ▒ 
- ▒ ░░ ░░   ░ ▒░ ▒ ░    ░     ▒ ░  ▒   ▒▒ ░░ ░ ▒  ░ ▒ ░░░▒ ▒ ░ ▒ ▒ ░░ ░░   ░ ▒░  ░   ░ 
- ▒ ░   ░   ░ ░  ▒ ░  ░       ▒ ░  ░   ▒     ░ ░    ▒ ░░ ░ ░ ░ ░ ▒ ░   ░   ░ ░ ░ ░   ░ 
- ░           ░  ░            ░        ░  ░    ░  ░ ░    ░ ░     ░           ░       ░ 
-                                                      ░                             
+   _____ _______    _      _____ _______ _____ _   _  _____
+  / ____|__   __|  / \    |  __ \|__   __|_   _| \ | |/ ____|
+ | (___    | |    /   \   | |__) |  | |    | | |  \| | |  __ 
+  \___ \   | |   / ___ \  |  _  /   | |    | | | . ` | | |_ |
+  ____) |  | |  / /   \ \ | | \ \   | |   _| |_| |\  | |__| |
+ |_____/   |_| /_/     \_\|_|  \_\  |_|  |_____|_| \_|\_____|
 {Style.RESET_ALL}
 
-{Fore.RED}⚠️  PLEASE WAIT! Server is initializing. DO NOT make API requests yet. ⚠️{Style.RESET_ALL}
-{Fore.RED}⚠️  Wait for the RUNNING banner to appear before making requests.     ⚠️{Style.RESET_ALL}
+{Fore.RED}⚠️  SERVER STARTING - DO NOT MAKE API REQUESTS YET                ⚠️{Style.RESET_ALL}
+{Fore.RED}⚠️  PLEASE WAIT FOR THE "RUNNING" BANNER TO APPEAR                ⚠️{Style.RESET_ALL}
 
-{Fore.YELLOW}⏳ Initializing server components...{Style.RESET_ALL}
+{Fore.CYAN}┌────────────────────────── Server Status ───────────────────────────┐{Style.RESET_ALL}
+│
+│  ⏳ Status: {Fore.YELLOW}INITIALIZING{Style.RESET_ALL}
+│  🔄 Loading components and checking environment...
+│
+{Fore.CYAN}└─────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
 """
     print(startup_banner, flush=True)
 
@@ -48,16 +49,23 @@ def print_running_banner(port: int, public_url: Optional[str] = None):
     """
     running_banner = f"""
 {Fore.GREEN}
-██████╗ ██╗   ██╗███╗   ██╗███╗   ██╗██╗███╗   ██╗ ██████╗ 
-██╔══██╗██║   ██║████╗  ██║████╗  ██║██║████╗  ██║██╔════╝ 
-██████╔╝██║   ██║██╔██╗ ██║██╔██╗ ██║██║██╔██╗ ██║██║  ███╗
-██╔══██╗██║   ██║██║╚██╗██║██║╚██╗██║██║██║╚██╗██║██║   ██║
-██║  ██║╚██████╔╝██║ ╚████║██║ ╚████║██║██║ ╚████║╚██████╔╝
-╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚═════╝ 
+╔══════════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+║  {Fore.CYAN}LocalLab Server{Fore.GREEN} - {Fore.YELLOW}READY FOR REQUESTS{Fore.GREEN}                          ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
+
+{Fore.GREEN}
+  _____  _    _ _   _ _   _ _____ _   _  _____ 
+ |  __ \| |  | | \ | | \ | |_   _| \ | |/ ____|
+ | |__) | |  | |  \| |  \| | | | |  \| | |  __ 
+ |  _  /| |  | | . ` | . ` | | | | . ` | | |_ |
+ | | \ \| |__| | |\  | |\  |_| |_| |\  | |__| |
+ |_|  \_\\____/|_| \_|_| \_|_____|_| \_|\_____|
 {Style.RESET_ALL}
 
-{Fore.GREEN}✅ SERVER IS READY! You can now make API requests.{Style.RESET_ALL}
-{Fore.GREEN}✅ Model will continue loading in the background if not already loaded.{Style.RESET_ALL}
+{Fore.GREEN}✅ SERVER READY! YOU CAN NOW MAKE API REQUESTS                      ✅{Style.RESET_ALL}
+{Fore.GREEN}✅ MODEL LOADING WILL CONTINUE IN BACKGROUND IF NOT FINISHED        ✅{Style.RESET_ALL}
 
 """
     print(running_banner, flush=True)

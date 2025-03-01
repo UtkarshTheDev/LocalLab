@@ -14,13 +14,29 @@ init(autoreset=True)
 # Test results
 passed = []
 failed = []
+skipped = []
+
+# Check if torch is available
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    print(f"{Fore.YELLOW}Warning: PyTorch is not installed. Skipping torch-dependent tests.{Style.RESET_ALL}")
 
 def print_header(text):
     """Print a formatted header"""
     print(f"\n{Fore.CYAN}======== {text} ========{Style.RESET_ALL}")
 
-def test_import(module_name, component=None):
+def test_import(module_name, component=None, requires_torch=False):
     """Test importing a module and optionally a specific component"""
+    # Skip torch-dependent tests if torch is not available
+    if requires_torch and not TORCH_AVAILABLE:
+        test_name = f"{module_name}{f'.{component}' if component else ''}"
+        print(f"{Fore.YELLOW}⚠ Skipped import of {test_name} (requires torch){Style.RESET_ALL}")
+        skipped.append(test_name)
+        return True
+        
     try:
         if component:
             # Import specific component from module
@@ -42,6 +58,7 @@ def main():
     """Run the tests"""
     print_header("LocalLab Structure Test")
     print(f"Python version: {sys.version}")
+    print(f"PyTorch available: {TORCH_AVAILABLE}")
     
     # Ensure we're in the project root
     if not os.path.exists("locallab"):
@@ -50,54 +67,62 @@ def main():
     
     # Test core package imports
     print_header("Testing Core Imports")
-    test_import("locallab")
-    test_import("locallab", "__version__")
-    test_import("locallab", "start_server")
+    test_import("locallab", requires_torch=True)
+    test_import("locallab", "__version__", requires_torch=True)
+    test_import("locallab", "start_server", requires_torch=True)
     
     # Test logger module
     print_header("Testing Logger Module")
-    test_import("locallab.logger")
-    test_import("locallab.logger", "get_logger")
-    test_import("locallab.logger.logger")
-    test_import("locallab.logger.logger", "log_request")
-    test_import("locallab.logger.logger", "set_server_status")
+    test_import("locallab.logger", requires_torch=False)
+    test_import("locallab.logger", "get_logger", requires_torch=False)
+    test_import("locallab.logger.logger", requires_torch=False)
+    test_import("locallab.logger.logger", "log_request", requires_torch=False)
+    test_import("locallab.logger.logger", "set_server_status", requires_torch=False)
     
     # Test core components
     print_header("Testing Core Components")
-    test_import("locallab.core.app")
-    test_import("locallab.model_manager")
-    test_import("locallab.server")
+    test_import("locallab.core.app", requires_torch=True)
+    test_import("locallab.model_manager", requires_torch=True)
+    test_import("locallab.server", requires_torch=True)
     
     # Test UI components
     print_header("Testing UI Components")
-    test_import("locallab.ui.banners")
-    test_import("locallab.ui.banners", "print_initializing_banner")
-    test_import("locallab.ui.banners", "print_running_banner")
+    test_import("locallab.ui.banners", requires_torch=False)
+    test_import("locallab.ui.banners", "print_initializing_banner", requires_torch=False)
+    test_import("locallab.ui.banners", "print_running_banner", requires_torch=False)
     
     # Test routes
     print_header("Testing Routes")
-    test_import("locallab.routes.models")
-    test_import("locallab.routes.generate")
-    test_import("locallab.routes.system")
+    test_import("locallab.routes.models", requires_torch=True)
+    test_import("locallab.routes.generate", requires_torch=True)
+    test_import("locallab.routes.system", requires_torch=True)
     
     # Test utils
     print_header("Testing Utils")
-    test_import("locallab.utils.networking")
-    test_import("locallab.utils.networking", "is_port_in_use")
+    test_import("locallab.utils.networking", requires_torch=False)
+    test_import("locallab.utils.networking", "is_port_in_use", requires_torch=False)
     
     # Summary
     print_header("Test Summary")
     print(f"Passed: {len(passed)} tests")
     print(f"Failed: {len(failed)} tests")
+    print(f"Skipped: {len(skipped)} tests (torch dependency)")
     
     if failed:
         print("\nFailed imports:")
         for f in failed:
             print(f"  - {f}")
-        return 1
-    else:
-        print(f"\n{Fore.GREEN}All tests passed!{Style.RESET_ALL}")
+            
+    if skipped:
+        print("\nSkipped imports (torch dependency):")
+        for s in skipped:
+            print(f"  - {s}")
+        
+    if not failed:
+        print(f"\n{Fore.GREEN}All non-skipped tests passed!{Style.RESET_ALL}")
         return 0
+    else:
+        return 1
 
 if __name__ == "__main__":
     sys.exit(main()) 
