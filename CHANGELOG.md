@@ -2,7 +2,15 @@
 
 All notable changes to LocalLab will be documented in this file.
 
-## [0.2.6] - 2023-05-05
+## [0.2.7] - 2025-03-02
+
+### Fixed
+
+- Added missing dependency `fastapi-cache2` that was causing server startup errors
+- Added missing dependency `nvidia-ml-py3` to properly monitor NVIDIA GPUs
+- Improved error handling for GPU monitoring when dependencies are missing
+
+## [0.2.6] - 2025-03-02
 
 ### Added
 
@@ -18,7 +26,7 @@ All notable changes to LocalLab will be documented in this file.
 - Properly escaped newline characters in the streaming response
 - Added missing dependencies in `setup.py`: colorama, python-multipart, websockets, psutil, and nest-asyncio
 
-## [0.2.5] - 2023-05-02
+## [0.2.5] - 2025-03-02
 
 ### Added
 
@@ -32,7 +40,7 @@ All notable changes to LocalLab will be documented in this file.
 - Naming mismatch between route handlers and `ModelManager` methods
 - New dependencies in `setup.py`: `netifaces` and `httpx`
 
-## [0.2.4] - 2025-03-04
+## [0.2.4] - 2025-03-02
 
 ### Fixed
 
@@ -54,7 +62,7 @@ All notable changes to LocalLab will be documented in this file.
 - Improved fallback handling for missing torch packages
 - Enhanced server startup logs with better optimization information
 
-## [0.2.3] - 2025-03-03
+## [0.2.3] - 2025-03-02
 
 ### Fixed
 
@@ -63,7 +71,7 @@ All notable changes to LocalLab will be documented in this file.
 - Enhanced server startup sequence for better compatibility with both local and Colab environments
 - Improved custom server implementation to handle callbacks more robustly
 
-## [0.2.2] - 2025-03-03
+## [0.2.2] - 2025-03-02
 
 ### Fixed
 

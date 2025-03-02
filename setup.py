@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="locallab",
-    version="0.2.6",
+    version="0.2.7",
     packages=find_packages(include=["locallab", "locallab.*"]),
     install_requires=[
         "fastapi>=0.95.0,<1.0.0",
@@ -29,7 +29,19 @@ setup(
         "websockets>=10.0",
         "psutil>=5.8.0",
         "nest-asyncio>=1.5.1",
+        "fastapi-cache2>=0.2.1",
+        "nvidia-ml-py3>=7.352.0",
+        "huggingface_hub>=0.16.0",
+        "pynvml>=11.0.0",
+        "typing_extensions>=4.0.0",
     ],
+    extras_require={
+        "dev": [
+            "pytest>=7.0.0",
+            "pytest-asyncio>=0.15.0",
+            "pytest-cov>=4.0.0",
+        ],
+    },
     author="Utkarsh Tiwari",
     author_email="utkarshweb2023@gmail.com",
     description="LocalLab: Run language models locally or in Google Collab with a friendly API",

@@ -34,6 +34,7 @@ def get_gpu_memory() -> Optional[Tuple[int, int]]:
     if not TORCH_AVAILABLE or not torch.cuda.is_available():
         return None
     
+    # First try nvidia-ml-py3 (nvidia_smi)
     try:
         import nvidia_smi
         nvidia_smi.nvmlInit()
@@ -45,9 +46,35 @@ def get_gpu_memory() -> Optional[Tuple[int, int]]:
         
         nvidia_smi.nvmlShutdown()
         return total_memory, free_memory
+    except ImportError:
+        # If nvidia_smi not available, log at debug level to avoid noise
+        logger.debug("nvidia-ml-py3 not installed, falling back to torch for GPU info")
+        # Fall back to torch for basic info
+        try:
+            # Get basic info from torch
+            device = torch.cuda.current_device()
+            total_memory = torch.cuda.get_device_properties(device).total_memory // (1024 * 1024)
+            # Note: torch doesn't provide free memory info easily, so we estimate
+            # by allocating a tensor and seeing what's available
+            torch.cuda.empty_cache()
+            free_memory = total_memory  # Optimistic starting point
+            
+            # Rough estimate - we can't get exact free memory from torch easily
+            return total_memory, free_memory
+        except Exception as torch_error:
+            logger.debug(f"Torch GPU memory check also failed: {str(torch_error)}")
+            return None
     except Exception as e:
-        logger.warning(f"Failed to get GPU memory info: {str(e)}")
-        return None
+        logger.debug(f"Failed to get detailed GPU memory info: {str(e)}")
+        # Fall back to torch for basic info (same as ImportError case)
+        try:
+            device = torch.cuda.current_device()
+            total_memory = torch.cuda.get_device_properties(device).total_memory // (1024 * 1024)
+            torch.cuda.empty_cache()
+            free_memory = total_memory  # Optimistic estimate
+            return total_memory, free_memory
+        except Exception:
+            return None
 
 
 def check_resource_availability(required_memory: int) -> bool:

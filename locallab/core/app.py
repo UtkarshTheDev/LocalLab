@@ -9,10 +9,22 @@ import gc
 import torch
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi_cache import FastAPICache
-from fastapi_cache.backends.inmemory import InMemoryBackend
 from contextlib import contextmanager
 from colorama import Fore, Style
+
+# Try to import FastAPICache, but don't fail if not available
+try:
+    from fastapi_cache import FastAPICache
+    from fastapi_cache.backends.inmemory import InMemoryBackend
+    FASTAPI_CACHE_AVAILABLE = True
+except ImportError:
+    FASTAPI_CACHE_AVAILABLE = False
+    # Create dummy FastAPICache to avoid errors
+    class DummyFastAPICache:
+        @staticmethod
+        def init(backend, **kwargs):
+            pass
+    FastAPICache = DummyFastAPICache
 
 from .. import __version__
 from ..logger import get_logger
@@ -67,8 +79,12 @@ async def startup_event():
     """Initialization tasks when the server starts"""
     logger.info("Starting LocalLab server...")
     
-    # Initialize cache
-    FastAPICache.init(InMemoryBackend(), prefix="locallab-cache")
+    # Initialize cache if available
+    if FASTAPI_CACHE_AVAILABLE:
+        FastAPICache.init(InMemoryBackend(), prefix="locallab-cache")
+        logger.info("FastAPICache initialized")
+    else:
+        logger.warning("FastAPICache not available, caching disabled")
     
     # Start loading the default model in background if specified
     if DEFAULT_MODEL:
