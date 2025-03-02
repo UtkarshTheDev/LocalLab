@@ -1,6 +1,20 @@
 # Changelog
 
-All notable changes for version updates.
+All notable changes to LocalLab will be documented in this file.
+
+## [0.2.5] - 2025-03-02
+
+### Added
+
+- Added `get_network_interfaces` function to retrieve information about available network interfaces
+- Added `get_public_ip` async function to retrieve the public IP address of the machine
+- Added adapter methods in ModelManager (`generate_text` and `generate_stream`) to maintain API compatibility with route handlers
+
+### Fixed
+
+- Fixed import error for `get_public_ip` and `get_network_interfaces` functions
+- Fixed naming mismatch between route handlers and ModelManager methods
+- Added new dependencies in setup.py: `netifaces` and `httpx`
 
 ## [0.2.4] - 2025-03-04
 

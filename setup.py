@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="locallab",
-    version="0.2.4",
+    version="0.2.5",
     packages=find_packages(include=["locallab", "locallab.*"]),
     install_requires=[
         "fastapi>=0.68.0,<1.0.0",
@@ -31,6 +31,8 @@ setup(
         "termcolor>=2.3.0",
         "tqdm>=4.65.0",
         "requests>=2.31.0",
+        "netifaces>=0.11.0",  # Added for network interface information
+        "httpx>=0.24.0",  # Added for async HTTP requests
     ],
     author="Utkarsh",
     author_email="utkarshweb2023@gmail.com",

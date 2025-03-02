@@ -2,7 +2,7 @@ import os
 import logging
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
-from typing import Optional, Generator, Dict, Any, List
+from typing import Optional, Generator, Dict, Any, List, Union, Callable, AsyncGenerator
 from fastapi import HTTPException
 import time
 from .config import (
@@ -16,6 +16,10 @@ from .utils import check_resource_availability, get_device, format_model_size
 import gc
 from colorama import Fore, Style
 import asyncio
+import re
+import zipfile
+import tempfile
+import json
 
 QUANTIZATION_SETTINGS = {
     "fp16": {
@@ -551,3 +555,21 @@ class ModelManager:
                 status_code=500,
                 detail=f"Failed to load model: {str(e)}"
             )
+
+    # Add adapter methods to match the interface expected by the routes    
+    async def generate_text(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> str:
+        """
+        Adapter method that calls the generate method.
+        This is used to maintain compatibility with routes that call generate_text.
+        """
+        return await self.generate(prompt=prompt, system_prompt=system_prompt, **kwargs)
+        
+    async def generate_stream(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> AsyncGenerator[str, None]:
+        """
+        Adapter method that calls the async_stream_generate method.
+        This is used to maintain compatibility with routes that call generate_stream.
+        """
+        # Ensure streaming is enabled
+        kwargs["stream"] = True
+        async for token in self.async_stream_generate(prompt=prompt, system_prompt=system_prompt, **kwargs):
+            yield token

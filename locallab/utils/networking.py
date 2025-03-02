@@ -103,3 +103,89 @@ def setup_ngrok(port: int = 8000, auth_token: Optional[str] = None) -> Optional[
         
         logger.error(f"{Fore.YELLOW}The server will continue to run locally on port {port}.{Style.RESET_ALL}")
         return None 
+
+def get_network_interfaces() -> dict:
+    """
+    Get information about available network interfaces
+    
+    Returns:
+        A dictionary with interface names as keys and their addresses as values
+    """
+    interfaces = {}
+    try:
+        import socket
+        import netifaces
+        
+        for interface in netifaces.interfaces():
+            addresses = netifaces.ifaddresses(interface)
+            # Get IPv4 addresses if available
+            if netifaces.AF_INET in addresses:
+                ipv4_info = addresses[netifaces.AF_INET][0]
+                interfaces[interface] = {
+                    "ip": ipv4_info.get("addr", ""),
+                    "netmask": ipv4_info.get("netmask", ""),
+                    "broadcast": ipv4_info.get("broadcast", "")
+                }
+            # Get IPv6 addresses if available
+            if netifaces.AF_INET6 in addresses:
+                ipv6_info = addresses[netifaces.AF_INET6][0]
+                if interface not in interfaces:
+                    interfaces[interface] = {}
+                interfaces[interface]["ipv6"] = ipv6_info.get("addr", "")
+    except ImportError:
+        logger.warning(f"{Fore.YELLOW}netifaces package not found. Limited network interface information available.{Style.RESET_ALL}")
+        # Fallback to simple hostname information
+        try:
+            hostname = socket.gethostname()
+            ip = socket.gethostbyname(hostname)
+            interfaces["default"] = {"ip": ip, "hostname": hostname}
+        except Exception as e:
+            logger.warning(f"Failed to get network interface information: {str(e)}")
+            interfaces["error"] = str(e)
+    except Exception as e:
+        logger.warning(f"Failed to get network interface information: {str(e)}")
+        interfaces["error"] = str(e)
+    
+    return interfaces
+
+async def get_public_ip() -> str:
+    """
+    Get the public IP address of this machine
+    
+    Returns:
+        The public IP address as a string, or an empty string if it cannot be determined
+    """
+    services = [
+        "https://api.ipify.org",
+        "https://api.my-ip.io/ip",
+        "https://checkip.amazonaws.com",
+        "https://ipinfo.io/ip"
+    ]
+    
+    try:
+        # Try to use httpx for async requests
+        import httpx
+        for service in services:
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(service, timeout=5.0)
+                    if response.status_code == 200:
+                        return response.text.strip()
+            except Exception:
+                continue
+    except ImportError:
+        # Fallback to requests (synchronous)
+        try:
+            import requests
+            for service in services:
+                try:
+                    response = requests.get(service, timeout=5.0)
+                    if response.status_code == 200:
+                        return response.text.strip()
+                except Exception:
+                    continue
+        except ImportError:
+            logger.warning(f"{Fore.YELLOW}Neither httpx nor requests packages found. Cannot determine public IP.{Style.RESET_ALL}")
+    
+    # If we couldn't get the IP from any service, return empty string
+    return "" 
