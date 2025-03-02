@@ -2,6 +2,15 @@
 
 All notable changes for version updates.
 
+## [0.2.3] - 2025-03-03
+
+### Fixed
+
+- Fixed critical server startup error in Google Colab environment with uvicorn callback configuration
+- Resolved "'list' object is not callable" error by properly implementing the callback_notify as an async function
+- Enhanced server startup sequence for better compatibility with both local and Colab environments
+- Improved custom server implementation to handle callbacks more robustly
+
 ## [0.2.2] - 2025-03-03
 
 ### Fixed

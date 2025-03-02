@@ -253,14 +253,19 @@ def start_server(use_ngrok: bool = False, port=8000, ngrok_auth_token: Optional[
             import nest_asyncio
             nest_asyncio.apply()
             logger.info(f"Starting server on port {port} (Colab mode)")
+            
+            # Define the callback for Colab
+            async def on_startup_async():
+                on_startup()
+            
             config = uvicorn.Config(
                 app, 
                 host="0.0.0.0", 
                 port=port, 
                 reload=False, 
                 log_level="info",
-                # Add callback to print the RUNNING banner when server starts
-                callback_notify=[on_startup]
+                # Use an async callback function, not a list
+                callback_notify=on_startup_async
             )
             server = uvicorn.Server(config)
             asyncio.get_event_loop().run_until_complete(server.serve())
@@ -278,8 +283,13 @@ def start_server(use_ngrok: bool = False, port=8000, ngrok_auth_token: Optional[
                     self.config.setup_event_loop()
                     await self.startup(sockets=sockets)
                     # Call our callback before processing requests
-                    for callback in self.config.callback_notify:
-                        callback()
+                    if callable(self.config.callback_notify):
+                        await self.config.callback_notify()
+                    elif isinstance(self.config.callback_notify, list):
+                        for callback in self.config.callback_notify:
+                            if callable(callback):
+                                callback()
+                    on_startup()  # Always ensure our startup function is called
                     await self.main_loop()
                     await self.shutdown()
             
@@ -290,7 +300,8 @@ def start_server(use_ngrok: bool = False, port=8000, ngrok_auth_token: Optional[
                 reload=False, 
                 workers=1, 
                 log_level="info",
-                callback_notify=[on_startup]
+                # This won't be used directly, as we call on_startup in the ServerWithCallback class
+                callback_notify=None
             )
             server = ServerWithCallback(config)
             asyncio.run(server.serve())
