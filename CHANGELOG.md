@@ -2,13 +2,29 @@
 
 All notable changes to LocalLab will be documented in this file.
 
-## [0.2.7] - 2025-03-02
+## [0.2.8] - 2025-03-02
 
 ### Fixed
 
-- Added missing dependency `fastapi-cache2` that was causing server startup errors
-- Added missing dependency `nvidia-ml-py3` to properly monitor NVIDIA GPUs
-- Improved error handling for GPU monitoring when dependencies are missing
+- Fixed parameter mismatch in text generation endpoints by properly handling `max_new_tokens` parameter
+- Resolved coroutine awaiting issues in streaming generation endpoints
+- Fixed async generator handling in `stream_chat` and `generate_stream` functions
+- Enhanced error handling in streaming responses to provide better error messages
+- Improved compatibility between route parameters and model manager methods
+
+## [0.2.7] - 2025-03-02
+
+### Added
+
+- Added missing dependencies in `setup.py`: huggingface_hub, pynvml, and typing_extensions
+- Improved dependency management with dev extras for testing packages
+- Enhanced error handling for GPU memory detection
+
+### Fixed
+
+- Fixed circular import issues between modules
+- Improved error handling in system utilities
+- Enhanced compatibility with Google Colab environments
 
 ## [0.2.6] - 2025-03-02
 

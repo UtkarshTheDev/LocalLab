@@ -280,6 +280,7 @@ class ModelManager:
         prompt: str,
         stream: bool = False,
         max_length: Optional[int] = None,
+        max_new_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
         top_k: Optional[int] = None,
@@ -306,6 +307,10 @@ class ModelManager:
             # Get model-specific generation parameters
             from .config import get_model_generation_params
             gen_params = get_model_generation_params(self.current_model)
+            
+            # Handle max_new_tokens parameter (map to max_length)
+            if max_new_tokens is not None:
+                max_length = max_new_tokens
             
             # Override with user-provided parameters if specified
             if max_length is not None:
@@ -423,8 +428,40 @@ class ModelManager:
             logger.error(f"Streaming generation failed: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Streaming generation failed: {str(e)}")
     
-    async def async_stream_generate(self, inputs: Dict[str, torch.Tensor], gen_params: Dict[str, Any]):
-        """Convert the synchronous stream generator to an async generator."""
+    async def async_stream_generate(self, inputs: Dict[str, torch.Tensor] = None, gen_params: Dict[str, Any] = None, prompt: str = None, system_prompt: Optional[str] = None, **kwargs):
+        """Convert the synchronous stream generator to an async generator.
+        
+        This can be called either with:
+        1. inputs and gen_params directly (internal use)
+        2. prompt, system_prompt and other kwargs (from generate_stream adapter)
+        """
+        # If called with prompt, prepare inputs and parameters
+        if prompt is not None:
+            # Get appropriate system instructions
+            from .config import system_instructions
+            instructions = str(system_instructions.get_instructions(self.current_model)) if not system_prompt else str(system_prompt)
+            
+            # Format prompt with system instructions
+            formatted_prompt = f"""<|system|>{instructions}</|system|>\n<|user|>{prompt}</|user|>\n<|assistant|>"""
+            
+            # Get model-specific generation parameters
+            from .config import get_model_generation_params
+            gen_params = get_model_generation_params(self.current_model)
+            
+            # Update with provided kwargs
+            for key, value in kwargs.items():
+                if key in ["max_length", "temperature", "top_p", "top_k", "repetition_penalty"]:
+                    gen_params[key] = value
+                elif key == "max_new_tokens":
+                    # Handle the max_new_tokens parameter by mapping to max_length
+                    gen_params["max_length"] = value
+            
+            # Tokenize the prompt
+            inputs = self.tokenizer(formatted_prompt, return_tensors="pt")
+            for key in inputs:
+                inputs[key] = inputs[key].to(self.device)
+        
+        # Now stream tokens using the prepared inputs and parameters
         for token in self._stream_generate(inputs, gen_params=gen_params):
             yield token
             await asyncio.sleep(0)
@@ -564,6 +601,11 @@ class ModelManager:
         """
         # Make sure we're not streaming when generating text
         kwargs["stream"] = False
+        
+        # Handle max_new_tokens parameter by mapping to max_length if needed
+        if "max_new_tokens" in kwargs and "max_length" not in kwargs:
+            kwargs["max_length"] = kwargs.pop("max_new_tokens")
+            
         # Directly await the generate method to return the string result
         return await self.generate(prompt=prompt, system_instructions=system_prompt, **kwargs)
         
@@ -572,7 +614,14 @@ class ModelManager:
         Calls the async_stream_generate method with proper parameters."""
         # Ensure streaming is enabled
         kwargs["stream"] = True
-        return self.async_stream_generate(prompt=prompt, system_prompt=system_prompt, **kwargs)
+        
+        # Handle max_new_tokens parameter by mapping to max_length
+        if "max_new_tokens" in kwargs and "max_length" not in kwargs:
+            kwargs["max_length"] = kwargs.pop("max_new_tokens")
+            
+        # Call async_stream_generate with the prompt and parameters
+        async for token in self.async_stream_generate(prompt=prompt, system_prompt=system_prompt, **kwargs):
+            yield token
 
     def is_model_loaded(self, model_id: str) -> bool:
         """Check if a specific model is loaded.

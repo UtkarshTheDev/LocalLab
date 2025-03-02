@@ -5,7 +5,7 @@ API routes for text generation
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from typing import Dict, List, Any, Optional, Generator, Tuple
+from typing import Dict, List, Any, Optional, Generator, Tuple, AsyncGenerator
 import json
 
 from ..logger import get_logger
@@ -212,9 +212,9 @@ async def generate_stream(
     temperature: float, 
     top_p: float, 
     system_prompt: Optional[str]
-) -> Generator[str, None, None]:
+) -> AsyncGenerator[str, None]:
     """
-    Generate text in a streaming fashion
+    Generate text in a streaming fashion and return as server-sent events
     """
     try:
         # Get model-specific generation parameters
@@ -230,12 +230,15 @@ async def generate_stream(
         # Merge model-specific params with request params
         generation_params.update(model_params)
         
-        # Stream tokens
-        async for token in model_manager.generate_stream(
+        # Get the stream generator
+        stream_generator = model_manager.generate_stream(
             prompt=prompt,
             system_prompt=system_prompt,
             **generation_params
-        ):
+        )
+        
+        # Stream tokens
+        async for token in stream_generator:
             # Format as server-sent event
             data = token.replace("\n", "\\n")
             yield f"data: {data}\n\n"
@@ -252,9 +255,9 @@ async def stream_chat(
     max_tokens: int,
     temperature: float,
     top_p: float
-) -> Generator[str, None, None]:
+) -> AsyncGenerator[str, None]:
     """
-    Stream chat completion
+    Stream chat completion responses as server-sent events
     """
     try:
         # Get model-specific generation parameters
@@ -270,11 +273,13 @@ async def stream_chat(
         # Merge model-specific params with request params
         generation_params.update(model_params)
         
-        # Generate streaming tokens
-        async for token in model_manager.generate_stream(
+        # Generate streaming tokens - properly await the async generator
+        stream_generator = model_manager.generate_stream(
             prompt=formatted_prompt,
             **generation_params
-        ):
+        )
+        
+        async for token in stream_generator:
             # Format as a server-sent event with the structure expected by chat clients
             data = json.dumps({"role": "assistant", "content": token})
             yield f"data: {data}\n\n"
@@ -282,7 +287,7 @@ async def stream_chat(
         # End of stream marker
         yield "data: [DONE]\n\n"
     except Exception as e:
-        logger.error(f"Chat streaming failed: {str(e)}")
+        logger.error(f"Streaming generation failed: {str(e)}")
         error_data = json.dumps({"error": str(e)})
         yield f"data: {error_data}\n\n"
         yield "data: [DONE]\n\n"
