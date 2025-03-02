@@ -17,10 +17,26 @@ init(autoreset=True)
 from typing import Optional, Dict, List, Tuple
 from . import __version__
 from .utils.networking import is_port_in_use, setup_ngrok
-from .ui.banners import print_initializing_banner, print_running_banner
+from .ui.banners import (
+    print_initializing_banner, 
+    print_running_banner, 
+    print_system_resources,
+    print_model_info,
+    print_api_docs,
+    print_system_instructions
+)
 from .logger import get_logger
 from .logger.logger import set_server_status, log_request
 from .utils.system import get_gpu_memory
+from .config import (
+    DEFAULT_MODEL,
+    system_instructions,
+    ENABLE_QUANTIZATION, 
+    QUANTIZATION_TYPE,
+    ENABLE_ATTENTION_SLICING,
+    ENABLE_BETTERTRANSFORMER, 
+    ENABLE_FLASH_ATTENTION
+)
 
 # Import torch - handle import error gracefully
 try:
@@ -245,6 +261,36 @@ def start_server(use_ngrok: bool = False, port=8000, ngrok_auth_token: Optional[
         # Update server status to running
         set_server_status("running")
         print_running_banner(port, public_url)
+        
+        # Print current system instructions
+        instructions_text = system_instructions.get_instructions()
+        print_system_instructions(instructions_text)
+        
+        # Import here to avoid circular imports
+        from .core.app import model_manager
+        
+        # Print model info if a model is loaded
+        if model_manager.current_model:
+            model_info = model_manager.get_model_info()
+            print_model_info(model_info)
+        else:
+            # Print model settings from environment variables
+            env_model_info = {
+                "model_id": os.environ.get("HUGGINGFACE_MODEL", DEFAULT_MODEL),
+                "model_name": os.environ.get("HUGGINGFACE_MODEL", DEFAULT_MODEL).split("/")[-1],
+                "parameters": "Unknown (not loaded yet)",
+                "device": "cpu" if not torch.cuda.is_available() else f"cuda:{torch.cuda.current_device()}",
+                "quantization": QUANTIZATION_TYPE if ENABLE_QUANTIZATION else "None",
+                "optimizations": {
+                    "attention_slicing": ENABLE_ATTENTION_SLICING,
+                    "flash_attention": ENABLE_FLASH_ATTENTION,
+                    "better_transformer": ENABLE_BETTERTRANSFORMER
+                }
+            }
+            print_model_info(env_model_info)
+        
+        # Print API documentation
+        print_api_docs()
     
     # Start uvicorn server directly in the main process
     try:

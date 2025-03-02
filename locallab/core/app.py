@@ -7,6 +7,7 @@ import logging
 import asyncio
 import gc
 import torch
+import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import contextmanager
@@ -35,6 +36,7 @@ from ..config import (
     CORS_ORIGINS,
     DEFAULT_MODEL,
     ENABLE_COMPRESSION,
+    QUANTIZATION_TYPE,
 )
 
 # Get the logger
@@ -86,13 +88,26 @@ async def startup_event():
     else:
         logger.warning("FastAPICache not available, caching disabled")
     
-    # Start loading the default model in background if specified
-    if DEFAULT_MODEL:
+    # Check for model specified in environment variables (prioritize HUGGINGFACE_MODEL)
+    model_to_load = os.environ.get("HUGGINGFACE_MODEL", DEFAULT_MODEL)
+    
+    # Log model configuration
+    logger.info(f"Model configuration:")
+    logger.info(f" - Model to load: {model_to_load}")
+    logger.info(f" - Quantization: {'Enabled - ' + os.environ.get('LOCALLAB_QUANTIZATION_TYPE', QUANTIZATION_TYPE) if os.environ.get('LOCALLAB_ENABLE_QUANTIZATION', '').lower() == 'true' else 'Disabled'}")
+    logger.info(f" - Attention slicing: {'Enabled' if os.environ.get('LOCALLAB_ENABLE_ATTENTION_SLICING', '').lower() == 'true' else 'Disabled'}")
+    logger.info(f" - Flash attention: {'Enabled' if os.environ.get('LOCALLAB_ENABLE_FLASH_ATTENTION', '').lower() == 'true' else 'Disabled'}")
+    logger.info(f" - Better transformer: {'Enabled' if os.environ.get('LOCALLAB_ENABLE_BETTERTRANSFORMER', '').lower() == 'true' else 'Disabled'}")
+    
+    # Start loading the model in background if specified
+    if model_to_load:
         try:
             # This will run asynchronously without blocking server startup
-            asyncio.create_task(load_model_in_background(DEFAULT_MODEL))
+            asyncio.create_task(load_model_in_background(model_to_load))
         except Exception as e:
             logger.error(f"Error starting model loading task: {str(e)}")
+    else:
+        logger.warning("No model specified to load on startup. Use the /models/load endpoint to load a model.")
 
 
 @app.on_event("shutdown")

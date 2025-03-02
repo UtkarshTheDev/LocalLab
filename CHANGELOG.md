@@ -2,7 +2,20 @@
 
 All notable changes to LocalLab will be documented in this file.
 
-## [0.2.8] - 2025-03-02
+## [0.2.9] - 2025-03-04
+
+### Added
+
+- Added comprehensive API documentation display on server startup with curl examples
+- Added model configuration section that displays current model and optimization settings
+- Added system instructions section showing the current prompt template
+- Improved environment variable handling for model configuration
+- Enhanced server startup logging with detailed optimization settings
+- Added support for reading HUGGINGFACE_MODEL environment variable to specify model
+- Redesigned modern ASCII art banners for a more aesthetic interface
+- Improved UI with cleaner banner separations and better readability
+
+## [0.2.8] - 2025-03-03
 
 ### Fixed
 
