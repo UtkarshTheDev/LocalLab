@@ -47,18 +47,22 @@ class ModelManager:
         
         logger.info(f"Using device: {self.device}")
         
-        if ENABLE_FLASH_ATTENTION:
+        # Only try to use Flash Attention if it's explicitly enabled and not empty
+        if ENABLE_FLASH_ATTENTION and str(ENABLE_FLASH_ATTENTION).lower() not in ('false', '0', 'none', ''):
             try:
                 import flash_attn
-                logger.info("Flash Attention enabled")
+                logger.info("Flash Attention enabled - will accelerate transformer attention operations")
             except ImportError:
-                logger.info("Flash Attention not available - this is optional and won't affect basic functionality")
+                logger.info("Flash Attention not available - this is an optional optimization and won't affect basic functionality")
+                logger.info("To enable Flash Attention, install with: pip install flash-attn --no-build-isolation")
     
     def _get_quantization_config(self) -> Optional[Dict[str, Any]]:
         """Get quantization configuration based on settings"""
-        if not ENABLE_QUANTIZATION:
+        # Check if quantization is explicitly disabled (not just False but also '0', 'none', '')
+        if not ENABLE_QUANTIZATION or str(ENABLE_QUANTIZATION).lower() in ('false', '0', 'none', ''):
+            logger.info("Quantization is disabled, using default precision")
             return {
-                "torch_dtype": torch.float16,
+                "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
                 "device_map": "auto"
             }
             
@@ -72,11 +76,20 @@ class ModelManager:
                     "Please upgrade to version 0.41.1 or higher."
                 )
                 return {
-                    "torch_dtype": torch.float16,
+                    "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
                     "device_map": "auto"
                 }
                 
+            # Check for empty quantization type
+            if not QUANTIZATION_TYPE or QUANTIZATION_TYPE.lower() in ('none', ''):
+                logger.info("No quantization type specified, defaulting to fp16")
+                return {
+                    "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
+                    "device_map": "auto"
+                }
+            
             if QUANTIZATION_TYPE == "int8":
+                logger.info("Using INT8 quantization")
                 return {
                     "device_map": "auto",
                     "quantization_config": BitsAndBytesConfig(
@@ -87,6 +100,7 @@ class ModelManager:
                     )
                 }
             elif QUANTIZATION_TYPE == "int4":
+                logger.info("Using INT4 quantization")
                 return {
                     "device_map": "auto",
                     "quantization_config": BitsAndBytesConfig(
@@ -96,6 +110,12 @@ class ModelManager:
                         bnb_4bit_quant_type="nf4"
                     )
                 }
+            else:
+                logger.info(f"Unrecognized quantization type '{QUANTIZATION_TYPE}', defaulting to fp16")
+                return {
+                    "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
+                    "device_map": "auto"
+                }
             
         except ImportError:
             logger.warning(
@@ -103,13 +123,13 @@ class ModelManager:
                 "Falling back to fp16. Please install bitsandbytes>=0.41.1 for quantization support."
             )
             return {
-                "torch_dtype": torch.float16,
+                "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
                 "device_map": "auto"
             }
         except Exception as e:
             logger.warning(f"Error configuring quantization: {str(e)}. Falling back to fp16.")
             return {
-                "torch_dtype": torch.float16,
+                "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
                 "device_map": "auto"
             }
         
@@ -121,21 +141,32 @@ class ModelManager:
     def _apply_optimizations(self, model: AutoModelForCausalLM) -> AutoModelForCausalLM:
         """Apply various optimizations to the model"""
         try:
-            if ENABLE_ATTENTION_SLICING and hasattr(model, 'enable_attention_slicing'):
-                model.enable_attention_slicing(1)
-                logger.info("Attention slicing enabled")
+            # Only apply attention slicing if explicitly enabled and not empty
+            if ENABLE_ATTENTION_SLICING and str(ENABLE_ATTENTION_SLICING).lower() not in ('false', '0', 'none', ''):
+                if hasattr(model, 'enable_attention_slicing'):
+                    model.enable_attention_slicing(1)
+                    logger.info("Attention slicing enabled")
+                else:
+                    logger.info("Attention slicing not available for this model")
                 
-            if ENABLE_CPU_OFFLOADING and hasattr(model, "enable_cpu_offload"):
-                model.enable_cpu_offload()
-                logger.info("CPU offloading enabled")
+            # Only apply CPU offloading if explicitly enabled and not empty
+            if ENABLE_CPU_OFFLOADING and str(ENABLE_CPU_OFFLOADING).lower() not in ('false', '0', 'none', ''):
+                if hasattr(model, "enable_cpu_offload"):
+                    model.enable_cpu_offload()
+                    logger.info("CPU offloading enabled")
+                else:
+                    logger.info("CPU offloading not available for this model")
                 
-            if ENABLE_BETTERTRANSFORMER:
+            # Only apply BetterTransformer if explicitly enabled and not empty
+            if ENABLE_BETTERTRANSFORMER and str(ENABLE_BETTERTRANSFORMER).lower() not in ('false', '0', 'none', ''):
                 try:
                     from optimum.bettertransformer import BetterTransformer
                     model = BetterTransformer.transform(model)
                     logger.info("BetterTransformer optimization applied")
                 except ImportError:
-                    logger.warning("BetterTransformer not available")
+                    logger.warning("BetterTransformer not available - install 'optimum' for this feature")
+                except Exception as e:
+                    logger.warning(f"BetterTransformer optimization failed: {str(e)}")
                     
             return model
         except Exception as e:
@@ -160,8 +191,11 @@ class ModelManager:
             hf_token = os.getenv("HF_TOKEN")
             config = self._get_quantization_config()
             
-            if config:
+            if config and config.get("quantization_config"):
                 logger.info(f"Using quantization config: {QUANTIZATION_TYPE}")
+            else:
+                precision = "fp16" if torch.cuda.is_available() else "fp32"
+                logger.info(f"Using {precision} precision (no quantization)")
             
             try:
                 self.tokenizer = AutoTokenizer.from_pretrained(
@@ -177,7 +211,7 @@ class ModelManager:
                     **config
                 )
                 
-                if not ENABLE_QUANTIZATION:
+                if not ENABLE_QUANTIZATION or str(ENABLE_QUANTIZATION).lower() in ('false', '0', 'none', ''):
                     device = "cuda" if torch.cuda.is_available() else "cpu"
                     self.model = self.model.to(device)
                 
@@ -242,8 +276,10 @@ class ModelManager:
         prompt: str,
         stream: bool = False,
         max_length: Optional[int] = None,
-        temperature: float = DEFAULT_TEMPERATURE,
-        top_p: float = DEFAULT_TOP_P,
+        temperature: Optional[float] = None,
+        top_p: Optional[float] = None,
+        top_k: Optional[int] = None,
+        repetition_penalty: Optional[float] = None,
         system_instructions: Optional[str] = None
     ) -> str:
         """Generate text from the model"""
@@ -263,33 +299,61 @@ class ModelManager:
             # Format prompt with system instructions
             formatted_prompt = f"""<|system|>{instructions}</|system|>\n<|user|>{prompt}</|user|>\n<|assistant|>"""
             
-            # Handle max_length properly
-            try:
-                if max_length is not None:
-                    max_length = int(max_length)  # Convert to integer if provided
-                else:
-                    max_length = self.model_config.get("max_length", DEFAULT_MAX_LENGTH) if self.model_config else DEFAULT_MAX_LENGTH
-                    max_length = int(max_length)  # Ensure it's an integer
-            except (ValueError, TypeError) as e:
-                logger.warning(f"Invalid max_length value: {max_length}. Using default: {DEFAULT_MAX_LENGTH}")
-                max_length = DEFAULT_MAX_LENGTH
+            # Get model-specific generation parameters
+            from .config import get_model_generation_params
+            gen_params = get_model_generation_params(self.current_model)
+            
+            # Override with user-provided parameters if specified
+            if max_length is not None:
+                try:
+                    gen_params["max_length"] = int(max_length)
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid max_length value: {max_length}. Using model default.")
+            if temperature is not None:
+                try:
+                    gen_params["temperature"] = float(temperature)
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid temperature value: {temperature}. Using model default.")
+            if top_p is not None:
+                try:
+                    gen_params["top_p"] = float(top_p)
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid top_p value: {top_p}. Using model default.")
+            if top_k is not None:
+                try:
+                    gen_params["top_k"] = int(top_k)
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid top_k value: {top_k}. Using model default.")
+            if repetition_penalty is not None:
+                try:
+                    gen_params["repetition_penalty"] = float(repetition_penalty)
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid repetition_penalty value: {repetition_penalty}. Using model default.")
             
             inputs = self.tokenizer(formatted_prompt, return_tensors="pt")
             for key in inputs:
                 inputs[key] = inputs[key].to(self.device)
             
             if stream:
-                return self.async_stream_generate(inputs, max_length, temperature, top_p)
+                return self.async_stream_generate(inputs, gen_params)
             
             with torch.no_grad():
-                outputs = self.model.generate(
+                generate_params = {
                     **inputs,
-                    max_new_tokens=max_length,
-                    temperature=temperature,
-                    top_p=top_p,
-                    do_sample=True,
-                    pad_token_id=self.tokenizer.eos_token_id
-                )
+                    "max_new_tokens": gen_params["max_length"],
+                    "temperature": gen_params["temperature"],
+                    "top_p": gen_params["top_p"],
+                    "do_sample": True,
+                    "pad_token_id": self.tokenizer.eos_token_id
+                }
+                
+                # Add optional parameters if present in gen_params
+                if "top_k" in gen_params:
+                    generate_params["top_k"] = gen_params["top_k"]
+                if "repetition_penalty" in gen_params:
+                    generate_params["repetition_penalty"] = gen_params["repetition_penalty"]
+                
+                outputs = self.model.generate(**generate_params)
             
             response = self.tokenizer.decode(outputs[0][len(inputs["input_ids"][0]):], skip_special_tokens=True)
             # Clean up response by removing system and user prompts if they got repeated
@@ -303,22 +367,46 @@ class ModelManager:
     def _stream_generate(
         self,
         inputs: Dict[str, torch.Tensor],
-        max_length: int,
-        temperature: float,
-        top_p: float
+        max_length: int = None,
+        temperature: float = None,
+        top_p: float = None,
+        gen_params: Optional[Dict[str, Any]] = None
     ) -> Generator[str, None, None]:
         """Stream generate text from the model"""
         try:
+            # If gen_params is provided, use it instead of individual parameters
+            if gen_params is not None:
+                max_length = gen_params.get("max_length", DEFAULT_MAX_LENGTH)
+                temperature = gen_params.get("temperature", DEFAULT_TEMPERATURE)
+                top_p = gen_params.get("top_p", DEFAULT_TOP_P)
+                top_k = gen_params.get("top_k", 50)
+                repetition_penalty = gen_params.get("repetition_penalty", 1.1)
+            else:
+                # Use provided individual parameters or defaults
+                max_length = max_length or DEFAULT_MAX_LENGTH
+                temperature = temperature or DEFAULT_TEMPERATURE
+                top_p = top_p or DEFAULT_TOP_P
+                top_k = 50
+                repetition_penalty = 1.1
+                
             with torch.no_grad():
                 for _ in range(max_length):
-                    outputs = self.model.generate(
+                    generate_params = {
                         **inputs,
-                        max_new_tokens=1,
-                        temperature=temperature,
-                        top_p=top_p,
-                        do_sample=True,
-                        pad_token_id=self.tokenizer.eos_token_id
-                    )
+                        "max_new_tokens": 1,
+                        "temperature": temperature,
+                        "top_p": top_p,
+                        "do_sample": True,
+                        "pad_token_id": self.tokenizer.eos_token_id
+                    }
+                    
+                    # Add optional parameters if available
+                    if top_k is not None:
+                        generate_params["top_k"] = top_k
+                    if repetition_penalty is not None:
+                        generate_params["repetition_penalty"] = repetition_penalty
+                        
+                    outputs = self.model.generate(**generate_params)
                     
                     new_token = self.tokenizer.decode(outputs[0][-1:], skip_special_tokens=True)
                     if not new_token or new_token.isspace():
@@ -331,9 +419,9 @@ class ModelManager:
             logger.error(f"Streaming generation failed: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Streaming generation failed: {str(e)}")
     
-    async def async_stream_generate(self, inputs: Dict[str, torch.Tensor], max_length: int, temperature: float, top_p: float):
+    async def async_stream_generate(self, inputs: Dict[str, torch.Tensor], gen_params: Dict[str, Any]):
         """Convert the synchronous stream generator to an async generator."""
-        for token in self._stream_generate(inputs, max_length, temperature, top_p):
+        for token in self._stream_generate(inputs, gen_params=gen_params):
             yield token
             await asyncio.sleep(0)
     

@@ -2,6 +2,28 @@
 
 All notable changes for version updates.
 
+## [0.2.4] - 2025-03-04
+
+### Fixed
+
+- Fixed API endpoint errors for `/models/available` and other model endpoints
+- Resolved parameter error in `get_model_generation_params()` function
+- Improved error handling for model optimization settings through environment variables
+- Fixed circular import issues between routes and core modules
+- Enhanced Flash Attention warning message to be more informative
+
+### Added
+
+- Added new `get_gpu_info()` function for detailed GPU monitoring
+- Added improved system resource endpoint with detailed GPU metrics
+- Added robust environment variable handling for optimization settings
+
+### Changed
+
+- Made optimization flags more robust by checking for empty string values
+- Improved fallback handling for missing torch packages
+- Enhanced server startup logs with better optimization information
+
 ## [0.2.3] - 2025-03-03
 
 ### Fixed

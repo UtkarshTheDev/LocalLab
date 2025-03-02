@@ -4,12 +4,15 @@ System utilities for LocalLab
 
 import os
 import psutil
+import shutil
+import socket
+import platform
 try:
     import torch
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, List
 
 from ..logger import get_logger
 from ..config import MIN_FREE_MEMORY
@@ -69,10 +72,11 @@ def check_resource_availability(required_memory: int) -> bool:
 
 
 def get_device() -> str:
-    """Get the best available device for computation"""
+    """Get the device to use for computations."""
     if TORCH_AVAILABLE and torch.cuda.is_available():
         return "cuda"
-    return "cpu"
+    else:
+        return "cpu"
 
 
 def format_model_size(size_in_bytes: int) -> str:
@@ -111,3 +115,99 @@ def get_system_resources() -> Dict[str, Any]:
                     })
     
     return resources 
+
+
+def get_cpu_info() -> Dict[str, Any]:
+    """Get information about the CPU."""
+    return {
+        "cores": psutil.cpu_count(logical=False),
+        "threads": psutil.cpu_count(logical=True),
+        "usage": psutil.cpu_percent(interval=0.1)
+    }
+
+
+def get_gpu_info() -> List[Dict[str, Any]]:
+    """Get detailed information about all available GPUs.
+    
+    Returns:
+        List of dictionaries with GPU information including name, memory, 
+        utilization, and temperature if available
+    """
+    gpu_info = []
+    
+    if not TORCH_AVAILABLE or not torch.cuda.is_available():
+        return gpu_info
+    
+    try:
+        # Get basic CUDA information
+        device_count = torch.cuda.device_count()
+        
+        for i in range(device_count):
+            gpu_data = {
+                "index": i,
+                "name": torch.cuda.get_device_name(i),
+                "total_memory_mb": round(torch.cuda.get_device_properties(i).total_memory / (1024 * 1024))
+            }
+            
+            # Try to get more detailed info with pynvml
+            try:
+                import pynvml
+                pynvml.nvmlInit()
+                handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+                
+                # Memory info
+                mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+                gpu_data.update({
+                    "memory_free_mb": round(mem_info.free / (1024 * 1024)),
+                    "memory_used_mb": round(mem_info.used / (1024 * 1024)),
+                    "memory_percent": round((mem_info.used / mem_info.total) * 100, 1)
+                })
+                
+                # Utilization info
+                try:
+                    util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+                    gpu_data.update({
+                        "gpu_utilization": util.gpu,
+                        "memory_utilization": util.memory
+                    })
+                except:
+                    pass
+                
+                # Temperature
+                try:
+                    temp = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
+                    gpu_data["temperature"] = temp
+                except:
+                    pass
+                    
+                # Power usage
+                try:
+                    power = pynvml.nvmlDeviceGetPowerUsage(handle) / 1000.0  # convert from mW to W
+                    gpu_data["power_usage_watts"] = round(power, 2)
+                except:
+                    pass
+                    
+            except (ImportError, Exception) as e:
+                # If pynvml fails, we still have basic torch.cuda info
+                gpu_data["available_memory_mb"] = round(torch.cuda.get_device_properties(i).total_memory / (1024 * 1024) - 
+                                               torch.cuda.memory_allocated(i) / (1024 * 1024))
+                gpu_data["used_memory_mb"] = round(torch.cuda.memory_allocated(i) / (1024 * 1024))
+            
+            gpu_info.append(gpu_data)
+            
+    except Exception as e:
+        import logging
+        logging.warning(f"Error getting GPU info: {str(e)}")
+        
+    return gpu_info
+
+
+def get_memory_info() -> Dict[str, Any]:
+    """Get information about the system memory."""
+    mem = psutil.virtual_memory()
+    return {
+        "total": mem.total,
+        "available": mem.available,
+        "used": mem.used,
+        "percent": mem.percent
+    } 

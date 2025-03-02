@@ -8,12 +8,16 @@ from typing import Dict, List, Any, Optional, Tuple
 import time
 import psutil
 import torch
+import platform
+from datetime import datetime
 
 from ..logger import get_logger
 from ..logger.logger import get_request_count, get_uptime_seconds
 from ..core.app import model_manager, start_time
 from ..ui.banners import print_system_resources
 from ..config import system_instructions
+from ..utils.system import get_gpu_info as utils_get_gpu_info
+from ..utils.networking import get_public_ip, get_network_interfaces
 
 # Get logger
 logger = get_logger("locallab.routes.system")
@@ -38,6 +42,17 @@ class SystemInstructionsRequest(BaseModel):
     model_id: Optional[str] = None
 
 
+class SystemResourcesResponse(BaseModel):
+    """Response model for system resources"""
+    cpu: Dict[str, Any]
+    memory: Dict[str, Any]
+    gpu: Optional[List[Dict[str, Any]]] = None
+    disk: Dict[str, Any]
+    platform: str
+    server_uptime: float
+    api_requests: int
+
+
 def get_gpu_memory() -> Optional[Tuple[int, int]]:
     """Get GPU memory info in MB"""
     try:
@@ -48,24 +63,6 @@ def get_gpu_memory() -> Optional[Tuple[int, int]]:
         return (info.total // 1024 // 1024, info.free // 1024 // 1024)
     except Exception as e:
         logger.debug(f"Failed to get GPU memory: {str(e)}")
-        return None
-
-
-def get_gpu_info() -> Optional[Dict[str, Any]]:
-    """Get detailed GPU information including memory and device name"""
-    try:
-        gpu_mem = get_gpu_memory()
-        if gpu_mem:
-            total_gpu, free_gpu = gpu_mem
-            return {
-                "total_memory": total_gpu,
-                "free_memory": free_gpu,
-                "used_memory": total_gpu - free_gpu,
-                "device": torch.cuda.get_device_name(0)
-            }
-        return None
-    except Exception as e:
-        logger.debug(f"Failed to get GPU info: {str(e)}")
         return None
 
 
@@ -112,7 +109,7 @@ async def get_system_info():
         memory_percent = memory.percent
         
         # Get GPU info if available
-        gpu_info = get_gpu_info() if torch.cuda.is_available() else None
+        gpu_info = utils_get_gpu_info() if torch.cuda.is_available() else None
         
         # Get server stats
         uptime = time.time() - start_time
@@ -170,24 +167,81 @@ async def root() -> Dict[str, Any]:
     }
 
 
+@router.get("/resources", response_model=SystemResourcesResponse)
+async def get_system_resources() -> SystemResourcesResponse:
+    """Get system resource information"""
+    disk = psutil.disk_usage('/')
+    uptime = time.time() - start_time
+    
+    # Get detailed GPU information
+    gpu_info = utils_get_gpu_info()
+    
+    return SystemResourcesResponse(
+        cpu={
+            "cores": psutil.cpu_count(logical=False),
+            "threads": psutil.cpu_count(logical=True),
+            "usage": psutil.cpu_percent(interval=0.1),
+            "frequency": psutil.cpu_freq().current if psutil.cpu_freq() else None
+        },
+        memory={
+            "total": psutil.virtual_memory().total,
+            "available": psutil.virtual_memory().available,
+            "used": psutil.virtual_memory().used,
+            "percent": psutil.virtual_memory().percent
+        },
+        gpu=gpu_info,
+        disk={
+            "total": disk.total,
+            "free": disk.free,
+            "used": disk.used,
+            "percent": disk.percent
+        },
+        platform=platform.platform(),
+        server_uptime=uptime,
+        api_requests=get_request_count()
+    )
+
+
+@router.get("/network", response_model=Dict[str, Any])
+async def get_network_info() -> Dict[str, Any]:
+    """Get network information"""
+    try:
+        public_ip = await get_public_ip()
+    except:
+        public_ip = "Unknown"
+        
+    return {
+        "public_ip": public_ip,
+        "hostname": platform.node(),
+        "interfaces": get_network_interfaces()
+    }
+
+
 def get_system_resources() -> Dict[str, Any]:
     """Get system resource information"""
+    try:
+        import torch
+        torch_available = True
+    except ImportError:
+        torch_available = False
+    
+    # Get memory information
+    virtual_memory = psutil.virtual_memory()
+    ram_gb = virtual_memory.total / 1024 / 1024 / 1024
+    ram_available_gb = virtual_memory.available / 1024 / 1024 / 1024
+    
     resources = {
-        "ram_gb": psutil.virtual_memory().total / 1024 / 1024 / 1024,
+        "ram_gb": ram_gb,
+        "ram_available_gb": ram_available_gb, 
+        "ram_used_percent": virtual_memory.percent,
         "cpu_count": psutil.cpu_count(),
-        "gpu_available": torch.cuda.is_available(),
+        "cpu_usage": psutil.cpu_percent(interval=0.1),
+        "gpu_available": torch_available and torch.cuda.is_available() if torch_available else False,
         "gpu_info": []
     }
     
+    # Use the new gpu_info function from utils.system for more detailed GPU info
     if resources['gpu_available']:
-        gpu_count = torch.cuda.device_count()
-        for i in range(gpu_count):
-            gpu_mem = get_gpu_memory()
-            if gpu_mem:
-                total_mem, _ = gpu_mem
-                resources['gpu_info'].append({
-                    'name': torch.cuda.get_device_name(i),
-                    'total_memory': total_mem
-                })
+        resources['gpu_info'] = utils_get_gpu_info()
     
-    return resources 
+    return resources

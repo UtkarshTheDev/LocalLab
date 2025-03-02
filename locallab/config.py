@@ -347,12 +347,37 @@ DEFAULT_SYSTEM_INSTRUCTIONS = """You are a helpful virtual assistant. Your respo
 Keep responses short unless specifically asked for detailed information.
 Respond directly to greetings with simple, friendly responses."""
 
-def get_model_generation_params() -> dict:
-    return {
+def get_model_generation_params(model_id: Optional[str] = None) -> dict:
+    """Get model generation parameters, optionally specific to a model.
+    
+    Args:
+        model_id: Optional model ID to get specific parameters for
+        
+    Returns:
+        Dictionary of generation parameters
+    """
+    # Base parameters (defaults)
+    params = {
         "max_length": get_env_var("LOCALLAB_MODEL_MAX_LENGTH", default=DEFAULT_MAX_LENGTH, var_type=int),
         "temperature": get_env_var("LOCALLAB_MODEL_TEMPERATURE", default=DEFAULT_TEMPERATURE, var_type=float),
         "top_p": get_env_var("LOCALLAB_MODEL_TOP_P", default=DEFAULT_TOP_P, var_type=float),
+        "top_k": get_env_var("LOCALLAB_TOP_K", default=DEFAULT_TOP_K, var_type=int),
+        "repetition_penalty": get_env_var("LOCALLAB_REPETITION_PENALTY", default=DEFAULT_REPETITION_PENALTY, var_type=float),
     }
+    
+    # If model_id is provided and exists in MODEL_REGISTRY, use model-specific parameters
+    if model_id and model_id in MODEL_REGISTRY:
+        model_config = MODEL_REGISTRY[model_id]
+        # Override with model-specific parameters if available
+        if "max_length" in model_config:
+            params["max_length"] = model_config["max_length"]
+        
+        # Add any other model-specific parameters from the registry
+        for param in ["temperature", "top_p", "top_k", "repetition_penalty"]:
+            if param in model_config:
+                params[param] = model_config[param]
+    
+    return params
 
 class SystemInstructions:
     def __init__(self):

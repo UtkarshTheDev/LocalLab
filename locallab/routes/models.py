@@ -52,6 +52,13 @@ async def list_models() -> ModelsListResponse:
     )
 
 
+@router.get("/available", response_model=ModelsListResponse)
+async def available_models() -> ModelsListResponse:
+    """List all available models (alternative endpoint)"""
+    # This endpoint exists to provide compatibility with different API patterns
+    return await list_models()
+
+
 @router.get("/current", response_model=ModelResponse)
 async def get_current_model() -> ModelResponse:
     """Get information about the currently loaded model"""
