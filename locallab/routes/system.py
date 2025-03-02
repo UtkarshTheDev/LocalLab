@@ -30,7 +30,7 @@ class SystemInfoResponse(BaseModel):
     """Response model for system information"""
     cpu_usage: float
     memory_usage: float
-    gpu_info: Optional[Dict[str, Any]] = None
+    gpu_info: Optional[List[Dict[str, Any]]] = None
     active_model: Optional[str] = None
     uptime: float
     request_count: int

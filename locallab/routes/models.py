@@ -95,6 +95,31 @@ async def load_model(model_id: str, background_tasks: BackgroundTasks) -> Dict[s
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class LoadModelRequest(BaseModel):
+    """Request model for loading a model with JSON body"""
+    model_id: str
+
+
+@router.post("/load", response_model=Dict[str, str])
+async def load_model_from_body(request: LoadModelRequest, background_tasks: BackgroundTasks) -> Dict[str, str]:
+    """Load a specific model using model_id from request body"""
+    model_id = request.model_id
+    if model_id not in MODEL_REGISTRY:
+        raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
+    
+    # Check if the model is already loaded
+    if model_manager.current_model == model_id and model_manager.is_model_loaded(model_id):
+        return {"status": "success", "message": f"Model {model_id} is already loaded"}
+    
+    try:
+        # Load model in background
+        background_tasks.add_task(model_manager.load_model, model_id)
+        return {"status": "loading", "message": f"Model {model_id} loading started in background"}
+    except Exception as e:
+        logger.error(f"Failed to load model {model_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/unload", response_model=Dict[str, str])
 async def unload_model() -> Dict[str, str]:
     """Unload the current model to free up resources"""

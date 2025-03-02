@@ -2,19 +2,35 @@
 
 All notable changes to LocalLab will be documented in this file.
 
-## [0.2.5] - 2025-03-02
+## [0.2.6] - 2023-05-05
 
 ### Added
 
-- Added `get_network_interfaces` function to retrieve information about available network interfaces
-- Added `get_public_ip` async function to retrieve the public IP address of the machine
-- Added adapter methods in ModelManager (`generate_text` and `generate_stream`) to maintain API compatibility with route handlers
+- New model loading endpoint that accepts model_id in the request body at `/models/load`
+- `format_chat_messages` function to properly format chat messages for the model
+- CLI function to support command-line usage with click interface
 
 ### Fixed
 
-- Fixed import error for `get_public_ip` and `get_network_interfaces` functions
-- Fixed naming mismatch between route handlers and ModelManager methods
-- Added new dependencies in setup.py: `netifaces` and `httpx`
+- Properly awaiting async `generate_text` in chat completion endpoint
+- Fixed async generator handling in `generate_stream` function
+- Fixed streaming in the `stream_chat` function to correctly send server-sent events
+- Properly escaped newline characters in the streaming response
+- Added missing dependencies in `setup.py`: colorama, python-multipart, websockets, psutil, and nest-asyncio
+
+## [0.2.5] - 2023-05-02
+
+### Added
+
+- `get_network_interfaces` function to retrieve information about available network interfaces
+- `get_public_ip` async function to retrieve the public IP address of the machine
+- Adapter methods in `ModelManager` (`generate_text` and `generate_stream`) to maintain API compatibility with route handlers
+
+### Fixed
+
+- Import error for `get_public_ip` and `get_network_interfaces` functions
+- Naming mismatch between route handlers and `ModelManager` methods
+- New dependencies in `setup.py`: `netifaces` and `httpx`
 
 ## [0.2.4] - 2025-03-04
 

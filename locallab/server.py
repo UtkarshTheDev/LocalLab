@@ -320,3 +320,20 @@ def start_server(use_ngrok: bool = False, port=8000, ngrok_auth_token: Optional[
         logger.error(f"Server startup failed: {str(e)}")
         logger.error(traceback.format_exc())
         raise 
+
+def cli():
+    """Command line interface entry point for the package"""
+    import click
+    
+    @click.command()
+    @click.option('--use-ngrok', is_flag=True, help='Enable ngrok for public access')
+    @click.option('--port', default=8000, help='Port to run the server on')
+    @click.option('--ngrok-auth-token', help='Ngrok authentication token')
+    def run(use_ngrok, port, ngrok_auth_token):
+        """Run the LocalLab server"""
+        start_server(use_ngrok=use_ngrok, port=port, ngrok_auth_token=ngrok_auth_token)
+    
+    run()
+
+if __name__ == "__main__":
+    cli() 

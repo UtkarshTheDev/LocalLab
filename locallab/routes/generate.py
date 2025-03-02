@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Dict, List, Any, Optional, Generator, Tuple
+import json
 
 from ..logger import get_logger
 from ..logger.logger import get_request_count
@@ -75,6 +76,36 @@ class BatchGenerationResponse(BaseModel):
     responses: List[str]
 
 
+def format_chat_messages(messages: List[ChatMessage]) -> str:
+    """
+    Format a list of chat messages into a prompt string that the model can understand
+    
+    Args:
+        messages: List of ChatMessage objects with role and content
+        
+    Returns:
+        Formatted prompt string
+    """
+    formatted_messages = []
+    
+    for msg in messages:
+        role = msg.role.strip().lower()
+        
+        if role == "system":
+            # System messages get special formatting
+            formatted_messages.append(f"# System Instruction\n{msg.content}\n")
+        elif role == "user":
+            formatted_messages.append(f"User: {msg.content}")
+        elif role == "assistant":
+            formatted_messages.append(f"Assistant: {msg.content}")
+        else:
+            # Default formatting for other roles
+            formatted_messages.append(f"{role.capitalize()}: {msg.content}")
+    
+    # Join all messages with newlines
+    return "\n\n".join(formatted_messages)
+
+
 @router.post("/generate", response_model=GenerationResponse)
 async def generate_text(request: GenerationRequest) -> GenerationResponse:
     """
@@ -105,8 +136,8 @@ async def generate_text(request: GenerationRequest) -> GenerationResponse:
         # Merge model-specific params with request params
         generation_params.update(model_params)
         
-        # Generate text
-        generated_text = model_manager.generate_text(
+        # Generate text - properly await the async call
+        generated_text = await model_manager.generate_text(
             prompt=request.prompt,
             system_prompt=request.system_prompt,
             **generation_params
@@ -123,46 +154,51 @@ async def generate_text(request: GenerationRequest) -> GenerationResponse:
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_completion(request: ChatRequest) -> ChatResponse:
-    """Chat completion endpoint similar to OpenAI's API"""
+    """
+    Chat completion API that formats messages into a prompt and returns the response
+    """
     if not model_manager.current_model:
         raise HTTPException(status_code=400, detail="No model is currently loaded")
     
+    # Format messages into a prompt
+    formatted_prompt = format_chat_messages(request.messages)
+    
+    # If streaming is requested, return a streaming response
+    if request.stream:
+        return StreamingResponse(
+            stream_chat(formatted_prompt, request.max_tokens, request.temperature, request.top_p),
+            media_type="text/event-stream"
+        )
+    
     try:
-        # Format messages into a prompt
-        formatted_prompt = "\n".join([f"{msg.role}: {msg.content}" for msg in request.messages])
-        
-        if request.stream:
-            # Return a streaming response
-            return StreamingResponse(
-                stream_chat(formatted_prompt, request.max_tokens, request.temperature, request.top_p),
-                media_type="text/event-stream"
-            )
-        
         # Get model-specific generation parameters
         model_params = get_model_generation_params(model_manager.current_model)
         
-        # Update with request parameters
+        # Prepare generation parameters
         generation_params = {
             "max_new_tokens": request.max_tokens,
             "temperature": request.temperature,
-            "top_p": request.top_p,
+            "top_p": request.top_p
         }
         
         # Merge model-specific params with request params
         generation_params.update(model_params)
         
-        # Generate text
-        response = model_manager.generate_text(
+        # Generate completion
+        generated_text = await model_manager.generate_text(
             prompt=formatted_prompt,
             **generation_params
         )
         
+        # Format response
         return ChatResponse(
             choices=[{
                 "message": {
                     "role": "assistant",
-                    "content": response
-                }
+                    "content": generated_text
+                },
+                "index": 0,
+                "finish_reason": "stop"
             }]
         )
     except Exception as e:
@@ -177,7 +213,9 @@ async def generate_stream(
     top_p: float, 
     system_prompt: Optional[str]
 ) -> Generator[str, None, None]:
-    """Generate text in a streaming fashion"""
+    """
+    Generate text in a streaming fashion
+    """
     try:
         # Get model-specific generation parameters
         model_params = get_model_generation_params(model_manager.current_model)
@@ -187,26 +225,26 @@ async def generate_stream(
             "max_new_tokens": max_tokens,
             "temperature": temperature,
             "top_p": top_p,
-            "stream": True
         }
         
         # Merge model-specific params with request params
         generation_params.update(model_params)
         
-        for token in model_manager.generate_stream(
+        # Stream tokens
+        async for token in model_manager.generate_stream(
             prompt=prompt,
             system_prompt=system_prompt,
             **generation_params
         ):
-            # Format as a server-sent event
-            yield f"data: {token}\n\n"
-        
-        # End of stream marker
+            # Format as server-sent event
+            data = token.replace("\n", "\\n")
+            yield f"data: {data}\n\n"
+            
+        # End of stream
         yield "data: [DONE]\n\n"
     except Exception as e:
         logger.error(f"Streaming generation failed: {str(e)}")
-        yield f"data: {{\"error\": \"{str(e)}\"}}\n\n"
-        yield "data: [DONE]\n\n"
+        yield f"data: [ERROR] {str(e)}\n\n"
 
 
 async def stream_chat(
@@ -215,7 +253,9 @@ async def stream_chat(
     temperature: float,
     top_p: float
 ) -> Generator[str, None, None]:
-    """Stream chat completion tokens"""
+    """
+    Stream chat completion
+    """
     try:
         # Get model-specific generation parameters
         model_params = get_model_generation_params(model_manager.current_model)
@@ -224,25 +264,27 @@ async def stream_chat(
         generation_params = {
             "max_new_tokens": max_tokens,
             "temperature": temperature,
-            "top_p": top_p,
-            "stream": True
+            "top_p": top_p
         }
         
         # Merge model-specific params with request params
         generation_params.update(model_params)
         
-        for token in model_manager.generate_stream(
+        # Generate streaming tokens
+        async for token in model_manager.generate_stream(
             prompt=formatted_prompt,
             **generation_params
         ):
-            # Format as a server-sent event with proper JSON structure
-            yield f'data: {{"choices": [{{"delta": {{"content": "{token}"}}}}]}}\n\n'
-        
+            # Format as a server-sent event with the structure expected by chat clients
+            data = json.dumps({"role": "assistant", "content": token})
+            yield f"data: {data}\n\n"
+            
         # End of stream marker
         yield "data: [DONE]\n\n"
     except Exception as e:
         logger.error(f"Chat streaming failed: {str(e)}")
-        yield f"data: {{\"error\": \"{str(e)}\"}}\n\n"
+        error_data = json.dumps({"error": str(e)})
+        yield f"data: {error_data}\n\n"
         yield "data: [DONE]\n\n"
 
 
@@ -270,7 +312,7 @@ async def batch_generate(request: BatchGenerationRequest) -> BatchGenerationResp
         
         responses = []
         for prompt in request.prompts:
-            generated_text = model_manager.generate_text(
+            generated_text = await model_manager.generate_text(
                 prompt=prompt,
                 system_prompt=request.system_prompt,
                 **generation_params

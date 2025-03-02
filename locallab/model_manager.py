@@ -562,14 +562,50 @@ class ModelManager:
         Adapter method that calls the generate method.
         This is used to maintain compatibility with routes that call generate_text.
         """
-        return await self.generate(prompt=prompt, system_prompt=system_prompt, **kwargs)
+        # Make sure we're not streaming when generating text
+        kwargs["stream"] = False
+        # Directly await the generate method to return the string result
+        return await self.generate(prompt=prompt, system_instructions=system_prompt, **kwargs)
         
     async def generate_stream(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> AsyncGenerator[str, None]:
-        """
-        Adapter method that calls the async_stream_generate method.
-        This is used to maintain compatibility with routes that call generate_stream.
-        """
+        """Adapter method for streaming text generation.
+        Calls the async_stream_generate method with proper parameters."""
         # Ensure streaming is enabled
         kwargs["stream"] = True
-        async for token in self.async_stream_generate(prompt=prompt, system_prompt=system_prompt, **kwargs):
-            yield token
+        return self.async_stream_generate(prompt=prompt, system_prompt=system_prompt, **kwargs)
+
+    def is_model_loaded(self, model_id: str) -> bool:
+        """Check if a specific model is loaded.
+        
+        Args:
+            model_id: The ID of the model to check
+            
+        Returns:
+            True if the model is loaded, False otherwise
+        """
+        return (self.model is not None) and (self.current_model == model_id)
+    
+    def unload_model(self) -> None:
+        """Unload the current model to free memory resources.
+        
+        This method removes the current model from memory and clears
+        the tokenizer and model references.
+        """
+        if self.model is not None:
+            # Log which model is being unloaded
+            model_id = self.current_model
+            
+            # Clear model and tokenizer
+            self.model = None
+            self.tokenizer = None
+            self.current_model = None
+            
+            # Clean up memory
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
+            
+            # Log model unloading
+            log_model_unloaded(model_id)
+            
+            logger.info(f"Model {model_id} unloaded successfully")
