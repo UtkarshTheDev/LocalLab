@@ -1,11 +1,11 @@
-# 🚀 LocalLab
+# 🚀 LocalLab: Run AI Models Easily
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/Developer-Utkarsh/LocalLab/ci.yml?style=flat-square)](https://github.com/Developer-Utkarsh/LocalLab/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/Developer-Utkarsh/LocalLab/publish.yml?style=flat-square)](https://github.com/Developer-Utkarsh/LocalLab/actions)
 [![LocalLab Version](https://img.shields.io/pypi/v/locallab.svg?style=flat-square)](https://pypi.org/project/locallab/)
 [![Python Version](https://img.shields.io/pypi/pyversions/locallab.svg?style=flat-square)](https://pypi.org/project/locallab/)
 [![License](https://img.shields.io/github/license/Developer-Utkarsh/LocalLab.svg?style=flat-square)](https://github.com/Developer-Utkarsh/LocalLab/blob/main/LICENSE)
 
-LocalLab is a powerful, lightweight AI inference server designed to deliver cutting-edge language model capabilities on your local machine or through Google Colab. It empowers developers and researchers to run sophisticated AI models on local hardware, optimizing resources with advanced features such as dynamic model loading, memory optimizations, and real-time system monitoring.
+LocalLab empowers users to run any Hugging Face AI model locally or on Google Colab with minimal setup required. It automatically configures an API using ngrok, enabling seamless integration into applications from any location. Designed for simplicity, LocalLab makes advanced AI accessible to all, regardless of technical expertise. With built-in model management, performance optimizations, and system monitoring, it ensures efficient and reliable AI operations for developers, researchers, and enthusiasts alike.
 
 ## What Problem Does LocalLab Solve?
 
