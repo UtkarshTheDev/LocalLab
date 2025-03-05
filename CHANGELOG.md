@@ -2,6 +2,12 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.3.5 - 2023-03-05
+
+### Fixed
+
+- Fixed Env Configuration by removing the duplicated Env Configuration.
+
 ## [0.2.9] - 2025-03-04
 
 ### Added
