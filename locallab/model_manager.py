@@ -563,15 +563,16 @@ class ModelManager:
                 if fallback_model:
                     logger.warning(
                         f"Insufficient resources for {model_name} "
-                        f"(Requires ~{format_model_size(
-                            temp_config['ram'])} RAM), "
+                        f"(Requires ~{format_model_size(temp_config['ram'])} RAM), "
                         f"falling back to {fallback_model}"
                     )
-                    return await self.load_model(fallback_model)
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Insufficient resources. Model requires ~{format_model_size(temp_config['ram'])} RAM"
+                    )
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Insufficient resources. Model requires ~{
-                        format_model_size(temp_config['ram'])} RAM"
+                    detail=f"Insufficient resources. Model requires ~{format_model_size(temp_config['ram'])} RAM"
                 )
 
             if self.model:

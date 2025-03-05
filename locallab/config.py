@@ -61,8 +61,6 @@ ENABLE_CPU_OFFLOADING = get_env_var(
     "ENABLE_CPU_OFFLOADING", default="false", var_type=bool)
 ENABLE_BETTERTRANSFORMER = get_env_var(
     "ENABLE_BETTERTRANSFORMER", default="false", var_type=bool)
-ENABLE_COMPRESSION = get_env_var(
-    "ENABLE_COMPRESSION", default="false", var_type=bool)
 
 # Resource management
 UNLOAD_UNUSED_MODELS = get_env_var(
@@ -202,8 +200,6 @@ MAX_BATCH_SIZE = get_env_var(
 
 
 # Cache Settings
-ENABLE_CACHE = get_env_var("LOCALLAB_ENABLE_CACHE",
-                           default=True, var_type=bool)
 CACHE_TTL = get_env_var("LOCALLAB_CACHE_TTL", default=3600, var_type=int)
 CACHE_STRATEGY = get_env_var("LOCALLAB_CACHE_STRATEGY", default="lru")
 CACHE_MAX_ITEMS = get_env_var(
@@ -366,7 +362,6 @@ ENABLE_CORS = get_env_var("LOCALLAB_ENABLE_CORS",
                           default="true", var_type=bool)
 CORS_ORIGINS = get_env_var("LOCALLAB_CORS_ORIGINS", default="*").split(",")
 WORKERS = 1  # Number of worker processes
-ENABLE_COMPRESSION = True
 
 # Security Settings
 MAX_TOKENS_PER_REQUEST = 4096
