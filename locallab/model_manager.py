@@ -55,13 +55,10 @@ class ModelManager:
         if ENABLE_FLASH_ATTENTION and str(ENABLE_FLASH_ATTENTION).lower() not in ('false', '0', 'none', ''):
             try:
                 import flash_attn
-                logger.info(
-                    "Flash Attention enabled - will accelerate transformer attention operations")
+                logger.info("Flash Attention enabled - will accelerate transformer attention operations")
             except ImportError:
-                logger.info(
-                    "Flash Attention not available - this is an optional optimization and won't affect basic functionality")
-                logger.info(
-                    "To enable Flash Attention, install with: pip install flash-attn --no-build-isolation")
+                logger.info("Flash Attention not available - this is an optional optimization and won't affect basic functionality")
+                logger.info("To enable Flash Attention, install with: pip install flash-attn --no-build-isolation")
 
     def _get_quantization_config(self) -> Optional[Dict[str, Any]]:
         """Get quantization configuration based on settings"""
@@ -79,8 +76,7 @@ class ModelManager:
 
             if version.parse(bnb.__version__) < version.parse("0.41.1"):
                 logger.warning(
-                    f"bitsandbytes version {
-                        bnb.__version__} may not support all quantization features. "
+                    f"bitsandbytes version {bnb.__version__} may not support all quantization features. "
                     "Please upgrade to version 0.41.1 or higher."
                 )
                 return {
@@ -120,8 +116,7 @@ class ModelManager:
                     )
                 }
             else:
-                logger.info(f"Unrecognized quantization type '{
-                            QUANTIZATION_TYPE}', defaulting to fp16")
+                logger.info(f"Unrecognized quantization type '{QUANTIZATION_TYPE}', defaulting to fp16")
                 return {
                     "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
                     "device_map": "auto"
@@ -137,8 +132,7 @@ class ModelManager:
                 "device_map": "auto"
             }
         except Exception as e:
-            logger.warning(f"Error configuring quantization: {
-                           str(e)}. Falling back to fp16.")
+            logger.warning(f"Error configuring quantization: {str(e)}. Falling back to fp16.")
             return {
                 "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
                 "device_map": "auto"
@@ -184,16 +178,14 @@ class ModelManager:
 
             return model
         except Exception as e:
-            logger.warning(
-                f"Some optimizations could not be applied: {str(e)}")
+            logger.warning(f"Some optimizations could not be applied: {str(e)}")
             return model
 
     async def load_model(self, model_id: str) -> bool:
         """Load a model from HuggingFace Hub"""
         try:
             start_time = time.time()
-            logger.info(f"\n{Fore.CYAN}Loading model: {
-                        model_id}{Style.RESET_ALL}")
+            logger.info(f"\n{Fore.CYAN}Loading model: {model_id}{Style.RESET_ALL}")
 
             if self.model is not None:
                 prev_model = self.current_model
@@ -241,13 +233,11 @@ class ModelManager:
 
                 load_time = time.time() - start_time
                 log_model_loaded(model_id, load_time)
-                logger.info(f"{Fore.GREEN}✓ Model '{model_id}' loaded successfully in {
-                            load_time:.2f} seconds{Style.RESET_ALL}")
+                logger.info(f"{Fore.GREEN}✓ Model '{model_id}' loaded successfully in {load_time:.2f} seconds{Style.RESET_ALL}")
                 return True
 
             except Exception as e:
-                logger.error(f"{Fore.RED}✗ Error loading model {
-                             model_id}: {str(e)}{Style.RESET_ALL}")
+                logger.error(f"{Fore.RED}✗ Error loading model {model_id}: {str(e)}{Style.RESET_ALL}")
                 if self.model is not None:
                     del self.model
                     self.model = None
@@ -259,8 +249,7 @@ class ModelManager:
                     fallback_model = self.model_config.get("fallback")
 
                 if fallback_model:
-                    logger.warning(f"{Fore.YELLOW}! Attempting to load fallback model: {
-                                   fallback_model}{Style.RESET_ALL}")
+                    logger.warning(f"{Fore.YELLOW}! Attempting to load fallback model: {fallback_model}{Style.RESET_ALL}")
                     return await self.load_model(fallback_model)
                 else:
                     raise HTTPException(
@@ -269,8 +258,7 @@ class ModelManager:
                     )
 
         except Exception as e:
-            logger.error(f"{Fore.RED}✗ Failed to load model {
-                         model_id}: {str(e)}{Style.RESET_ALL}")
+            logger.error(f"{Fore.RED}✗ Failed to load model {model_id}: {str(e)}{Style.RESET_ALL}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to load model: {str(e)}"
@@ -282,8 +270,7 @@ class ModelManager:
             return
 
         if time.time() - self.last_used > MODEL_TIMEOUT:
-            logger.info(f"Unloading model {
-                        self.current_model} due to inactivity")
+            logger.info(f"Unloading model {self.current_model} due to inactivity")
             model_id = self.current_model
             del self.model
             self.model = None
@@ -320,8 +307,7 @@ class ModelManager:
                 self.current_model)) if not system_instructions else str(system_instructions)
 
             # Format prompt with system instructions
-            formatted_prompt = f"""<|system|>{
-                instructions}</|system|>\n<|user|>{prompt}</|user|>\n<|assistant|>"""
+            formatted_prompt = f"""<|system|>{instructions}</|system|>\n<|user|>{prompt}</|user|>\n<|assistant|>"""
 
             # Get model-specific generation parameters
             from .config import get_model_generation_params
@@ -336,33 +322,28 @@ class ModelManager:
                 try:
                     gen_params["max_length"] = int(max_length)
                 except (ValueError, TypeError):
-                    logger.warning(f"Invalid max_length value: {
-                                   max_length}. Using model default.")
+                    logger.warning(f"Invalid max_length value: {max_length}. Using model default.")
             if temperature is not None:
                 try:
                     gen_params["temperature"] = float(temperature)
                 except (ValueError, TypeError):
-                    logger.warning(f"Invalid temperature value: {
-                                   temperature}. Using model default.")
+                    logger.warning(f"Invalid temperature value: {temperature}. Using model default.")
             if top_p is not None:
                 try:
                     gen_params["top_p"] = float(top_p)
                 except (ValueError, TypeError):
-                    logger.warning(f"Invalid top_p value: {
-                                   top_p}. Using model default.")
+                    logger.warning(f"Invalid top_p value: {top_p}. Using model default.")
             if top_k is not None:
                 try:
                     gen_params["top_k"] = int(top_k)
                 except (ValueError, TypeError):
-                    logger.warning(f"Invalid top_k value: {
-                                   top_k}. Using model default.")
+                    logger.warning(f"Invalid top_k value: {top_k}. Using model default.")
             if repetition_penalty is not None:
                 try:
                     gen_params["repetition_penalty"] = float(
                         repetition_penalty)
                 except (ValueError, TypeError):
-                    logger.warning(f"Invalid repetition_penalty value: {
-                                   repetition_penalty}. Using model default.")
+                    logger.warning(f"Invalid repetition_penalty value: {repetition_penalty}. Using model default.")
 
             inputs = self.tokenizer(formatted_prompt, return_tensors="pt")
             for key in inputs:
@@ -475,8 +456,7 @@ class ModelManager:
                 self.current_model)) if not system_prompt else str(system_prompt)
 
             # Format prompt with system instructions
-            formatted_prompt = f"""<|system|>{
-                instructions}</|system|>\n<|user|>{prompt}</|user|>\n<|assistant|>"""
+            formatted_prompt = f"""<|system|>{instructions}</|system|>\n<|user|>{prompt}</|user|>\n<|assistant|>"""
 
             # Get model-specific generation parameters
             from .config import get_model_generation_params
@@ -621,16 +601,14 @@ class ModelManager:
 
             model_size = sum(p.numel() * p.element_size()
                              for p in self.model.parameters())
-            logger.info(f"Custom model loaded successfully. Size: {
-                        format_model_size(model_size)}")
+            logger.info(f"Custom model loaded successfully. Size: {format_model_size(model_size)}")
 
             return True
 
         except Exception as e:
             logger.error(f"Failed to load custom model {model_name}: {str(e)}")
             if fallback_model:
-                logger.warning(f"Attempting to load fallback model: {
-                               fallback_model}")
+                logger.warning(f"Attempting to load fallback model: {fallback_model}")
                 return await self.load_model(fallback_model)
             raise HTTPException(
                 status_code=500,
