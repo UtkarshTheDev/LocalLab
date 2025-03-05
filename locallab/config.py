@@ -338,9 +338,12 @@ def estimate_model_requirements(model_id: str) -> Optional[Dict[str, Any]]:
 
         return requirements
     except Exception as e:
-        logging.error(f"Error estimating requirements for {
-                      model_id}: {str(e)}")
-        return None
+
+        logging.error(
+            f"Error estimating requirements for {model_id}: {str(e)}"
+        )
+
+    return None
 
 
 # Add custom model if specified
