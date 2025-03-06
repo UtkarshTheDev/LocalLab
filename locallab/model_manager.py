@@ -147,7 +147,7 @@ class ModelManager:
         """Apply various optimizations to the model"""
         try:
             # Only apply attention slicing if explicitly enabled and not empty
-            if ENABLE_ATTENTION_SLICING and str(ENABLE_ATTENTION_SLICING).lower() not in ('false', '0', 'none', ''):
+            if os.environ.get('LOCALLAB_ENABLE_ATTENTION_SLICING', '').lower() not in ('false', '0', 'none', ''):
                 if hasattr(model, 'enable_attention_slicing'):
                     model.enable_attention_slicing(1)
                     logger.info("Attention slicing enabled")
@@ -156,7 +156,7 @@ class ModelManager:
                         "Attention slicing not available for this model")
 
             # Only apply CPU offloading if explicitly enabled and not empty
-            if ENABLE_CPU_OFFLOADING and str(ENABLE_CPU_OFFLOADING).lower() not in ('false', '0', 'none', ''):
+            if os.environ.get('LOCALLAB_ENABLE_CPU_OFFLOADING', '').lower() not in ('false', '0', 'none', ''):
                 if hasattr(model, "enable_cpu_offload"):
                     model.enable_cpu_offload()
                     logger.info("CPU offloading enabled")
@@ -164,7 +164,7 @@ class ModelManager:
                     logger.info("CPU offloading not available for this model")
 
             # Only apply BetterTransformer if explicitly enabled and not empty
-            if ENABLE_BETTERTRANSFORMER and str(ENABLE_BETTERTRANSFORMER).lower() not in ('false', '0', 'none', ''):
+            if os.environ.get('LOCALLAB_ENABLE_BETTERTRANSFORMER', '').lower() not in ('false', '0', 'none', ''):
                 try:
                     from optimum.bettertransformer import BetterTransformer
                     model = BetterTransformer.transform(model)
@@ -219,9 +219,16 @@ class ModelManager:
                     **config
                 )
 
+                # Move model to the appropriate device
                 if not ENABLE_QUANTIZATION or str(ENABLE_QUANTIZATION).lower() in ('false', '0', 'none', ''):
                     device = "cuda" if torch.cuda.is_available() else "cpu"
                     self.model = self.model.to(device)
+
+                # Capture model parameters after loading
+                model_architecture = self.model.config.architectures[0] if hasattr(self.model.config, 'architectures') else 'Unknown'
+                memory_used = torch.cuda.memory_allocated() if torch.cuda.is_available() else 'N/A'
+                logger.info(f"Model architecture: {model_architecture}")
+                logger.info(f"Memory used: {memory_used}")
 
                 self.model = self._apply_optimizations(self.model)
 
