@@ -176,6 +176,19 @@ class ModelManager:
                     logger.warning(
                         f"BetterTransformer optimization failed: {str(e)}")
 
+            # Only apply Flash Attention if explicitly enabled and not empty
+            if os.environ.get('LOCALLAB_ENABLE_FLASH_ATTENTION', '').lower() not in ('false', '0', 'none', ''):
+                try:
+                    from flash_attn import FlashAttention
+                    model = FlashAttention(model)
+                    logger.info("Flash Attention optimization applied")
+                except ImportError:
+                    logger.warning(
+                        "Flash Attention not available - install 'flash-attn' for this feature")
+                except Exception as e:
+                    logger.warning(
+                        f"Flash Attention optimization failed: {str(e)}")
+
             return model
         except Exception as e:
             logger.warning(f"Some optimizations could not be applied: {str(e)}")
@@ -219,10 +232,13 @@ class ModelManager:
                     **config
                 )
 
-                # Move model to the appropriate device
+                # Move model only if quantization is disabled
                 if not ENABLE_QUANTIZATION or str(ENABLE_QUANTIZATION).lower() in ('false', '0', 'none', ''):
                     device = "cuda" if torch.cuda.is_available() else "cpu"
+                    logger.info(f"Moving model to {device}")
                     self.model = self.model.to(device)
+                else:
+                    logger.info("Skipping device move for quantized model - using device_map='auto'")
 
                 # Capture model parameters after loading
                 model_architecture = self.model.config.architectures[0] if hasattr(self.model.config, 'architectures') else 'Unknown'

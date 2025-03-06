@@ -187,7 +187,7 @@ def print_api_docs():
     }}
 
   • Example:
-    curl -X POST "http://localhost:8000/generate" \\
+    curl -X POST "<server-ngrok-public-url>/generate" \\
     -H "Content-Type: application/json" \\
     -d '{{"prompt": "Write a story about a dragon", "max_tokens": 100}}'
 
@@ -204,7 +204,7 @@ def print_api_docs():
     }}
 
   • Example:
-    curl -X POST "http://localhost:8000/chat" \\
+    curl -X POST "<server-ngrok-public-url>/chat" \\
     -H "Content-Type: application/json" \\
     -d '{{"messages": [{{"role": "user", "content": "Hello, who are you?"}}]}}'
 
@@ -212,12 +212,12 @@ def print_api_docs():
 
 1️⃣ /models - List available models
   • GET
-  • Example: curl "http://localhost:8000/models"
+  • Example: curl "<server-ngrok-public-url>/models"
 
 2️⃣ /models/load - Load a specific model
   • POST with JSON body: {{ "model_id": "microsoft/phi-2" }}
   • Example:
-    curl -X POST "http://localhost:8000/models/load" \\
+    curl -X POST "<server-ngrok-public-url>/models/load" \\
     -H "Content-Type: application/json" \\
     -d '{{"model_id": "microsoft/phi-2"}}'
 
@@ -225,14 +225,14 @@ def print_api_docs():
 
 1️⃣ /system/info - Get system information
   • GET
-  • Example: curl "http://localhost:8000/system/info"
+  • Example: curl "<server-ngrok-public-url>/system/info"
 
 2️⃣ /system/resources - Get detailed system resources
   • GET
-  • Example: curl "http://localhost:8000/system/resources"
+  • Example: curl "<server-ngrok-public-url>/system/resources"
 
 3️⃣ /docs - Interactive API documentation (Swagger UI)
-  • Open in browser: http://localhost:8000/docs
+  • Open in browser: <server-ngrok-public-url>/docs
 
 {Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
 """
