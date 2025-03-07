@@ -236,7 +236,12 @@ class ModelManager:
                 if not ENABLE_QUANTIZATION or str(ENABLE_QUANTIZATION).lower() in ('false', '0', 'none', ''):
                     device = "cuda" if torch.cuda.is_available() else "cpu"
                     logger.info(f"Moving model to {device}")
-                    self.model = self.model.to(device)
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        model_id,
+                        trust_remote_code=True,
+                        token=hf_token,               
+                        device_map="auto"
+                    )
                 else:
                     logger.info("Skipping device move for quantized model - using device_map='auto'")
 
