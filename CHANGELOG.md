@@ -2,6 +2,22 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.5 - 2025-03-08
+
+### Added
+
+- Added memory monitoring to prevent CUDA out of memory errors
+- Implemented adaptive token generation for streaming responses
+- Added CUDA memory configuration with expandable segments
+
+### Fixed
+
+- Fixed torch.compile() errors by adding proper error handling and fallback to eager mode
+- Fixed early stopping warning by correctly setting num_beams parameter
+- Improved streaming generation with smaller token chunks for more responsive output
+- Added memory-aware generation that adapts to available GPU resources
+- Implemented error recovery for out-of-memory situations during generation
+
 ## 0.4.4 - 2025-03-08
 
 ### Fixed

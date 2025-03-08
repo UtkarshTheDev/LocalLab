@@ -231,6 +231,14 @@ class ModelManager:
                 gc.collect()
                 log_model_unloaded(prev_model)
 
+            # Set CUDA memory allocation configuration to avoid fragmentation
+            os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+            
+            # Configure torch.compile to suppress errors and fall back to eager mode
+            if hasattr(torch, "_dynamo"):
+                torch._dynamo.config.suppress_errors = True
+                logger.info("Configured torch._dynamo to suppress errors and fall back to eager mode")
+
             hf_token = os.getenv("HF_TOKEN")
             
             # Check quantization settings from environment variables
@@ -270,29 +278,30 @@ class ModelManager:
                 self.model = self._apply_optimizations(self.model)
                 
                 # Try to compile the model for faster inference if PyTorch version supports it
+                # But with more robust error handling
                 try:
-                    if torch.__version__ >= "2.0.0" and torch.cuda.is_available():
-                        logger.info("Attempting to compile model with torch.compile() for faster inference...")
-                        # Use a separate thread to avoid blocking
-                        import threading
-                        
-                        def compile_model():
+                    if hasattr(torch, 'compile') and torch.cuda.is_available():
+                        # Only attempt compilation if we have enough GPU memory
+                        free_memory = torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_allocated()
+                        if free_memory > 2 * 1024 * 1024 * 1024:  # Only compile if we have >2GB free
+                            logger.info("Attempting to compile model with torch.compile() for faster inference...")
                             try:
-                                # Only compile the forward method for generation
-                                self.model.forward = torch.compile(
-                                    self.model.forward,
-                                    mode="reduce-overhead",  # Use reduce-overhead mode for faster compilation
-                                    fullgraph=False  # Partial graph compilation for better compatibility
+                                # Use a safer compilation mode
+                                self.model = torch.compile(
+                                    self.model, 
+                                    mode="reduce-overhead",
+                                    fullgraph=False,
+                                    dynamic=True  # Better for variable input sizes
                                 )
                                 self.compiled_model = True
                                 logger.info(f"{Fore.GREEN}Model successfully compiled with torch.compile(){Style.RESET_ALL}")
-                            except Exception as e:
-                                logger.warning(f"Could not compile model: {str(e)}. Continuing with uncompiled model.")
-                        
-                        # Start compilation in background
-                        threading.Thread(target=compile_model).start()
+                            except Exception as compile_error:
+                                logger.warning(f"Model compilation failed with specific error: {str(compile_error)}")
+                                logger.info("Continuing with uncompiled model")
+                        else:
+                            logger.info("Skipping model compilation due to limited GPU memory")
                 except Exception as e:
-                    logger.warning(f"Torch compile not available: {str(e)}. Continuing with standard model.")
+                    logger.warning(f"Could not compile model: {str(e)}. Continuing with uncompiled model.")
 
                 # Capture model parameters after loading
                 model_architecture = self.model.config.architectures[0] if hasattr(self.model.config, 'architectures') else 'Unknown'
@@ -454,41 +463,62 @@ class ModelManager:
             if stream:
                 return self.async_stream_generate(inputs, gen_params)
 
+            # Check if we need to clear CUDA cache before generation
+            if torch.cuda.is_available():
+                current_mem = torch.cuda.memory_allocated() / (1024 * 1024 * 1024)  # GB
+                total_mem = torch.cuda.get_device_properties(0).total_memory / (1024 * 1024 * 1024)  # GB
+                if current_mem > 0.8 * total_mem:  # If using >80% of GPU memory
+                    # Clear cache to avoid OOM
+                    torch.cuda.empty_cache()
+                    logger.info("Cleared CUDA cache before generation to avoid out of memory error")
+
             with torch.no_grad():
-                generate_params = {
-                    **inputs,
-                    "max_new_tokens": gen_params["max_length"],
-                    "temperature": gen_params["temperature"],
-                    "top_p": gen_params["top_p"],
-                    "do_sample": True,
-                    "pad_token_id": self.tokenizer.eos_token_id
-                }
+                try:
+                    generate_params = {
+                        **inputs,
+                        "max_new_tokens": gen_params["max_length"],
+                        "temperature": gen_params["temperature"],
+                        "top_p": gen_params["top_p"],
+                        "do_sample": True,
+                        "pad_token_id": self.tokenizer.eos_token_id,
+                        # Fix the early stopping warning by setting num_beams explicitly
+                        "num_beams": 1
+                    }
 
-                # Add optional parameters if present in gen_params
-                if "top_k" in gen_params:
-                    generate_params["top_k"] = gen_params["top_k"]
-                if "repetition_penalty" in gen_params:
-                    generate_params["repetition_penalty"] = gen_params["repetition_penalty"]
-                
-                # Add early stopping for faster generation
-                generate_params["early_stopping"] = True
-                
-                # Add batch size for faster generation (process multiple tokens at once)
-                generate_params["num_return_sequences"] = 1
-                
-                # Set a reasonable max time for generation to prevent hanging
-                if "max_time" not in generate_params and not stream:
-                    generate_params["max_time"] = 30.0  # 30 seconds max for generation
-                
-                # Use efficient attention implementation if available
-                if hasattr(self.model.config, "attn_implementation"):
-                    generate_params["attn_implementation"] = "flash_attention_2"
+                    # Add optional parameters if present in gen_params
+                    if "top_k" in gen_params:
+                        generate_params["top_k"] = gen_params["top_k"]
+                    if "repetition_penalty" in gen_params:
+                        generate_params["repetition_penalty"] = gen_params["repetition_penalty"]
+                    
+                    # Set a reasonable max time for generation to prevent hanging
+                    if "max_time" not in generate_params and not stream:
+                        generate_params["max_time"] = 30.0  # 30 seconds max for generation
+                    
+                    # Use efficient attention implementation if available
+                    if hasattr(self.model.config, "attn_implementation"):
+                        generate_params["attn_implementation"] = "flash_attention_2"
 
-                # Generate text
-                start_time = time.time()
-                outputs = self.model.generate(**generate_params)
-                generation_time = time.time() - start_time
-                logger.info(f"Generation completed in {generation_time:.2f} seconds")
+                    # Generate text
+                    start_time = time.time()
+                    outputs = self.model.generate(**generate_params)
+                    generation_time = time.time() - start_time
+                    logger.info(f"Generation completed in {generation_time:.2f} seconds")
+                
+                except RuntimeError as e:
+                    if "CUDA out of memory" in str(e):
+                        # If we run out of memory, clear cache and try again with smaller parameters
+                        torch.cuda.empty_cache()
+                        logger.warning("CUDA out of memory during generation. Cleared cache and reducing parameters.")
+                        
+                        # Reduce parameters for memory efficiency
+                        generate_params["max_new_tokens"] = min(generate_params.get("max_new_tokens", 512), 256)
+                        
+                        # Try again with reduced parameters
+                        outputs = self.model.generate(**generate_params)
+                    else:
+                        # For other errors, re-raise
+                        raise
 
             response = self.tokenizer.decode(
                 outputs[0][len(inputs["input_ids"][0]):], skip_special_tokens=True)
@@ -551,9 +581,10 @@ class ModelManager:
             input_ids = inputs["input_ids"]
             attention_mask = inputs["attention_mask"]
             
-            # Generate multiple tokens at once for efficiency
-            tokens_to_generate_per_step = 8  # Generate 8 tokens at a time for efficiency
-
+            # Generate fewer tokens at once for more responsive streaming
+            # Using smaller chunks makes it appear more interactive
+            tokens_to_generate_per_step = 3  # Reduced from 8 to 3 for more responsive streaming
+            
             with torch.no_grad():
                 for step in range(0, max_length, tokens_to_generate_per_step):
                     # Calculate how many tokens to generate in this step
@@ -570,38 +601,78 @@ class ModelManager:
                         "do_sample": True,
                         "pad_token_id": self.tokenizer.eos_token_id,
                         "repetition_penalty": repetition_penalty,
-                        "early_stopping": True
+                        # Remove early_stopping to fix the warning
+                        "num_beams": 1  # Explicitly set to 1 to avoid warnings
                     }
                     
                     # Use efficient attention if available
                     if hasattr(self.model.config, "attn_implementation"):
                         generate_params["attn_implementation"] = "flash_attention_2"
                     
-                    # Generate tokens
-                    outputs = self.model.generate(**generate_params)
-
-                    # Get the new tokens (skip the input tokens)
-                    new_tokens = outputs[0][len(input_ids[0]):]
+                    try:
+                        # Generate tokens
+                        outputs = self.model.generate(**generate_params)
+                        
+                        # Get the new tokens (skip the input tokens)
+                        new_tokens = outputs[0][len(input_ids[0]):]
+                        
+                        # Decode and yield each new token
+                        new_text = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
+                        
+                        # If no new text was generated or it's just whitespace, stop generation
+                        if not new_text or new_text.isspace():
+                            break
+                        
+                        # Yield the new text
+                        yield new_text
+                        
+                        # Update input_ids and attention_mask for next iteration
+                        input_ids = outputs
+                        attention_mask = torch.ones_like(input_ids)
+                        
+                        # Ensure the updated inputs are on the correct device
+                        if input_ids.device != model_device:
+                            input_ids = input_ids.to(model_device)
+                        if attention_mask.device != model_device:
+                            attention_mask = attention_mask.to(model_device)
+                            
+                        # Check if we're running out of memory and need to clear cache
+                        if torch.cuda.is_available():
+                            current_mem = torch.cuda.memory_allocated() / (1024 * 1024 * 1024)  # GB
+                            total_mem = torch.cuda.get_device_properties(0).total_memory / (1024 * 1024 * 1024)  # GB
+                            if current_mem > 0.9 * total_mem:  # If using >90% of GPU memory
+                                # Clear cache to avoid OOM
+                                torch.cuda.empty_cache()
+                                logger.info("Cleared CUDA cache to avoid out of memory error")
                     
-                    # Decode and yield each new token
-                    new_text = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
-                    
-                    # If no new text was generated or it's just whitespace, stop generation
-                    if not new_text or new_text.isspace():
-                        break
-
-                    # Yield the new text
-                    yield new_text
-                    
-                    # Update input_ids and attention_mask for next iteration
-                    input_ids = outputs
-                    attention_mask = torch.ones_like(input_ids)
-                    
-                    # Ensure the updated inputs are on the correct device
-                    if input_ids.device != model_device:
-                        input_ids = input_ids.to(model_device)
-                    if attention_mask.device != model_device:
-                        attention_mask = attention_mask.to(model_device)
+                    except RuntimeError as e:
+                        if "CUDA out of memory" in str(e):
+                            # If we run out of memory, clear cache and try again with smaller batch
+                            torch.cuda.empty_cache()
+                            logger.warning("CUDA out of memory during streaming. Cleared cache and reducing batch size.")
+                            
+                            # Reduce tokens per step for the rest of generation
+                            tokens_to_generate_per_step = 1
+                            current_tokens_to_generate = 1
+                            
+                            # Try again with smaller batch
+                            generate_params["max_new_tokens"] = 1
+                            outputs = self.model.generate(**generate_params)
+                            
+                            # Continue as before
+                            new_tokens = outputs[0][len(input_ids[0]):]
+                            new_text = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
+                            
+                            if not new_text or new_text.isspace():
+                                break
+                                
+                            yield new_text
+                            
+                            input_ids = outputs
+                            attention_mask = torch.ones_like(input_ids)
+                        else:
+                            # For other errors, re-raise
+                            raise
 
         except Exception as e:
             logger.error(f"Streaming generation failed: {str(e)}")
