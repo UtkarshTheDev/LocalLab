@@ -257,7 +257,14 @@ def start_server(use_ngrok: bool = False, port=8000, ngrok_auth_token: Optional[
         raise
     
     # Create a function to display the Running banner when the server is ready
+    startup_complete = False  # Flag to track if startup has been completed
+    
     def on_startup():
+        # Use a flag to ensure this function only runs once
+        nonlocal startup_complete
+        if startup_complete:
+            return
+        
         # Update server status to running
         set_server_status("running")
         print_running_banner(port, public_url)
@@ -291,6 +298,9 @@ def start_server(use_ngrok: bool = False, port=8000, ngrok_auth_token: Optional[
         
         # Print API documentation
         print_api_docs()
+        
+        # Set flag to indicate startup is complete
+        startup_complete = True
     
     # Start uvicorn server directly in the main process
     try:
@@ -302,6 +312,7 @@ def start_server(use_ngrok: bool = False, port=8000, ngrok_auth_token: Optional[
             
             # Define the callback for Colab
             async def on_startup_async():
+                # This will only run once due to the flag in on_startup
                 on_startup()
             
             config = uvicorn.Config(
@@ -328,14 +339,11 @@ def start_server(use_ngrok: bool = False, port=8000, ngrok_auth_token: Optional[
                 async def serve(self, sockets=None):
                     self.config.setup_event_loop()
                     await self.startup(sockets=sockets)
+                    
                     # Call our callback before processing requests
-                    if callable(self.config.callback_notify):
-                        await self.config.callback_notify()
-                    elif isinstance(self.config.callback_notify, list):
-                        for callback in self.config.callback_notify:
-                            if callable(callback):
-                                callback()
-                    on_startup()  # Always ensure our startup function is called
+                    # Only call on_startup once
+                    on_startup()
+                    
                     await self.main_loop()
                     await self.shutdown()
             

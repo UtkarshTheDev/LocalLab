@@ -48,6 +48,8 @@ class ModelManager:
         self.tokenizer: Optional[AutoTokenizer] = None
         self.model_config: Optional[Dict[str, Any]] = None
         self.last_used: float = time.time()
+        self.compiled_model: bool = False
+        self.response_cache = {}  # Simple in-memory cache for responses
 
         logger.info(f"Using device: {self.device}")
 
@@ -141,8 +143,9 @@ class ModelManager:
             # Only apply attention slicing if explicitly enabled and not empty
             if os.environ.get('LOCALLAB_ENABLE_ATTENTION_SLICING', '').lower() not in ('false', '0', 'none', ''):
                 if hasattr(model, 'enable_attention_slicing'):
-                    model.enable_attention_slicing(1)
-                    logger.info("Attention slicing enabled")
+                    # Use more aggressive slicing for faster inference
+                    model.enable_attention_slicing("max")
+                    logger.info("Attention slicing enabled with max setting")
                 else:
                     logger.info(
                         "Attention slicing not available for this model")
@@ -171,15 +174,40 @@ class ModelManager:
             # Only apply Flash Attention if explicitly enabled and not empty
             if os.environ.get('LOCALLAB_ENABLE_FLASH_ATTENTION', '').lower() not in ('false', '0', 'none', ''):
                 try:
-                    from flash_attn import FlashAttention
-                    model = FlashAttention(model)
-                    logger.info("Flash Attention optimization applied")
+                    # Try to enable flash attention directly on the model config
+                    if hasattr(model.config, "attn_implementation"):
+                        model.config.attn_implementation = "flash_attention_2"
+                        logger.info("Flash Attention 2 enabled via config")
+                    # For older models, try the flash_attn module
+                    else:
+                        import flash_attn
+                        logger.info("Flash Attention enabled via module")
                 except ImportError:
                     logger.warning(
                         "Flash Attention not available - install 'flash-attn' for this feature")
                 except Exception as e:
                     logger.warning(
                         f"Flash Attention optimization failed: {str(e)}")
+            
+            # Enable memory efficient attention if available
+            try:
+                if hasattr(model, "enable_xformers_memory_efficient_attention"):
+                    model.enable_xformers_memory_efficient_attention()
+                    logger.info("XFormers memory efficient attention enabled")
+            except Exception as e:
+                logger.info(f"XFormers memory efficient attention not available: {str(e)}")
+            
+            # Enable gradient checkpointing for memory efficiency if available
+            try:
+                if hasattr(model, "gradient_checkpointing_enable"):
+                    model.gradient_checkpointing_enable()
+                    logger.info("Gradient checkpointing enabled for memory efficiency")
+            except Exception as e:
+                logger.info(f"Gradient checkpointing not available: {str(e)}")
+            
+            # Set model to evaluation mode for faster inference
+            model.eval()
+            logger.info("Model set to evaluation mode for faster inference")
 
             return model
         except Exception as e:
@@ -197,6 +225,8 @@ class ModelManager:
                 logger.info(f"Unloading previous model: {prev_model}")
                 del self.model
                 self.model = None
+                self.compiled_model = False
+                self.response_cache.clear()  # Clear cache when changing models
                 torch.cuda.empty_cache()
                 gc.collect()
                 log_model_unloaded(prev_model)
@@ -236,14 +266,39 @@ class ModelManager:
                 
                 logger.info(f"Model loaded with device_map='auto' for automatic placement")
 
+                # Apply optimizations if needed
+                self.model = self._apply_optimizations(self.model)
+                
+                # Try to compile the model for faster inference if PyTorch version supports it
+                try:
+                    if torch.__version__ >= "2.0.0" and torch.cuda.is_available():
+                        logger.info("Attempting to compile model with torch.compile() for faster inference...")
+                        # Use a separate thread to avoid blocking
+                        import threading
+                        
+                        def compile_model():
+                            try:
+                                # Only compile the forward method for generation
+                                self.model.forward = torch.compile(
+                                    self.model.forward,
+                                    mode="reduce-overhead",  # Use reduce-overhead mode for faster compilation
+                                    fullgraph=False  # Partial graph compilation for better compatibility
+                                )
+                                self.compiled_model = True
+                                logger.info(f"{Fore.GREEN}Model successfully compiled with torch.compile(){Style.RESET_ALL}")
+                            except Exception as e:
+                                logger.warning(f"Could not compile model: {str(e)}. Continuing with uncompiled model.")
+                        
+                        # Start compilation in background
+                        threading.Thread(target=compile_model).start()
+                except Exception as e:
+                    logger.warning(f"Torch compile not available: {str(e)}. Continuing with standard model.")
+
                 # Capture model parameters after loading
                 model_architecture = self.model.config.architectures[0] if hasattr(self.model.config, 'architectures') else 'Unknown'
                 memory_used = torch.cuda.memory_allocated() if torch.cuda.is_available() else 'N/A'
                 logger.info(f"Model architecture: {model_architecture}")
                 logger.info(f"Memory used: {memory_used}")
-
-                # Apply optimizations if needed
-                self.model = self._apply_optimizations(self.model)
 
                 self.current_model = model_id
                 if model_id in MODEL_REGISTRY:
@@ -261,6 +316,7 @@ class ModelManager:
                 if self.model is not None:
                     del self.model
                     self.model = None
+                    self.compiled_model = False
                     torch.cuda.empty_cache()
                     gc.collect()
 
@@ -328,10 +384,31 @@ class ModelManager:
 
             # Format prompt with system instructions
             formatted_prompt = f"""<|system|>{instructions}</|system|>\n<|user|>{prompt}</|user|>\n<|assistant|>"""
+            
+            # Check cache for non-streaming requests with default parameters
+            cache_key = None
+            if not stream and not any([max_length, max_new_tokens, temperature, top_p, top_k, repetition_penalty]):
+                cache_key = f"{self.current_model}:{hash(formatted_prompt)}"
+                if cache_key in self.response_cache:
+                    logger.info(f"Cache hit for prompt: {prompt[:30]}...")
+                    return self.response_cache[cache_key]
 
             # Get model-specific generation parameters
             from .config import get_model_generation_params
             gen_params = get_model_generation_params(self.current_model)
+            
+            # Set optimized defaults for faster generation
+            if not max_length and not max_new_tokens:
+                # Use a smaller default max_length for faster generation
+                gen_params["max_length"] = min(gen_params.get("max_length", DEFAULT_MAX_LENGTH), 512)
+            
+            if not temperature:
+                # Slightly lower temperature for faster and more focused generation
+                gen_params["temperature"] = min(gen_params.get("temperature", DEFAULT_TEMPERATURE), 0.7)
+            
+            if not top_k:
+                # Add top_k for faster sampling
+                gen_params["top_k"] = 40
 
             # Handle max_new_tokens parameter (map to max_length)
             if max_new_tokens is not None:
@@ -392,14 +469,42 @@ class ModelManager:
                     generate_params["top_k"] = gen_params["top_k"]
                 if "repetition_penalty" in gen_params:
                     generate_params["repetition_penalty"] = gen_params["repetition_penalty"]
+                
+                # Add early stopping for faster generation
+                generate_params["early_stopping"] = True
+                
+                # Add batch size for faster generation (process multiple tokens at once)
+                generate_params["num_return_sequences"] = 1
+                
+                # Set a reasonable max time for generation to prevent hanging
+                if "max_time" not in generate_params and not stream:
+                    generate_params["max_time"] = 30.0  # 30 seconds max for generation
+                
+                # Use efficient attention implementation if available
+                if hasattr(self.model.config, "attn_implementation"):
+                    generate_params["attn_implementation"] = "flash_attention_2"
 
+                # Generate text
+                start_time = time.time()
                 outputs = self.model.generate(**generate_params)
+                generation_time = time.time() - start_time
+                logger.info(f"Generation completed in {generation_time:.2f} seconds")
 
             response = self.tokenizer.decode(
                 outputs[0][len(inputs["input_ids"][0]):], skip_special_tokens=True)
             # Clean up response by removing system and user prompts if they got repeated
             response = response.replace(
                 str(instructions), "").replace(prompt, "").strip()
+            
+            # Cache the response if we have a cache key
+            if cache_key:
+                self.response_cache[cache_key] = response
+                # Limit cache size to prevent memory issues
+                if len(self.response_cache) > 100:
+                    # Remove oldest entries
+                    for _ in range(10):
+                        self.response_cache.pop(next(iter(self.response_cache)), None)
+            
             return response
 
         except Exception as e:
@@ -423,14 +528,14 @@ class ModelManager:
                 temperature = gen_params.get(
                     "temperature", DEFAULT_TEMPERATURE)
                 top_p = gen_params.get("top_p", DEFAULT_TOP_P)
-                top_k = gen_params.get("top_k", 50)
+                top_k = gen_params.get("top_k", 40)  # Default to 40 for faster generation
                 repetition_penalty = gen_params.get("repetition_penalty", 1.1)
             else:
                 # Use provided individual parameters or defaults
-                max_length = max_length or DEFAULT_MAX_LENGTH
-                temperature = temperature or DEFAULT_TEMPERATURE
+                max_length = max_length or min(DEFAULT_MAX_LENGTH, 512)  # Limit default max_length
+                temperature = temperature or 0.7  # Lower temperature for faster generation
                 top_p = top_p or DEFAULT_TOP_P
-                top_k = 50
+                top_k = 40  # Default to 40 for faster generation
                 repetition_penalty = 1.1
 
             # Get the actual device of the model
@@ -441,38 +546,62 @@ class ModelManager:
                 if inputs[key].device != model_device:
                     inputs[key] = inputs[key].to(model_device)
 
+            # Use KV caching for faster generation
+            past_key_values = None
+            input_ids = inputs["input_ids"]
+            attention_mask = inputs["attention_mask"]
+            
+            # Generate multiple tokens at once for efficiency
+            tokens_to_generate_per_step = 8  # Generate 8 tokens at a time for efficiency
+
             with torch.no_grad():
-                for _ in range(max_length):
+                for step in range(0, max_length, tokens_to_generate_per_step):
+                    # Calculate how many tokens to generate in this step
+                    current_tokens_to_generate = min(tokens_to_generate_per_step, max_length - step)
+                    
+                    # Generate parameters
                     generate_params = {
-                        **inputs,
-                        "max_new_tokens": 1,
+                        "input_ids": input_ids,
+                        "attention_mask": attention_mask,
+                        "max_new_tokens": current_tokens_to_generate,
                         "temperature": temperature,
                         "top_p": top_p,
+                        "top_k": top_k,
                         "do_sample": True,
-                        "pad_token_id": self.tokenizer.eos_token_id
+                        "pad_token_id": self.tokenizer.eos_token_id,
+                        "repetition_penalty": repetition_penalty,
+                        "early_stopping": True
                     }
-
-                    # Add optional parameters if available
-                    if top_k is not None:
-                        generate_params["top_k"] = top_k
-                    if repetition_penalty is not None:
-                        generate_params["repetition_penalty"] = repetition_penalty
-
+                    
+                    # Use efficient attention if available
+                    if hasattr(self.model.config, "attn_implementation"):
+                        generate_params["attn_implementation"] = "flash_attention_2"
+                    
+                    # Generate tokens
                     outputs = self.model.generate(**generate_params)
 
-                    new_token = self.tokenizer.decode(
-                        outputs[0][-1:], skip_special_tokens=True)
-                    if not new_token or new_token.isspace():
+                    # Get the new tokens (skip the input tokens)
+                    new_tokens = outputs[0][len(input_ids[0]):]
+                    
+                    # Decode and yield each new token
+                    new_text = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
+                    
+                    # If no new text was generated or it's just whitespace, stop generation
+                    if not new_text or new_text.isspace():
                         break
 
-                    yield new_token
-                    inputs = {"input_ids": outputs,
-                              "attention_mask": torch.ones_like(outputs)}
+                    # Yield the new text
+                    yield new_text
+                    
+                    # Update input_ids and attention_mask for next iteration
+                    input_ids = outputs
+                    attention_mask = torch.ones_like(input_ids)
                     
                     # Ensure the updated inputs are on the correct device
-                    for key in inputs:
-                        if inputs[key].device != model_device:
-                            inputs[key] = inputs[key].to(model_device)
+                    if input_ids.device != model_device:
+                        input_ids = input_ids.to(model_device)
+                    if attention_mask.device != model_device:
+                        attention_mask = attention_mask.to(model_device)
 
         except Exception as e:
             logger.error(f"Streaming generation failed: {str(e)}")

@@ -2,6 +2,14 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.4 - 2025-03-08
+
+### Fixed
+
+- Fixed issue with banners (running banner, system instructions, model configuration, API documentation) repeating in the console at regular intervals
+- Added flag to ensure startup information is only displayed once during server initialization
+- Improved server callback handling to prevent duplicate banner displays
+
 ## 0.3.5 - 2023-03-05
 
 ### Fixed
