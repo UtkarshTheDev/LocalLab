@@ -2,7 +2,7 @@
 LocalLab: Run LLMs locally with a friendly API similar to OpenAI
 """
 
-__version__ = "0.4.2"
+__version__ = "0.4.3"
 
 from typing import Dict, Any, Optional
 

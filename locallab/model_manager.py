@@ -202,11 +202,16 @@ class ModelManager:
                 log_model_unloaded(prev_model)
 
             hf_token = os.getenv("HF_TOKEN")
-            config = self._get_quantization_config()
-
+            
             # Check quantization settings from environment variables
             enable_quantization = os.environ.get('LOCALLAB_ENABLE_QUANTIZATION', '').lower() not in ('false', '0', 'none', '')
             quantization_type = os.environ.get('LOCALLAB_QUANTIZATION_TYPE', '') if enable_quantization else "None"
+            
+            # Get configuration based on quantization settings
+            config = self._get_quantization_config() if enable_quantization else {
+                "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
+                "device_map": "auto"  # Always use device_map="auto" for automatic placement
+            }
 
             if config and config.get("quantization_config"):
                 logger.info(f"Using quantization config: {quantization_type}")
@@ -221,21 +226,15 @@ class ModelManager:
                     token=hf_token
                 )
 
+                # Load the model with device_map="auto" to let the library handle device placement
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_id,
                     trust_remote_code=True,
                     token=hf_token,
                     **config
                 )
-
-                # Check if the model has offloaded modules
-                if hasattr(self.model, 'is_offloaded') and self.model.is_offloaded:
-                    logger.warning("Model has offloaded modules; skipping device move.")
-                else:
-                    # Move model to the appropriate device only if quantization is disabled
-                    if not enable_quantization:
-                        device = "cuda" if torch.cuda.is_available() else "cpu"
-                        self.model = self.model.to(device)
+                
+                logger.info(f"Model loaded with device_map='auto' for automatic placement")
 
                 # Capture model parameters after loading
                 model_architecture = self.model.config.architectures[0] if hasattr(self.model.config, 'architectures') else 'Unknown'
@@ -243,6 +242,7 @@ class ModelManager:
                 logger.info(f"Model architecture: {model_architecture}")
                 logger.info(f"Memory used: {memory_used}")
 
+                # Apply optimizations if needed
                 self.model = self._apply_optimizations(self.model)
 
                 self.current_model = model_id
