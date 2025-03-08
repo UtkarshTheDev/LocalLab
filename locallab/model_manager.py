@@ -63,7 +63,10 @@ class ModelManager:
     def _get_quantization_config(self) -> Optional[Dict[str, Any]]:
         """Get quantization configuration based on settings"""
         # Check if quantization is explicitly disabled (not just False but also '0', 'none', '')
-        if not ENABLE_QUANTIZATION or str(ENABLE_QUANTIZATION).lower() in ('false', '0', 'none', ''):
+        enable_quantization = os.environ.get('LOCALLAB_ENABLE_QUANTIZATION', '').lower() not in ('false', '0', 'none', '')
+        quantization_type = os.environ.get('LOCALLAB_QUANTIZATION_TYPE', '')
+        
+        if not enable_quantization:
             logger.info("Quantization is disabled, using default precision")
             return {
                 "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
@@ -85,7 +88,7 @@ class ModelManager:
                 }
 
             # Check for empty quantization type
-            if not QUANTIZATION_TYPE or QUANTIZATION_TYPE.lower() in ('none', ''):
+            if not quantization_type or quantization_type.lower() in ('none', ''):
                 logger.info(
                     "No quantization type specified, defaulting to fp16")
                 return {
@@ -93,7 +96,7 @@ class ModelManager:
                     "device_map": "auto"
                 }
 
-            if QUANTIZATION_TYPE == "int8":
+            if quantization_type == "int8":
                 logger.info("Using INT8 quantization")
                 return {
                     "device_map": "auto",
@@ -104,7 +107,7 @@ class ModelManager:
                         bnb_8bit_use_double_quant=True
                     )
                 }
-            elif QUANTIZATION_TYPE == "int4":
+            elif quantization_type == "int4":
                 logger.info("Using INT4 quantization")
                 return {
                     "device_map": "auto",
@@ -116,7 +119,7 @@ class ModelManager:
                     )
                 }
             else:
-                logger.info(f"Unrecognized quantization type '{QUANTIZATION_TYPE}', defaulting to fp16")
+                logger.info(f"Unrecognized quantization type '{quantization_type}', defaulting to fp16")
                 return {
                     "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
                     "device_map": "auto"
@@ -131,17 +134,6 @@ class ModelManager:
                 "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
                 "device_map": "auto"
             }
-        except Exception as e:
-            logger.warning(f"Error configuring quantization: {str(e)}. Falling back to fp16.")
-            return {
-                "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
-                "device_map": "auto"
-            }
-
-        return {
-            "torch_dtype": torch.float16,
-            "device_map": "auto"
-        }
 
     def _apply_optimizations(self, model: AutoModelForCausalLM) -> AutoModelForCausalLM:
         """Apply various optimizations to the model"""
@@ -212,8 +204,12 @@ class ModelManager:
             hf_token = os.getenv("HF_TOKEN")
             config = self._get_quantization_config()
 
+            # Check quantization settings from environment variables
+            enable_quantization = os.environ.get('LOCALLAB_ENABLE_QUANTIZATION', '').lower() not in ('false', '0', 'none', '')
+            quantization_type = os.environ.get('LOCALLAB_QUANTIZATION_TYPE', '') if enable_quantization else "None"
+
             if config and config.get("quantization_config"):
-                logger.info(f"Using quantization config: {QUANTIZATION_TYPE}")
+                logger.info(f"Using quantization config: {quantization_type}")
             else:
                 precision = "fp16" if torch.cuda.is_available() else "fp32"
                 logger.info(f"Using {precision} precision (no quantization)")
@@ -232,18 +228,14 @@ class ModelManager:
                     **config
                 )
 
-                # Move model only if quantization is disabled
-                if not ENABLE_QUANTIZATION or str(ENABLE_QUANTIZATION).lower() in ('false', '0', 'none', ''):
-                    device = "cuda" if torch.cuda.is_available() else "cpu"
-                    logger.info(f"Moving model to {device}")
-                    self.model = AutoModelForCausalLM.from_pretrained(
-                        model_id,
-                        trust_remote_code=True,
-                        token=hf_token,               
-                        device_map="auto"
-                    )
+                # Check if the model has offloaded modules
+                if hasattr(self.model, 'is_offloaded') and self.model.is_offloaded:
+                    logger.warning("Model has offloaded modules; skipping device move.")
                 else:
-                    logger.info("Skipping device move for quantized model - using device_map='auto'")
+                    # Move model to the appropriate device only if quantization is disabled
+                    if not enable_quantization:
+                        device = "cuda" if torch.cuda.is_available() else "cpu"
+                        self.model = self.model.to(device)
 
                 # Capture model parameters after loading
                 model_architecture = self.model.config.architectures[0] if hasattr(self.model.config, 'architectures') else 'Unknown'
@@ -374,8 +366,13 @@ class ModelManager:
                     logger.warning(f"Invalid repetition_penalty value: {repetition_penalty}. Using model default.")
 
             inputs = self.tokenizer(formatted_prompt, return_tensors="pt")
+            
+            # Get the actual device of the model
+            model_device = next(self.model.parameters()).device
+            
+            # Move inputs to the same device as the model
             for key in inputs:
-                inputs[key] = inputs[key].to(self.device)
+                inputs[key] = inputs[key].to(model_device)
 
             if stream:
                 return self.async_stream_generate(inputs, gen_params)
@@ -436,6 +433,14 @@ class ModelManager:
                 top_k = 50
                 repetition_penalty = 1.1
 
+            # Get the actual device of the model
+            model_device = next(self.model.parameters()).device
+            
+            # Ensure inputs are on the same device as the model
+            for key in inputs:
+                if inputs[key].device != model_device:
+                    inputs[key] = inputs[key].to(model_device)
+
             with torch.no_grad():
                 for _ in range(max_length):
                     generate_params = {
@@ -463,6 +468,11 @@ class ModelManager:
                     yield new_token
                     inputs = {"input_ids": outputs,
                               "attention_mask": torch.ones_like(outputs)}
+                    
+                    # Ensure the updated inputs are on the correct device
+                    for key in inputs:
+                        if inputs[key].device != model_device:
+                            inputs[key] = inputs[key].to(model_device)
 
         except Exception as e:
             logger.error(f"Streaming generation failed: {str(e)}")
@@ -500,8 +510,13 @@ class ModelManager:
 
             # Tokenize the prompt
             inputs = self.tokenizer(formatted_prompt, return_tensors="pt")
+            
+            # Get the actual device of the model
+            model_device = next(self.model.parameters()).device
+            
+            # Move inputs to the same device as the model
             for key in inputs:
-                inputs[key] = inputs[key].to(self.device)
+                inputs[key] = inputs[key].to(model_device)
 
         # Now stream tokens using the prepared inputs and parameters
         for token in self._stream_generate(inputs, gen_params=gen_params):
@@ -528,6 +543,14 @@ class ModelManager:
         vram_required = self.model_config.get("vram", "Unknown") if isinstance(
             self.model_config, dict) else "Unknown"
 
+        # Check environment variables for optimization settings
+        enable_quantization = os.environ.get('LOCALLAB_ENABLE_QUANTIZATION', '').lower() not in ('false', '0', 'none', '')
+        quantization_type = os.environ.get('LOCALLAB_QUANTIZATION_TYPE', '') if enable_quantization else "None"
+        
+        # If quantization is disabled or type is empty, set to "None"
+        if not enable_quantization or not quantization_type or quantization_type.lower() in ('none', ''):
+            quantization_type = "None"
+
         model_info = {
             "model_id": self.current_model,
             "model_name": model_name,
@@ -538,11 +561,11 @@ class ModelManager:
             "ram_required": ram_required,
             "vram_required": vram_required,
             "memory_used": f"{memory_used / (1024 * 1024):.2f} MB",
-            "quantization": QUANTIZATION_TYPE if ENABLE_QUANTIZATION else "None",
+            "quantization": quantization_type,
             "optimizations": {
-                "attention_slicing": ENABLE_ATTENTION_SLICING,
-                "flash_attention": ENABLE_FLASH_ATTENTION,
-                "better_transformer": ENABLE_BETTERTRANSFORMER
+                "attention_slicing": os.environ.get('LOCALLAB_ENABLE_ATTENTION_SLICING', '').lower() not in ('false', '0', 'none', ''),
+                "flash_attention": os.environ.get('LOCALLAB_ENABLE_FLASH_ATTENTION', '').lower() not in ('false', '0', 'none', ''),
+                "better_transformer": os.environ.get('LOCALLAB_ENABLE_BETTERTRANSFORMER', '').lower() not in ('false', '0', 'none', '')
             }
         }
 
@@ -560,9 +583,9 @@ class ModelManager:
 • Quantization: {Fore.YELLOW}{model_info['quantization']}{Style.RESET_ALL}
 
 {Fore.GREEN}🔧 Optimizations{Style.RESET_ALL}
-• Attention Slicing: {Fore.YELLOW}{str(ENABLE_ATTENTION_SLICING)}{Style.RESET_ALL}
-• Flash Attention: {Fore.YELLOW}{str(ENABLE_FLASH_ATTENTION)}{Style.RESET_ALL}
-• Better Transformer: {Fore.YELLOW}{str(ENABLE_BETTERTRANSFORMER)}{Style.RESET_ALL}
+• Attention Slicing: {Fore.YELLOW}{str(model_info['optimizations']['attention_slicing'])}{Style.RESET_ALL}
+• Flash Attention: {Fore.YELLOW}{str(model_info['optimizations']['flash_attention'])}{Style.RESET_ALL}
+• Better Transformer: {Fore.YELLOW}{str(model_info['optimizations']['better_transformer'])}{Style.RESET_ALL}
 """)
 
         return model_info
