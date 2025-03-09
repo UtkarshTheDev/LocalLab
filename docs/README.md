@@ -43,6 +43,7 @@ sequenceDiagram
 docs/
 ├── guides/           # Start here for comprehensive guides
 │   ├── getting-started.md  # Begin your journey
+│   ├── cli.md             # Command-line interface guide
 │   ├── api.md             # API documentation
 │   ├── faq.md            # Common questions
 │   ├── troubleshooting.md # Solve common issues
@@ -71,8 +72,9 @@ docs/
 ### For New Users
 
 1. Start with our [Getting Started Guide](./guides/getting-started.md)
-2. Choose your client: [Python](./clients/python/README.md) or [Node.js](./clients/nodejs/README.md)
-3. Pick your deployment: [Local](./deployment/local.md) or [Google Colab](./colab/README.md)
+2. Explore the [CLI Guide](./guides/cli.md) for interactive setup
+3. Choose your client: [Python](./clients/python/README.md) or [Node.js](./clients/nodejs/README.md)
+4. Pick your deployment: [Local](./deployment/local.md) or [Google Colab](./colab/README.md)
 
 ### Deployment Decision Guide
 
@@ -109,6 +111,7 @@ stateDiagram-v2
 1. **New Users**
 
    - Start with [Getting Started](./guides/getting-started.md)
+   - Explore the [CLI Guide](./guides/cli.md) for interactive setup
    - Check [FAQ](./guides/faq.md) for common questions
    - Use [Troubleshooting](./guides/troubleshooting.md) when stuck
 
@@ -132,6 +135,7 @@ stateDiagram-v2
 
 ## 🌟 Features
 
+- **Interactive CLI**: Configure and run your server with an intuitive command-line interface
 - **Multiple Model Support:** Pre-configured models and custom model loading
 - **Advanced Optimizations:** Quantization, attention slicing, and more
 - **Resource Management:** Automatic monitoring and optimization

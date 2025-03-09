@@ -19,8 +19,28 @@ def get_env_var(key: str, *, default: Any = None, var_type: Type = str) -> Any:
     Returns:
         Converted and validated value
     """
+    # First check environment variables
     value = os.environ.get(key)
-
+    
+    # If not found in environment, try the config file
+    if value is None:
+        try:
+            # Import here to avoid circular imports
+            from .cli.config import get_config_value
+            # Convert key format: LOCALLAB_ENABLE_QUANTIZATION -> enable_quantization
+            if key.startswith("LOCALLAB_"):
+                config_key = key[9:].lower()
+            else:
+                config_key = key.lower()
+            
+            config_value = get_config_value(config_key)
+            if config_value is not None:
+                value = config_value
+        except (ImportError, ModuleNotFoundError):
+            # If the config module isn't available yet, just use the environment variable
+            pass
+    
+    # If still not found, use default
     if value is None:
         return default
 

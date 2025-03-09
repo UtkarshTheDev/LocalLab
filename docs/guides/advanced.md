@@ -6,11 +6,21 @@
 2. [Performance Optimization](#performance-optimization)
 3. [Model Management](#model-management)
 4. [System Configuration](#system-configuration)
-5. [Best Practices](#best-practices)
+5. [CLI Configuration](#cli-configuration)
+6. [Best Practices](#best-practices)
 
 ## Advanced Features
 
 ### Custom Model Loading
+
+**Using CLI (New!)**
+
+```bash
+# Load a custom model with the CLI
+locallab start --model meta-llama/Llama-2-7b-chat-hf
+```
+
+**Using Environment Variables**
 
 ```python
 import os
@@ -48,6 +58,15 @@ responses = await client.batch_generate(prompts)
 
 ### 1. Memory Optimization
 
+**Using CLI (New!)**
+
+```bash
+# Enable memory optimizations via CLI
+locallab start --quantize --quantize-type int8 --attention-slicing
+```
+
+**Using Environment Variables**
+
 ```python
 # Enable memory optimizations
 os.environ["LOCALLAB_ENABLE_QUANTIZATION"] = "true"
@@ -56,6 +75,15 @@ os.environ["LOCALLAB_ENABLE_CPU_OFFLOADING"] = "true"
 ```
 
 ### 2. Speed Optimization
+
+**Using CLI (New!)**
+
+```bash
+# Enable speed optimizations via CLI
+locallab start --flash-attention --better-transformer
+```
+
+**Using Environment Variables**
 
 ```python
 # Enable speed optimizations
@@ -120,14 +148,66 @@ os.environ["LOCALLAB_ENABLE_FILE_LOGGING"] = "true"
 os.environ["LOCALLAB_LOG_FILE"] = "locallab.log"
 ```
 
+## CLI Configuration
+
+The LocalLab CLI provides a powerful way to configure and manage your server. Here are some advanced CLI features:
+
+### Interactive Configuration Wizard
+
+```bash
+# Run the configuration wizard
+locallab config
+```
+
+### System Information
+
+```bash
+# Get detailed system information
+locallab info
+```
+
+### Advanced CLI Options
+
+```bash
+# Start with advanced configuration
+locallab start \
+  --model microsoft/phi-2 \
+  --port 8080 \
+  --quantize \
+  --quantize-type int4 \
+  --attention-slicing \
+  --flash-attention \
+  --better-transformer
+```
+
+### Persistent Configuration
+
+The CLI stores your configuration in `~/.locallab/config.json`. You can edit this file directly for advanced configuration:
+
+```json
+{
+  "model_id": "microsoft/phi-2",
+  "port": 8080,
+  "enable_quantization": true,
+  "quantization_type": "int8",
+  "enable_attention_slicing": true,
+  "enable_flash_attention": true,
+  "enable_better_transformer": true
+}
+```
+
+For more details, see the [CLI Guide](./cli.md).
+
 ## Best Practices
 
 1. **Resource Management**
+
    - Monitor system resources
    - Use appropriate quantization
    - Enable optimizations based on hardware
 
 2. **Error Handling**
+
    ```python
    try:
        response = await client.generate("Hello")
@@ -148,6 +228,7 @@ os.environ["LOCALLAB_LOG_FILE"] = "locallab.log"
 
 ## Related Resources
 
-- [API Reference](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/features/api-reference.md)
-- [Configuration Guide](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/features/configuration.md)
-- [Troubleshooting](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/troubleshooting.md)
+- [CLI Guide](./cli.md)
+- [API Reference](./api.md)
+- [Configuration Guide](../features/configuration.md)
+- [Troubleshooting](./troubleshooting.md)

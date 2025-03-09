@@ -37,6 +37,8 @@ from .config import (
     ENABLE_BETTERTRANSFORMER, 
     ENABLE_FLASH_ATTENTION
 )
+from .cli.interactive import prompt_for_config, is_in_colab
+from .cli.config import save_config, set_config_value, get_config_value
 
 # Import torch - handle import error gracefully
 try:
@@ -68,11 +70,7 @@ def check_environment() -> List[Tuple[str, str, bool]]:
         ))
     
     # Check for Colab environment
-    try:
-        import google.colab
-        in_colab = True
-    except ImportError:
-        in_colab = False
+    in_colab = is_in_colab()
     
     # Check for ngrok token if in Colab
     if in_colab:
@@ -196,8 +194,19 @@ def signal_handler(signum, frame):
     threading.Thread(target=delayed_exit, daemon=True).start()
 
 
-def start_server(use_ngrok: bool = False, port=8000, ngrok_auth_token: Optional[str] = None):
+def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Optional[str] = None):
     """Start the LocalLab server directly in the main process"""
+    
+    # Interactive CLI configuration if needed
+    config = prompt_for_config(use_ngrok, port, ngrok_auth_token)
+    
+    # Save configuration for future use
+    save_config(config)
+    
+    # Extract values from config
+    use_ngrok = config.get("use_ngrok", use_ngrok)
+    port = config.get("port", port or 8000)
+    ngrok_auth_token = config.get("ngrok_auth_token", ngrok_auth_token)
     
     # Set initial server status
     set_server_status("initializing")
@@ -275,23 +284,46 @@ def start_server(use_ngrok: bool = False, port=8000, ngrok_auth_token: Optional[
         
         # Import here to avoid circular imports
         from .core.app import model_manager
+        from .cli.config import get_config_value
         
         # Print model info if a model is loaded
         if model_manager.current_model:
             model_info = model_manager.get_model_info()
             print_model_info(model_info)
         else:
-            # Print model settings from environment variables
+            # Get model settings from config system
+            model_id = os.environ.get("HUGGINGFACE_MODEL", DEFAULT_MODEL)
+            
+            # Get optimization settings from config system
+            enable_quantization = get_config_value('enable_quantization', ENABLE_QUANTIZATION)
+            if isinstance(enable_quantization, str):
+                enable_quantization = enable_quantization.lower() not in ('false', '0', 'none', '')
+            
+            quantization_type = get_config_value('quantization_type', QUANTIZATION_TYPE)
+            
+            enable_attention_slicing = get_config_value('enable_attention_slicing', ENABLE_ATTENTION_SLICING)
+            if isinstance(enable_attention_slicing, str):
+                enable_attention_slicing = enable_attention_slicing.lower() not in ('false', '0', 'none', '')
+            
+            enable_flash_attention = get_config_value('enable_flash_attention', ENABLE_FLASH_ATTENTION)
+            if isinstance(enable_flash_attention, str):
+                enable_flash_attention = enable_flash_attention.lower() not in ('false', '0', 'none', '')
+            
+            enable_better_transformer = get_config_value('enable_better_transformer', ENABLE_BETTERTRANSFORMER)
+            if isinstance(enable_better_transformer, str):
+                enable_better_transformer = enable_better_transformer.lower() not in ('false', '0', 'none', '')
+            
+            # Print model settings
             env_model_info = {
-                "model_id": os.environ.get("HUGGINGFACE_MODEL", DEFAULT_MODEL),
-                "model_name": os.environ.get("HUGGINGFACE_MODEL", DEFAULT_MODEL).split("/")[-1],
+                "model_id": model_id,
+                "model_name": model_id.split("/")[-1],
                 "parameters": "Unknown (not loaded yet)",
                 "device": "cpu" if not torch.cuda.is_available() else f"cuda:{torch.cuda.current_device()}",
-                "quantization": QUANTIZATION_TYPE if ENABLE_QUANTIZATION else "None",
+                "quantization": quantization_type if enable_quantization else "None",
                 "optimizations": {
-                    "attention_slicing": ENABLE_ATTENTION_SLICING,
-                    "flash_attention": ENABLE_FLASH_ATTENTION,
-                    "better_transformer": ENABLE_BETTERTRANSFORMER
+                    "attention_slicing": enable_attention_slicing,
+                    "flash_attention": enable_flash_attention,
+                    "better_transformer": enable_better_transformer
                 }
             }
             print_model_info(env_model_info)
@@ -379,15 +411,95 @@ def cli():
     """Command line interface entry point for the package"""
     import click
     
-    @click.command()
+    @click.group()
+    @click.version_option(__version__)
+    def locallab_cli():
+        """LocalLab - Your lightweight AI inference server for running LLMs locally"""
+        pass
+    
+    @locallab_cli.command()
     @click.option('--use-ngrok', is_flag=True, help='Enable ngrok for public access')
-    @click.option('--port', default=8000, help='Port to run the server on')
+    @click.option('--port', default=None, type=int, help='Port to run the server on')
     @click.option('--ngrok-auth-token', help='Ngrok authentication token')
-    def run(use_ngrok, port, ngrok_auth_token):
-        """Run the LocalLab server"""
+    @click.option('--model', help='Model to load (e.g., microsoft/phi-2)')
+    @click.option('--quantize', is_flag=True, help='Enable quantization')
+    @click.option('--quantize-type', type=click.Choice(['int8', 'int4']), help='Quantization type')
+    @click.option('--attention-slicing', is_flag=True, help='Enable attention slicing')
+    @click.option('--flash-attention', is_flag=True, help='Enable flash attention')
+    @click.option('--better-transformer', is_flag=True, help='Enable BetterTransformer')
+    def start(use_ngrok, port, ngrok_auth_token, model, quantize, quantize_type, 
+              attention_slicing, flash_attention, better_transformer):
+        """Start the LocalLab server"""
+        # Import the config system
+        from .cli.config import set_config_value
+        
+        # Set configuration values from command line options
+        if model:
+            os.environ["HUGGINGFACE_MODEL"] = model
+        
+        if quantize:
+            set_config_value('enable_quantization', 'true')
+            if quantize_type:
+                set_config_value('quantization_type', quantize_type)
+        
+        if attention_slicing:
+            set_config_value('enable_attention_slicing', 'true')
+        
+        if flash_attention:
+            set_config_value('enable_flash_attention', 'true')
+        
+        if better_transformer:
+            set_config_value('enable_better_transformer', 'true')
+        
+        # Start the server
         start_server(use_ngrok=use_ngrok, port=port, ngrok_auth_token=ngrok_auth_token)
     
-    run()
+    @locallab_cli.command()
+    def config():
+        """Configure LocalLab settings"""
+        # This will run the interactive configuration without starting the server
+        config = prompt_for_config()
+        save_config(config)
+        click.echo("Configuration saved successfully!")
+    
+    @locallab_cli.command()
+    def info():
+        """Display system information"""
+        # Import here to avoid circular imports
+        from .utils.system import get_system_resources
+        
+        resources = get_system_resources()
+        
+        click.echo("\n🖥️ System Information:")
+        click.echo(f"  CPU: {resources['cpu_count']} cores")
+        click.echo(f"  RAM: {resources['ram_gb']:.1f} GB")
+        
+        if resources['gpu_available']:
+            for i, gpu in enumerate(resources['gpu_info']):
+                click.echo(f"  GPU {i}: {gpu.get('name', 'Unknown')} ({gpu.get('total_memory', 0)} MB)")
+        else:
+            click.echo("  GPU: Not available")
+        
+        # Check for PyTorch
+        click.echo("\n📦 Package Information:")
+        click.echo(f"  LocalLab version: {__version__}")
+        
+        try:
+            import torch
+            click.echo(f"  PyTorch version: {torch.__version__}")
+            click.echo(f"  CUDA available: {torch.cuda.is_available()}")
+            if torch.cuda.is_available():
+                click.echo(f"  CUDA version: {torch.version.cuda}")
+        except ImportError:
+            click.echo("  PyTorch: Not installed")
+        
+        try:
+            import transformers
+            click.echo(f"  Transformers version: {transformers.__version__}")
+        except ImportError:
+            click.echo("  Transformers: Not installed")
+    
+    return locallab_cli()
 
 if __name__ == "__main__":
     cli() 

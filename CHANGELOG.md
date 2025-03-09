@@ -2,6 +2,18 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.7 - 2025-03-08
+
+### Added
+
+- Enhanced CLI with interactive configuration wizard
+- Added persistent configuration storage
+- Implemented environment detection for smart defaults
+- Added command groups: start, config, info
+- Added support for configuring optimizations through CLI
+- Improved Google Colab integration with context-aware prompts
+- Added system information command
+
 ## 0.4.6 - 2025-03-08
 
 ### Fixed

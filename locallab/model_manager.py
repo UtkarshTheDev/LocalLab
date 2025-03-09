@@ -65,8 +65,15 @@ class ModelManager:
     def _get_quantization_config(self) -> Optional[Dict[str, Any]]:
         """Get quantization configuration based on settings"""
         # Check if quantization is explicitly disabled (not just False but also '0', 'none', '')
-        enable_quantization = os.environ.get('LOCALLAB_ENABLE_QUANTIZATION', '').lower() not in ('false', '0', 'none', '')
-        quantization_type = os.environ.get('LOCALLAB_QUANTIZATION_TYPE', '')
+        # Use the config system to get the value, which checks environment variables and config file
+        from .cli.config import get_config_value
+        
+        enable_quantization = get_config_value('enable_quantization', ENABLE_QUANTIZATION)
+        # Convert string values to boolean if needed
+        if isinstance(enable_quantization, str):
+            enable_quantization = enable_quantization.lower() not in ('false', '0', 'none', '')
+        
+        quantization_type = get_config_value('quantization_type', QUANTIZATION_TYPE)
         
         if not enable_quantization:
             logger.info("Quantization is disabled, using default precision")
@@ -140,8 +147,15 @@ class ModelManager:
     def _apply_optimizations(self, model: AutoModelForCausalLM) -> AutoModelForCausalLM:
         """Apply various optimizations to the model"""
         try:
+            # Import the config system
+            from .cli.config import get_config_value
+            
             # Only apply attention slicing if explicitly enabled and not empty
-            if os.environ.get('LOCALLAB_ENABLE_ATTENTION_SLICING', '').lower() not in ('false', '0', 'none', ''):
+            enable_attention_slicing = get_config_value('enable_attention_slicing', ENABLE_ATTENTION_SLICING)
+            if isinstance(enable_attention_slicing, str):
+                enable_attention_slicing = enable_attention_slicing.lower() not in ('false', '0', 'none', '')
+            
+            if enable_attention_slicing:
                 if hasattr(model, 'enable_attention_slicing'):
                     # Use more aggressive slicing for faster inference
                     model.enable_attention_slicing("max")
@@ -151,7 +165,11 @@ class ModelManager:
                         "Attention slicing not available for this model")
 
             # Only apply CPU offloading if explicitly enabled and not empty
-            if os.environ.get('LOCALLAB_ENABLE_CPU_OFFLOADING', '').lower() not in ('false', '0', 'none', ''):
+            enable_cpu_offloading = get_config_value('enable_cpu_offloading', ENABLE_CPU_OFFLOADING)
+            if isinstance(enable_cpu_offloading, str):
+                enable_cpu_offloading = enable_cpu_offloading.lower() not in ('false', '0', 'none', '')
+            
+            if enable_cpu_offloading:
                 if hasattr(model, "enable_cpu_offload"):
                     model.enable_cpu_offload()
                     logger.info("CPU offloading enabled")
@@ -159,7 +177,11 @@ class ModelManager:
                     logger.info("CPU offloading not available for this model")
 
             # Only apply BetterTransformer if explicitly enabled and not empty
-            if os.environ.get('LOCALLAB_ENABLE_BETTERTRANSFORMER', '').lower() not in ('false', '0', 'none', ''):
+            enable_bettertransformer = get_config_value('enable_better_transformer', ENABLE_BETTERTRANSFORMER)
+            if isinstance(enable_bettertransformer, str):
+                enable_bettertransformer = enable_bettertransformer.lower() not in ('false', '0', 'none', '')
+            
+            if enable_bettertransformer:
                 try:
                     from optimum.bettertransformer import BetterTransformer
                     model = BetterTransformer.transform(model)
@@ -172,7 +194,11 @@ class ModelManager:
                         f"BetterTransformer optimization failed: {str(e)}")
 
             # Only apply Flash Attention if explicitly enabled and not empty
-            if os.environ.get('LOCALLAB_ENABLE_FLASH_ATTENTION', '').lower() not in ('false', '0', 'none', ''):
+            enable_flash_attention = get_config_value('enable_flash_attention', ENABLE_FLASH_ATTENTION)
+            if isinstance(enable_flash_attention, str):
+                enable_flash_attention = enable_flash_attention.lower() not in ('false', '0', 'none', '')
+            
+            if enable_flash_attention:
                 try:
                     # Try to enable flash attention directly on the model config
                     if hasattr(model.config, "attn_implementation"):
@@ -241,9 +267,15 @@ class ModelManager:
 
             hf_token = os.getenv("HF_TOKEN")
             
-            # Check quantization settings from environment variables
-            enable_quantization = os.environ.get('LOCALLAB_ENABLE_QUANTIZATION', '').lower() not in ('false', '0', 'none', '')
-            quantization_type = os.environ.get('LOCALLAB_QUANTIZATION_TYPE', '') if enable_quantization else "None"
+            # Import the config system
+            from .cli.config import get_config_value
+            
+            # Check quantization settings from config system
+            enable_quantization = get_config_value('enable_quantization', ENABLE_QUANTIZATION)
+            if isinstance(enable_quantization, str):
+                enable_quantization = enable_quantization.lower() not in ('false', '0', 'none', '')
+            
+            quantization_type = get_config_value('quantization_type', QUANTIZATION_TYPE) if enable_quantization else "None"
             
             # Get configuration based on quantization settings
             config = self._get_quantization_config() if enable_quantization else {

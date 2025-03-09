@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="locallab",
-    version="0.4.6",
+    version="0.4.7",
     packages=find_packages(include=["locallab", "locallab.*"]),
     install_requires=[
         "fastapi>=0.95.0,<1.0.0",
@@ -34,6 +34,7 @@ setup(
         "huggingface_hub>=0.16.0",
         "pynvml>=11.0.0",
         "typing_extensions>=4.0.0",
+        "questionary>=1.10.0",  # For interactive CLI prompts
     ],
     extras_require={
         "dev": [
