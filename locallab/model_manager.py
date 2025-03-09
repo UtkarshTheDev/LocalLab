@@ -558,14 +558,14 @@ class ModelManager:
                 temperature = gen_params.get(
                     "temperature", DEFAULT_TEMPERATURE)
                 top_p = gen_params.get("top_p", DEFAULT_TOP_P)
-                top_k = gen_params.get("top_k", 40)  # Default to 40 for faster generation
+                top_k = gen_params.get("top_k", 40)  # Default to 40 for better quality
                 repetition_penalty = gen_params.get("repetition_penalty", 1.1)
             else:
                 # Use provided individual parameters or defaults
                 max_length = max_length or min(DEFAULT_MAX_LENGTH, 512)  # Limit default max_length
-                temperature = temperature or 0.7  # Lower temperature for faster generation
+                temperature = temperature or 0.7  # Use same temperature as non-streaming
                 top_p = top_p or DEFAULT_TOP_P
-                top_k = 40  # Default to 40 for faster generation
+                top_k = 40  # Default to 40 for better quality
                 repetition_penalty = 1.1
 
             # Get the actual device of the model
@@ -582,15 +582,21 @@ class ModelManager:
             attention_mask = inputs["attention_mask"]
             
             # Generate fewer tokens at once for more responsive streaming
-            # Using smaller chunks makes it appear more interactive
-            tokens_to_generate_per_step = 3  # Reduced from 8 to 3 for more responsive streaming
+            # Using smaller chunks makes it appear more interactive while maintaining quality
+            tokens_to_generate_per_step = 2  # Reduced from 3 to 2 for better quality control
+            
+            # Track generated text for quality control
+            generated_text = ""
+            
+            # Define stop sequences for proper termination
+            stop_sequences = ["</s>", "<|endoftext|>", "<|im_end|>", "<|assistant|>"]
             
             with torch.no_grad():
                 for step in range(0, max_length, tokens_to_generate_per_step):
                     # Calculate how many tokens to generate in this step
                     current_tokens_to_generate = min(tokens_to_generate_per_step, max_length - step)
                     
-                    # Generate parameters
+                    # Generate parameters - use the same high-quality parameters as non-streaming
                     generate_params = {
                         "input_ids": input_ids,
                         "attention_mask": attention_mask,
@@ -601,7 +607,6 @@ class ModelManager:
                         "do_sample": True,
                         "pad_token_id": self.tokenizer.eos_token_id,
                         "repetition_penalty": repetition_penalty,
-                        # Remove early_stopping to fix the warning
                         "num_beams": 1  # Explicitly set to 1 to avoid warnings
                     }
                     
@@ -623,8 +628,36 @@ class ModelManager:
                         if not new_text or new_text.isspace():
                             break
                         
+                        # Add to generated text for quality control
+                        generated_text += new_text
+                        
+                        # Check for stop sequences
+                        should_stop = False
+                        for stop_seq in stop_sequences:
+                            if stop_seq in generated_text:
+                                # We've reached a stop sequence, stop generation
+                                should_stop = True
+                                break
+                                
+                        # Check for repetition (a sign of poor quality)
+                        if len(generated_text) > 50:
+                            # Check for repeating patterns of 10+ characters
+                            last_50_chars = generated_text[-50:]
+                            for pattern_len in range(10, 20):
+                                if pattern_len < len(last_50_chars) // 2:
+                                    pattern = last_50_chars[-pattern_len:]
+                                    if pattern in last_50_chars[:-pattern_len]:
+                                        # Detected repetition, stop generation
+                                        logger.warning("Detected repetition in streaming generation, stopping")
+                                        should_stop = True
+                                        break
+                        
                         # Yield the new text
                         yield new_text
+                        
+                        # Stop if needed
+                        if should_stop:
+                            break
                         
                         # Update input_ids and attention_mask for next iteration
                         input_ids = outputs
@@ -666,6 +699,7 @@ class ModelManager:
                             if not new_text or new_text.isspace():
                                 break
                                 
+                            generated_text += new_text
                             yield new_text
                             
                             input_ids = outputs
@@ -699,6 +733,24 @@ class ModelManager:
             # Get model-specific generation parameters
             from .config import get_model_generation_params
             gen_params = get_model_generation_params(self.current_model)
+            
+            # Set optimized defaults for streaming that match non-streaming quality
+            # Use the same parameters as non-streaming for consistency
+            if not kwargs.get("max_length") and not kwargs.get("max_new_tokens"):
+                # Use a reasonable default max_length
+                gen_params["max_length"] = min(gen_params.get("max_length", DEFAULT_MAX_LENGTH), 512)
+            
+            if not kwargs.get("temperature"):
+                # Use the same temperature as non-streaming
+                gen_params["temperature"] = min(gen_params.get("temperature", DEFAULT_TEMPERATURE), 0.7)
+            
+            if not kwargs.get("top_k"):
+                # Add top_k for better quality
+                gen_params["top_k"] = 40
+                
+            if not kwargs.get("repetition_penalty"):
+                # Add repetition penalty to avoid loops
+                gen_params["repetition_penalty"] = 1.1
 
             # Update with provided kwargs
             for key, value in kwargs.items():
@@ -718,10 +770,56 @@ class ModelManager:
             for key in inputs:
                 inputs[key] = inputs[key].to(model_device)
 
-        # Now stream tokens using the prepared inputs and parameters
-        for token in self._stream_generate(inputs, gen_params=gen_params):
+        # Check if we need to clear CUDA cache before generation
+        if torch.cuda.is_available():
+            current_mem = torch.cuda.memory_allocated() / (1024 * 1024 * 1024)  # GB
+            total_mem = torch.cuda.get_device_properties(0).total_memory / (1024 * 1024 * 1024)  # GB
+            if current_mem > 0.8 * total_mem:  # If using >80% of GPU memory
+                # Clear cache to avoid OOM
+                torch.cuda.empty_cache()
+                logger.info("Cleared CUDA cache before streaming generation to avoid out of memory error")
+
+        # Create a custom stream generator with improved quality
+        async def improved_stream_generator():
+            # Use the same stopping conditions as non-streaming
+            stop_sequences = ["</s>", "<|endoftext|>", "<|im_end|>", "<|assistant|>"]
+            accumulated_text = ""
+            
+            # Use a generator that produces high-quality chunks
+            try:
+                for token_chunk in self._stream_generate(inputs, gen_params=gen_params):
+                    accumulated_text += token_chunk
+                    
+                    # Check for stop sequences
+                    should_stop = False
+                    for stop_seq in stop_sequences:
+                        if stop_seq in accumulated_text:
+                            # Truncate at stop sequence
+                            accumulated_text = accumulated_text.split(stop_seq)[0]
+                            should_stop = True
+                            break
+                    
+                    # Yield the token chunk
+                    yield token_chunk
+                    
+                    # Stop if we've reached a stop sequence
+                    if should_stop:
+                        break
+                    
+                    # Also stop if we've generated too much text (safety measure)
+                    if len(accumulated_text) > gen_params.get("max_length", 512) * 4:  # Character estimate
+                        logger.warning("Stream generation exceeded maximum length - stopping")
+                        break
+                        
+                    await asyncio.sleep(0)
+            except Exception as e:
+                logger.error(f"Error in stream generation: {str(e)}")
+                # Don't propagate the error to avoid breaking the stream
+                # Just stop generating
+        
+        # Use the improved generator
+        async for token in improved_stream_generator():
             yield token
-            await asyncio.sleep(0)
 
     def get_model_info(self) -> Dict[str, Any]:
         """Get information about the currently loaded model"""

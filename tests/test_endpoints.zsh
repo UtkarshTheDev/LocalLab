@@ -51,13 +51,13 @@ test_endpoint "/models/available"
 
 # Test Text Generation
 test_endpoint "/generate" "POST" '{
-    "prompt": "Hello!",
+    "prompt": "Hello! Tell me about React Native.",
     "stream": false
 }'
 
 # Test Streaming Generation
 test_endpoint "/generate" "POST" '{
-    "prompt": "Tell me a story",
+    "prompt": "Create a professional X post for any topics which you want.",
     "stream": true
 }'
 
@@ -65,7 +65,7 @@ test_endpoint "/generate" "POST" '{
 test_endpoint "/chat" "POST" '{
     "messages": [
         {"role": "system", "content": "You are a helpful assistant"},
-        {"role": "user", "content": "Hi, how are you?"}
+        {"role": "user", "content": "Hi, how are you?, Create a perfect X post for the Topic about Expo and React Native and tell difference btw them."}
     ],
     "stream": false
 }'
@@ -74,7 +74,7 @@ test_endpoint "/chat" "POST" '{
 test_endpoint "/generate/batch" "POST" '{
     "prompts": [
         "What is 2+2?",
-        "Who is Shakespeare?"
+        "Who is Linus Torwalds?",
     ]
 }'
 

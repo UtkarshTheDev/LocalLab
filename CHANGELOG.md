@@ -2,6 +2,16 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.6 - 2025-03-08
+
+### Fixed
+
+- Improved streaming generation quality to match non-streaming responses
+- Added proper stopping conditions for streaming to prevent endless generation
+- Implemented repetition detection to stop low-quality streaming responses
+- Reduced token chunk size for better quality control in streaming mode
+- Ensured consistent generation parameters between streaming and non-streaming modes
+
 ## 0.4.5 - 2025-03-08
 
 ### Added
