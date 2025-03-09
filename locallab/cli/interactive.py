@@ -51,7 +51,22 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
     Returns:
         Dict of configuration values
     """
-    config = {}
+    # Import here to avoid circular imports
+    from .config import load_config, get_config_value
+    
+    # Load existing configuration
+    saved_config = load_config()
+    
+    # Initialize config with saved values
+    config = saved_config.copy()
+    
+    # Override with provided parameters
+    if use_ngrok is not None:
+        config["use_ngrok"] = use_ngrok
+    if port is not None:
+        config["port"] = port
+    if ngrok_auth_token is not None:
+        config["ngrok_auth_token"] = ngrok_auth_token
     
     # Determine if we're in Colab
     in_colab = is_in_colab()
@@ -73,17 +88,29 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
     # Check for missing required environment variables
     missing_vars = get_missing_required_env_vars()
     
-    # If no missing vars and all parameters provided, return early
-    if not missing_vars and use_ngrok is not None and port is not None and (not in_colab or ngrok_auth_token is not None):
-        config["use_ngrok"] = use_ngrok
-        config["port"] = port
-        config["ngrok_auth_token"] = ngrok_auth_token
+    # Check if we have all required configuration
+    has_model = "model_id" in config or os.environ.get("HUGGINGFACE_MODEL") or os.environ.get("DEFAULT_MODEL")
+    has_port = "port" in config or port is not None
+    has_ngrok_config = not in_colab or not config.get("use_ngrok", use_ngrok) or "ngrok_auth_token" in config or ngrok_auth_token is not None or os.environ.get("NGROK_AUTH_TOKEN")
+    
+    # If we have all required config, return early
+    if has_model and has_port and has_ngrok_config and not missing_vars:
+        # Ensure port is set in config
+        if "port" not in config and port is not None:
+            config["port"] = port
+        # Ensure use_ngrok is set in config
+        if "use_ngrok" not in config and use_ngrok is not None:
+            config["use_ngrok"] = use_ngrok
+        # Ensure ngrok_auth_token is set in config if needed
+        if config.get("use_ngrok", False) and "ngrok_auth_token" not in config and ngrok_auth_token is not None:
+            config["ngrok_auth_token"] = ngrok_auth_token
+        
         return config
     
     click.echo("\n🚀 Welcome to LocalLab! Let's set up your server.\n")
     
     # Ask for model if not provided
-    if "HUGGINGFACE_MODEL" in missing_vars:
+    if not has_model:
         model_id = click.prompt(
             "📦 Which model would you like to use?",
             default=DEFAULT_MODEL
@@ -92,24 +119,26 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
         config["model_id"] = model_id
     
     # Ask for port if not provided
-    if port is None:
+    if not has_port:
         port = click.prompt(
             "🔌 Which port would you like to run on?",
-            default=8000,
+            default=config.get("port", 8000),
             type=int
         )
-    config["port"] = port
+        config["port"] = port
     
     # Ask about ngrok if in Colab and not provided
     if in_colab:
-        if use_ngrok is None:
+        if "use_ngrok" not in config and use_ngrok is None:
             use_ngrok = click.confirm(
                 "🌐 Do you want to enable public access via ngrok?",
                 default=True
             )
-        config["use_ngrok"] = use_ngrok
+            config["use_ngrok"] = use_ngrok
+        else:
+            use_ngrok = config.get("use_ngrok", use_ngrok)
         
-        if use_ngrok and (ngrok_auth_token is None or "NGROK_AUTH_TOKEN" in missing_vars):
+        if use_ngrok and "ngrok_auth_token" not in config and ngrok_auth_token is None and "NGROK_AUTH_TOKEN" not in os.environ:
             ngrok_auth_token = click.prompt(
                 "🔑 Please enter your ngrok auth token (get one at https://dashboard.ngrok.com/get-started/your-authtoken)",
                 hide_input=True
@@ -118,14 +147,16 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
             config["ngrok_auth_token"] = ngrok_auth_token
     else:
         # Not in Colab, ask about ngrok only if not provided
-        if use_ngrok is None:
+        if "use_ngrok" not in config and use_ngrok is None:
             use_ngrok = click.confirm(
                 "🌐 Do you want to enable public access via ngrok?",
                 default=False
             )
-        config["use_ngrok"] = use_ngrok
+            config["use_ngrok"] = use_ngrok
+        else:
+            use_ngrok = config.get("use_ngrok", use_ngrok)
         
-        if use_ngrok and ngrok_auth_token is None:
+        if use_ngrok and "ngrok_auth_token" not in config and ngrok_auth_token is None and "NGROK_AUTH_TOKEN" not in os.environ:
             ngrok_auth_token = click.prompt(
                 "🔑 Please enter your ngrok auth token (get one at https://dashboard.ngrok.com/get-started/your-authtoken)",
                 hide_input=True
@@ -135,76 +166,91 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
     
     # Ask about optimizations if GPU is available
     if has_gpu:
-        setup_optimizations = click.confirm(
-            "⚡ Would you like to configure optimizations for better performance?",
-            default=True
-        )
+        # Check if optimization settings are already configured
+        has_optimization_config = all(key in config for key in [
+            "enable_quantization", 
+            "enable_attention_slicing", 
+            "enable_flash_attention", 
+            "enable_better_transformer"
+        ])
         
-        if setup_optimizations:
-            # Quantization
-            enable_quantization = click.confirm(
-                "📊 Enable quantization for reduced memory usage?",
-                default=ENABLE_QUANTIZATION
+        if not has_optimization_config:
+            setup_optimizations = click.confirm(
+                "⚡ Would you like to configure optimizations for better performance?",
+                default=True
             )
-            os.environ["LOCALLAB_ENABLE_QUANTIZATION"] = str(enable_quantization).lower()
-            config["enable_quantization"] = enable_quantization
             
-            if enable_quantization:
-                quant_type = click.prompt(
-                    "📊 Quantization type",
-                    type=click.Choice(["int8", "int4"]),
-                    default=QUANTIZATION_TYPE or "int8"
+            if setup_optimizations:
+                # Quantization
+                enable_quantization = click.confirm(
+                    "📊 Enable quantization for reduced memory usage?",
+                    default=config.get("enable_quantization", ENABLE_QUANTIZATION)
                 )
-                os.environ["LOCALLAB_QUANTIZATION_TYPE"] = quant_type
-                config["quantization_type"] = quant_type
-            
-            # Attention slicing
-            enable_attn_slicing = click.confirm(
-                "🔪 Enable attention slicing for reduced memory usage?",
-                default=ENABLE_ATTENTION_SLICING
-            )
-            os.environ["LOCALLAB_ENABLE_ATTENTION_SLICING"] = str(enable_attn_slicing).lower()
-            config["enable_attention_slicing"] = enable_attn_slicing
-            
-            # Flash attention
-            enable_flash_attn = click.confirm(
-                "⚡ Enable flash attention for faster inference?",
-                default=ENABLE_FLASH_ATTENTION
-            )
-            os.environ["LOCALLAB_ENABLE_FLASH_ATTENTION"] = str(enable_flash_attn).lower()
-            config["enable_flash_attention"] = enable_flash_attn
-            
-            # BetterTransformer
-            enable_better_transformer = click.confirm(
-                "🔄 Enable BetterTransformer for optimized inference?",
-                default=ENABLE_BETTERTRANSFORMER
-            )
-            os.environ["LOCALLAB_ENABLE_BETTERTRANSFORMER"] = str(enable_better_transformer).lower()
-            config["enable_better_transformer"] = enable_better_transformer
+                os.environ["LOCALLAB_ENABLE_QUANTIZATION"] = str(enable_quantization).lower()
+                config["enable_quantization"] = enable_quantization
+                
+                if enable_quantization:
+                    quant_type = click.prompt(
+                        "📊 Quantization type",
+                        type=click.Choice(["int8", "int4"]),
+                        default=config.get("quantization_type", QUANTIZATION_TYPE or "int8")
+                    )
+                    os.environ["LOCALLAB_QUANTIZATION_TYPE"] = quant_type
+                    config["quantization_type"] = quant_type
+                
+                # Attention slicing
+                enable_attn_slicing = click.confirm(
+                    "🔪 Enable attention slicing for reduced memory usage?",
+                    default=config.get("enable_attention_slicing", ENABLE_ATTENTION_SLICING)
+                )
+                os.environ["LOCALLAB_ENABLE_ATTENTION_SLICING"] = str(enable_attn_slicing).lower()
+                config["enable_attention_slicing"] = enable_attn_slicing
+                
+                # Flash attention
+                enable_flash_attn = click.confirm(
+                    "⚡ Enable flash attention for faster inference?",
+                    default=config.get("enable_flash_attention", ENABLE_FLASH_ATTENTION)
+                )
+                os.environ["LOCALLAB_ENABLE_FLASH_ATTENTION"] = str(enable_flash_attn).lower()
+                config["enable_flash_attention"] = enable_flash_attn
+                
+                # BetterTransformer
+                enable_better_transformer = click.confirm(
+                    "🔄 Enable BetterTransformer for optimized inference?",
+                    default=config.get("enable_better_transformer", ENABLE_BETTERTRANSFORMER)
+                )
+                os.environ["LOCALLAB_ENABLE_BETTERTRANSFORMER"] = str(enable_better_transformer).lower()
+                config["enable_better_transformer"] = enable_better_transformer
     
     # Ask about advanced options
-    setup_advanced = click.confirm(
-        "🔧 Would you like to configure advanced options?",
-        default=False
-    )
+    has_advanced_config = all(key in config for key in [
+        "enable_cpu_offloading", 
+        "model_timeout"
+    ])
     
-    if setup_advanced:
-        # CPU offloading
-        enable_cpu_offloading = click.confirm(
-            "💻 Enable CPU offloading for large models?",
-            default=ENABLE_CPU_OFFLOADING
+    if not has_advanced_config:
+        setup_advanced = click.confirm(
+            "🔧 Would you like to configure advanced options?",
+            default=False
         )
-        os.environ["LOCALLAB_ENABLE_CPU_OFFLOADING"] = str(enable_cpu_offloading).lower()
-        config["enable_cpu_offloading"] = enable_cpu_offloading
         
-        # Model timeout
-        model_timeout = click.prompt(
-            "⏱️ Model unloading timeout in seconds (0 to disable)",
-            default=3600,
-            type=int
-        )
-        os.environ["LOCALLAB_MODEL_TIMEOUT"] = str(model_timeout)
-        config["model_timeout"] = model_timeout
+        if setup_advanced:
+            # CPU offloading
+            enable_cpu_offloading = click.confirm(
+                "💻 Enable CPU offloading for large models?",
+                default=config.get("enable_cpu_offloading", ENABLE_CPU_OFFLOADING)
+            )
+            os.environ["LOCALLAB_ENABLE_CPU_OFFLOADING"] = str(enable_cpu_offloading).lower()
+            config["enable_cpu_offloading"] = enable_cpu_offloading
+            
+            # Model timeout
+            model_timeout = click.prompt(
+                "⏱️ Model unloading timeout in seconds (0 to disable)",
+                default=config.get("model_timeout", 3600),
+                type=int
+            )
+            os.environ["LOCALLAB_MODEL_TIMEOUT"] = str(model_timeout)
+            config["model_timeout"] = model_timeout
     
-    click.echo("\n✅ Configuration complete! Starting server...\n")
+    click.echo("\n✅ Configuration complete!\n")
     return config 

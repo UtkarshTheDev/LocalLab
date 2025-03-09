@@ -10,6 +10,7 @@ import threading
 import traceback
 import socket
 import uvicorn
+import uvicorn.lifespan
 import os
 from colorama import Fore, Style, init
 init(autoreset=True)
@@ -38,7 +39,7 @@ from .config import (
     ENABLE_FLASH_ATTENTION
 )
 from .cli.interactive import prompt_for_config, is_in_colab
-from .cli.config import save_config, set_config_value, get_config_value
+from .cli.config import save_config, set_config_value, get_config_value, load_config, get_all_config
 
 # Import torch - handle import error gracefully
 try:
@@ -194,8 +195,55 @@ def signal_handler(signum, frame):
     threading.Thread(target=delayed_exit, daemon=True).start()
 
 
+class ServerWithCallback(uvicorn.Server):
+    def install_signal_handlers(self):
+        # Override to prevent uvicorn from installing its own handlers
+        pass
+    
+    async def serve(self, sockets=None):
+        self.config.setup_event_loop()
+        
+        # Initialize lifespan attribute before startup
+        self.lifespan = uvicorn.lifespan.Lifespan(
+            self.config.loaded_app,
+            self.config.lifespan,
+            self.config.logger
+        )
+        
+        await self.startup(sockets=sockets)
+        
+        # Call our callback before processing requests
+        # We need to access the on_startup function from the outer scope
+        if hasattr(self, 'on_startup_callback') and callable(self.on_startup_callback):
+            self.on_startup_callback()
+        
+        await self.main_loop()
+        await self.shutdown()
+
+
 def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Optional[str] = None):
     """Start the LocalLab server directly in the main process"""
+    
+    # Import here to avoid circular imports
+    from .cli.config import load_config, set_config_value
+    
+    # Load existing configuration
+    saved_config = load_config()
+    
+    # Apply saved configuration to environment variables
+    for key, value in saved_config.items():
+        if key == "model_id":
+            os.environ["HUGGINGFACE_MODEL"] = str(value)
+        elif key == "ngrok_auth_token":
+            os.environ["NGROK_AUTH_TOKEN"] = str(value)
+        elif key in ["enable_quantization", "enable_attention_slicing", "enable_flash_attention", 
+                    "enable_better_transformer", "enable_cpu_offloading"]:
+            env_key = f"LOCALLAB_{key.upper()}"
+            os.environ[env_key] = str(value).lower()
+        elif key == "quantization_type":
+            os.environ["LOCALLAB_QUANTIZATION_TYPE"] = str(value)
+        elif key == "model_timeout":
+            os.environ["LOCALLAB_MODEL_TIMEOUT"] = str(value)
     
     # Interactive CLI configuration if needed
     config = prompt_for_config(use_ngrok, port, ngrok_auth_token)
@@ -213,15 +261,6 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
     
     # Display startup banner with INITIALIZING status
     print_initializing_banner(__version__)
-    
-    # Check environment for issues
-    issues = check_environment()
-    if issues:
-        print(f"\n{Fore.YELLOW}⚠️ Environment Check Results:{Style.RESET_ALL}")
-        for issue, suggestion, is_critical in issues:
-            prefix = f"{Fore.RED}CRITICAL:" if is_critical else f"{Fore.YELLOW}WARNING:"
-            print(f"{prefix} {issue}{Style.RESET_ALL}")
-            print(f"  {Fore.CYAN}Suggestion: {suggestion}{Style.RESET_ALL}\n")
     
     # Check if port is already in use
     if is_port_in_use(port):
@@ -245,8 +284,6 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
             print(ngrok_section)
         else:
             logger.warning(f"{Fore.YELLOW}Failed to set up ngrok tunnel. Server will run locally on port {port}.{Style.RESET_ALL}")
-            logger.warning(f"{Fore.YELLOW}Note: In Google Colab, this means you'll only be able to access the server from within Colab.{Style.RESET_ALL}")
-            logger.warning(f"{Fore.YELLOW}If you need public access, please set up ngrok with an auth token.{Style.RESET_ALL}")
     
     # Server info section
     server_section = f"\n{Fore.CYAN}┌────────────────────────── Server Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🖥️ Local URL: {Fore.GREEN}http://localhost:{port}{Style.RESET_ALL}\n│  ⚙️ Status: {Fore.GREEN}Starting{Style.RESET_ALL}\n│  🔄 Model Loading: {Fore.YELLOW}In Progress{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
@@ -356,29 +393,13 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                 # Use an async callback function, not a list
                 callback_notify=on_startup_async
             )
-            server = uvicorn.Server(config)
+            server = ServerWithCallback(config)
+            server.on_startup_callback = on_startup  # Set the callback
             asyncio.get_event_loop().run_until_complete(server.serve())
         else:
             # Local environment
             logger.info(f"Starting server on port {port} (local mode)")
-            # For local environment, we'll need a custom callback
-            # We'll use a custom Server subclass for this
-            class ServerWithCallback(uvicorn.Server):
-                def install_signal_handlers(self):
-                    # Override to prevent uvicorn from installing its own handlers
-                    pass
-                
-                async def serve(self, sockets=None):
-                    self.config.setup_event_loop()
-                    await self.startup(sockets=sockets)
-                    
-                    # Call our callback before processing requests
-                    # Only call on_startup once
-                    on_startup()
-                    
-                    await self.main_loop()
-                    await self.shutdown()
-            
+            # For local environment, we'll use a custom Server subclass
             config = uvicorn.Config(
                 app, 
                 host="127.0.0.1", 
@@ -390,6 +411,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                 callback_notify=None
             )
             server = ServerWithCallback(config)
+            server.on_startup_callback = on_startup  # Set the callback
             asyncio.run(server.serve())
     except Exception as e:
         # Update server status on error
@@ -405,7 +427,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                 
         logger.error(f"Server startup failed: {str(e)}")
         logger.error(traceback.format_exc())
-        raise 
+        raise
 
 def cli():
     """Command line interface entry point for the package"""
@@ -430,7 +452,7 @@ def cli():
     def start(use_ngrok, port, ngrok_auth_token, model, quantize, quantize_type, 
               attention_slicing, flash_attention, better_transformer):
         """Start the LocalLab server"""
-        # Import the config system
+        # Import the config system - lazy import to speed up CLI
         from .cli.config import set_config_value
         
         # Set configuration values from command line options
@@ -457,47 +479,77 @@ def cli():
     @locallab_cli.command()
     def config():
         """Configure LocalLab settings"""
+        # Lazy import to speed up CLI
+        from .cli.interactive import prompt_for_config
+        from .cli.config import save_config, load_config, get_all_config
+        
+        # Show current configuration if it exists
+        current_config = load_config()
+        if current_config:
+            click.echo("\n📋 Current Configuration:")
+            for key, value in current_config.items():
+                click.echo(f"  {key}: {value}")
+            click.echo("")
+            
+            # Ask if user wants to reconfigure
+            if not click.confirm("Would you like to reconfigure these settings?", default=True):
+                click.echo("Configuration unchanged.")
+                return
+        
         # This will run the interactive configuration without starting the server
         config = prompt_for_config()
         save_config(config)
-        click.echo("Configuration saved successfully!")
+        
+        # Show the new configuration
+        click.echo("\n📋 New Configuration:")
+        for key, value in config.items():
+            click.echo(f"  {key}: {value}")
+        
+        click.echo("\n✅ Configuration saved successfully!")
+        click.echo("You can now run 'locallab start' to start the server with these settings.")
     
     @locallab_cli.command()
     def info():
         """Display system information"""
-        # Import here to avoid circular imports
+        # Lazy import to speed up CLI
         from .utils.system import get_system_resources
         
-        resources = get_system_resources()
-        
-        click.echo("\n🖥️ System Information:")
-        click.echo(f"  CPU: {resources['cpu_count']} cores")
-        click.echo(f"  RAM: {resources['ram_gb']:.1f} GB")
-        
-        if resources['gpu_available']:
-            for i, gpu in enumerate(resources['gpu_info']):
-                click.echo(f"  GPU {i}: {gpu.get('name', 'Unknown')} ({gpu.get('total_memory', 0)} MB)")
-        else:
-            click.echo("  GPU: Not available")
-        
-        # Check for PyTorch
-        click.echo("\n📦 Package Information:")
-        click.echo(f"  LocalLab version: {__version__}")
-        
         try:
-            import torch
-            click.echo(f"  PyTorch version: {torch.__version__}")
-            click.echo(f"  CUDA available: {torch.cuda.is_available()}")
-            if torch.cuda.is_available():
-                click.echo(f"  CUDA version: {torch.version.cuda}")
-        except ImportError:
-            click.echo("  PyTorch: Not installed")
-        
-        try:
-            import transformers
-            click.echo(f"  Transformers version: {transformers.__version__}")
-        except ImportError:
-            click.echo("  Transformers: Not installed")
+            resources = get_system_resources()
+            
+            click.echo("\n🖥️ System Information:")
+            click.echo(f"  CPU: {resources.get('cpu_count', 'Unknown')} cores")
+            
+            # Handle RAM display with proper error checking
+            ram_gb = resources.get('ram_total', 0) / (1024 * 1024 * 1024) if 'ram_total' in resources else 0
+            click.echo(f"  RAM: {ram_gb:.1f} GB")
+            
+            if resources.get('gpu_available', False):
+                click.echo("\n🎮 GPU Information:")
+                for i, gpu in enumerate(resources.get('gpu_info', [])):
+                    click.echo(f"  GPU {i}: {gpu.get('name', 'Unknown')}")
+                    vram_gb = gpu.get('total_memory', 0) / (1024 * 1024 * 1024) if 'total_memory' in gpu else 0
+                    click.echo(f"    VRAM: {vram_gb:.1f} GB")
+            else:
+                click.echo("\n⚠️ No GPU detected")
+                
+            # Display Python version
+            import sys
+            click.echo(f"\n🐍 Python: {sys.version.split()[0]}")
+            
+            # Display LocalLab version
+            click.echo(f"📦 LocalLab: {__version__}")
+            
+            # Display configuration location
+            from pathlib import Path
+            config_path = Path.home() / ".locallab" / "config.json"
+            if config_path.exists():
+                click.echo(f"\n⚙️ Configuration: {config_path}")
+            
+        except Exception as e:
+            click.echo(f"\n❌ Error retrieving system information: {str(e)}")
+            click.echo("Please check that all required dependencies are installed.")
+            return 1
     
     return locallab_cli()
 

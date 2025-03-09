@@ -7,6 +7,13 @@
 
 LocalLab empowers users to run any Hugging Face AI model locally or on Google Colab with minimal setup required. It automatically configures an API using ngrok, enabling seamless integration into applications from any location. Designed for simplicity, LocalLab makes advanced AI accessible to all, regardless of technical expertise. With built-in model management, performance optimizations, and system monitoring, it ensures efficient and reliable AI operations for developers, researchers, and enthusiasts alike.
 
+## What's New in v0.4.9
+
+- **🔧 Fixed Configuration System**: The `locallab config` command now properly saves settings that are respected when running `locallab start`
+- **📋 Configuration Display**: The CLI now shows your current configuration before prompting for changes
+- **⏩ Skip Unnecessary Prompts**: Only prompts for settings that aren't already configured
+- **✅ Clear Feedback**: After saving configuration, the CLI shows what was saved and how to use it
+
 ## What Problem Does LocalLab Solve?
 
 - **Local Inference:** Run advanced language models without relying on expensive cloud services.
@@ -38,12 +45,14 @@ LocalLab empowers users to run any Hugging Face AI model locally or on Google Co
 
 ## Key Features
 
+- **Interactive CLI:** Configure and run your server with an intuitive command-line interface that adapts to your environment.
 - **Multiple Model Support:** Pre-configured models along with the ability to load custom ones on demand.
 - **Advanced Optimizations:** Support for FP16, INT8, and INT4 quantization, Flash Attention, and attention slicing.
 - **Comprehensive Logging System:** Colorized console output with server status tracking, request monitoring, and performance metrics.
 - **Robust Resource Monitoring:** Real-time insights into system performance and resource usage.
 - **Flexible Client Libraries:** Comprehensive clients available for both Python and Node.js.
 - **Google Colab Friendly:** Dedicated workflow for deploying via Google Colab with public URL access.
+- **Persistent Configuration:** Save your settings for future use with the new configuration system.
 
 ## Unique Visual Overview
 
@@ -77,6 +86,7 @@ sequenceDiagram
 For full documentation and detailed guides, please visit our [documentation page](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/README.md).
 
 - [Getting Started Guide](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/guides/getting-started.md)
+- [CLI Guide](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/guides/cli.md)
 - [Python Client](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/clients/python/README.md)
 - [Node.js Client](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/clients/nodejs/README.md)
 - [Client Comparison](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/clients/comparison.md)
@@ -91,14 +101,30 @@ For full documentation and detailed guides, please visit our [documentation page
    pip install locallab
    ```
 
-2. **Starting the Server Locally:**
+2. **Using the CLI (New!):**
+
+   ```bash
+   # Start the server with interactive configuration
+   locallab start
+
+   # Start with specific options
+   locallab start --model microsoft/phi-2 --quantize --quantize-type int8
+
+   # Run the configuration wizard without starting the server
+   locallab config
+
+   # Display system information
+   locallab info
+   ```
+
+3. **Starting the Server Programmatically:**
 
    ```python
    from locallab import start_server
    start_server()
    ```
 
-3. **Starting the Server on Google Colab:**
+4. **Starting the Server on Google Colab:**
 
    ```python
    !pip install locallab
@@ -117,7 +143,7 @@ For full documentation and detailed guides, please visit our [documentation page
    start_server(use_ngrok=True)  # Creates a public URL accessible from anywhere
    ```
 
-4. **Connecting your Client:**
+5. **Connecting your Client:**
 
    ```python
    from locallab.client import LocalLabClient
@@ -129,6 +155,33 @@ For full documentation and detailed guides, please visit our [documentation page
    response = client.generate("Hello, how are you?")
    print(response)
    ```
+
+## CLI Features (New in v0.4.8!)
+
+LocalLab now includes a powerful command-line interface with the following features:
+
+- **Interactive Configuration:** Guided setup for all server settings
+- **Environment Detection:** Smart defaults based on your system
+- **Persistent Settings:** Configuration stored in `~/.locallab/config.json`
+- **System Information:** Detailed insights about your hardware
+- **Performance Optimizations:** Easy configuration of quantization and other optimizations
+- **Google Colab Integration:** Automatic detection and configuration for Colab environments
+
+Example CLI usage:
+
+```bash
+# Start with interactive prompts
+locallab start
+
+# Configure with specific options
+locallab start --model microsoft/phi-2 --port 8080 --quantize --attention-slicing
+
+# Run configuration wizard
+locallab config
+
+# Check system resources
+locallab info
+```
 
 ## Join the Community
 

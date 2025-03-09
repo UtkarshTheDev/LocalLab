@@ -2,6 +2,34 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.9 - 2025-03-11
+
+### Fixed
+
+- Fixed critical issue with `locallab config` command not being respected when running `locallab start`
+- Enhanced configuration system to properly load and apply saved settings
+- Improved user experience by showing current configuration before prompting for changes
+- Added clear feedback when configuration is saved and how to use it
+
+## 0.4.8 - 2025-03-10
+
+### Fixed
+
+- Fixed critical server startup error related to missing 'lifespan' attribute in ServerWithCallback class
+- Fixed KeyError in 'locallab info' command by properly handling RAM information
+- Significantly improved CLI startup speed through lazy loading of imports
+- Enhanced error handling in system information display
+- Fixed environment variable conflicts between CLI configuration and OS environment variables
+- Improved configuration system to properly handle both CLI and environment variable settings
+- Optimized server startup process for faster response time
+
+### Changed
+
+- Reduced unnecessary operations during CLI startup for better performance
+- Improved memory usage reporting with proper unit conversion (GB instead of MB)
+- Enhanced ServerWithCallback class with proper lifespan initialization
+- Updated configuration system to use a unified approach for all settings
+
 ## 0.4.7 - 2025-03-08
 
 ### Added

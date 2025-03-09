@@ -120,8 +120,9 @@ def get_system_resources() -> Dict[str, Any]:
     resources = {
         'cpu_count': psutil.cpu_count(),
         'cpu_usage': psutil.cpu_percent(),
-        'ram_total': psutil.virtual_memory().total / (1024 * 1024),
-        'ram_available': psutil.virtual_memory().available / (1024 * 1024),
+        'ram_total': psutil.virtual_memory().total,  # in bytes
+        'ram_available': psutil.virtual_memory().available,  # in bytes
+        'ram_gb': psutil.virtual_memory().total / (1024 * 1024 * 1024),  # in GB
         'memory_usage': psutil.virtual_memory().percent,
         'gpu_available': False,
         'gpu_info': []
@@ -135,13 +136,15 @@ def get_system_resources() -> Dict[str, Any]:
             for i in range(gpu_count):
                 gpu_mem = get_gpu_memory()
                 if gpu_mem:
-                    total_mem, _ = gpu_mem
+                    total_mem, free_mem = gpu_mem
                     resources['gpu_info'].append({
                         'name': torch.cuda.get_device_name(i),
-                        'total_memory': total_mem
+                        'total_memory': total_mem,  # in MB
+                        'free_memory': free_mem,  # in MB
+                        'total_memory_gb': total_mem / 1024  # in GB
                     })
     
-    return resources 
+    return resources
 
 
 def get_cpu_info() -> Dict[str, Any]:

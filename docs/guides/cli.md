@@ -11,6 +11,8 @@ LocalLab provides a powerful command-line interface (CLI) that makes it easy to 
 5. [Environment Variables](#environment-variables)
 6. [Configuration Storage](#configuration-storage)
 7. [Google Colab Integration](#google-colab-integration)
+8. [New in v0.4.9](#new-in-v049)
+9. [New in v0.4.8](#new-in-v048)
 
 ## Installation
 
@@ -85,7 +87,7 @@ Example interactive session:
 
 🔧 Would you like to configure advanced options? [y/N]:
 
-✅ Configuration complete! Starting server...
+✅ Configuration complete!
 ```
 
 ## Command Reference
@@ -114,12 +116,27 @@ locallab start --model microsoft/phi-2 --quantize --quantize-type int8
 
 ### `locallab config`
 
-Run the configuration wizard without starting the server.
+Run the configuration wizard without starting the server. This command now shows your current configuration and allows you to modify it.
 
 Example:
 
 ```bash
 locallab config
+```
+
+Output:
+
+```
+📋 Current Configuration:
+  port: 8000
+  model_id: microsoft/phi-2
+  enable_quantization: true
+  quantization_type: int8
+  enable_attention_slicing: true
+  enable_flash_attention: false
+  enable_better_transformer: false
+
+Would you like to reconfigure these settings? [Y/n]:
 ```
 
 ### `locallab info`
@@ -178,6 +195,92 @@ start_server(use_ngrok=True, port=8080)
 ```
 
 The CLI will detect that it's running in Colab and prompt for any missing required settings, such as the ngrok authentication token if `use_ngrok=True` is specified.
+
+## New in v0.4.9
+
+Version 0.4.9 brings significant improvements to the configuration system:
+
+### 🔄 Persistent Configuration That Works
+
+- **Fixed Configuration Persistence**: The `locallab config` command now properly saves settings that are respected when running `locallab start`
+- **Configuration Display**: The `config` command now shows your current configuration before prompting for changes
+- **Skip Unnecessary Prompts**: The CLI now only prompts for settings that aren't already configured
+- **Clear Feedback**: After saving configuration, the CLI shows what was saved and how to use it
+
+### 🛠️ Improved Configuration Workflow
+
+```bash
+# Step 1: Configure your settings once
+locallab config
+
+# Step 2: Start the server using your saved configuration
+locallab start
+```
+
+With this improved workflow, you only need to configure your settings once, and they'll be remembered for future sessions.
+
+### Example Configuration Session
+
+```
+$ locallab config
+
+📋 Current Configuration:
+  port: 8000
+  model_id: microsoft/phi-2
+  enable_quantization: true
+  quantization_type: int8
+  enable_attention_slicing: true
+
+Would you like to reconfigure these settings? [Y/n]: n
+Configuration unchanged.
+
+$ locallab start
+🎮 GPU detected with 8192MB free of 16384MB total
+💾 System memory: 12288MB free of 16384MB total
+
+✅ Using saved configuration!
+```
+
+## New in v0.4.8
+
+Version 0.4.8 brings significant improvements to the CLI:
+
+### ⚡ Lightning-Fast Startup
+
+- **Lazy Loading**: The CLI now uses lazy loading for imports, resulting in much faster startup times
+- **Optimized Initialization**: Reduced unnecessary operations during CLI startup
+- **Faster Response**: Commands like `locallab info` now respond almost instantly
+
+### 🛡️ Improved Error Handling
+
+- **Robust Error Recovery**: Better handling of common errors like missing dependencies
+- **Informative Messages**: More helpful error messages that guide you to solutions
+- **Graceful Fallbacks**: The CLI now gracefully handles missing or invalid configuration values
+
+### 🔄 Unified Configuration System
+
+- **Seamless Integration**: CLI options, environment variables, and configuration files now work together harmoniously
+- **Consistent Behavior**: No more conflicts between different ways of setting configuration values
+- **Clear Precedence**: Environment variables take precedence over saved configuration, which takes precedence over defaults
+
+### 📊 Enhanced System Information
+
+- **Detailed Hardware Info**: The `locallab info` command now provides more detailed information about your system
+- **Better Memory Reporting**: Improved memory usage reporting with proper unit conversion (GB instead of MB)
+- **GPU Details**: More comprehensive GPU information when available
+
+### Example Usage
+
+```bash
+# Start with interactive configuration - now much faster!
+locallab start
+
+# Use the improved system information command
+locallab info
+
+# Configure with specific options - now with better error handling
+locallab start --model microsoft/phi-2 --quantize --quantize-type int8 --attention-slicing
+```
 
 ## Using the CLI in Python Code
 
