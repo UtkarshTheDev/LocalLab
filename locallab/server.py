@@ -209,69 +209,93 @@ class ServerWithCallback(uvicorn.Server):
         try:
             # Try the newer location first (uvicorn >= 0.18.0)
             from uvicorn.lifespan.on import LifespanOn
-            # LifespanOn doesn't accept logger parameter
-            self.lifespan = LifespanOn(
-                self.config.app,
-                self.config.lifespan_on if hasattr(self.config, "lifespan_on") else "auto"
-            )
-            logger.info("Using LifespanOn from uvicorn.lifespan.on")
-        except (ImportError, AttributeError) as e:
-            logger.debug(f"Failed to import LifespanOn: {str(e)}")
+            # LifespanOn may only accept app parameter in some versions
+            try:
+                # Try with just the app parameter
+                self.lifespan = LifespanOn(self.config.app)
+                logger.info("Using LifespanOn from uvicorn.lifespan.on (single parameter)")
+            except TypeError:
+                # If that fails, try with both parameters
+                try:
+                    self.lifespan = LifespanOn(
+                        self.config.app,
+                        self.config.lifespan_on if hasattr(self.config, "lifespan_on") else "auto"
+                    )
+                    logger.info("Using LifespanOn from uvicorn.lifespan.on (two parameters)")
+                except TypeError:
+                    logger.debug("LifespanOn initialization failed with both one and two parameters")
+                    raise
+        except (ImportError, AttributeError, TypeError) as e:
+            logger.debug(f"Failed to import or initialize LifespanOn: {str(e)}")
             try:
                 # Try the older location (uvicorn < 0.18.0)
                 from uvicorn.lifespan.lifespan import Lifespan
                 try:
-                    # Try with logger parameter first
-                    self.lifespan = Lifespan(
-                        self.config.app,
-                        "auto",
-                        logger
-                    )
+                    # Try with just the app parameter
+                    self.lifespan = Lifespan(self.config.app)
+                    logger.info("Using Lifespan from uvicorn.lifespan.lifespan (single parameter)")
                 except TypeError:
-                    # If that fails, try without logger parameter
-                    self.lifespan = Lifespan(
-                        self.config.app,
-                        "auto"
-                    )
-                logger.info("Using Lifespan from uvicorn.lifespan.lifespan")
-            except (ImportError, AttributeError) as e:
-                logger.debug(f"Failed to import Lifespan from lifespan.lifespan: {str(e)}")
-                try:
-                    # Try the oldest location
-                    from uvicorn.lifespan import Lifespan
                     try:
-                        # Try with logger parameter first
+                        # Try with two parameters
+                        self.lifespan = Lifespan(
+                            self.config.app,
+                            "auto"
+                        )
+                        logger.info("Using Lifespan from uvicorn.lifespan.lifespan (two parameters)")
+                    except TypeError:
+                        # Try with three parameters
                         self.lifespan = Lifespan(
                             self.config.app,
                             "auto",
                             logger
                         )
+                        logger.info("Using Lifespan from uvicorn.lifespan.lifespan (three parameters)")
+                logger.info("Using Lifespan from uvicorn.lifespan.lifespan")
+            except (ImportError, AttributeError, TypeError) as e:
+                logger.debug(f"Failed to import or initialize Lifespan from lifespan.lifespan: {str(e)}")
+                try:
+                    # Try the oldest location
+                    from uvicorn.lifespan import Lifespan
+                    try:
+                        # Try with just the app parameter
+                        self.lifespan = Lifespan(self.config.app)
+                        logger.info("Using Lifespan from uvicorn.lifespan (single parameter)")
                     except TypeError:
-                        # If that fails, try without logger parameter
-                        self.lifespan = Lifespan(
-                            self.config.app,
-                            "auto"
-                        )
+                        try:
+                            # Try with two parameters
+                            self.lifespan = Lifespan(
+                                self.config.app,
+                                "auto"
+                            )
+                            logger.info("Using Lifespan from uvicorn.lifespan (two parameters)")
+                        except TypeError:
+                            # Try with three parameters
+                            self.lifespan = Lifespan(
+                                self.config.app,
+                                "auto",
+                                logger
+                            )
+                            logger.info("Using Lifespan from uvicorn.lifespan (three parameters)")
                     logger.info("Using Lifespan from uvicorn.lifespan")
-                except (ImportError, AttributeError) as e:
-                    logger.debug(f"Failed to import Lifespan from uvicorn.lifespan: {str(e)}")
+                except (ImportError, AttributeError, TypeError) as e:
+                    logger.debug(f"Failed to import or initialize Lifespan from uvicorn.lifespan: {str(e)}")
                     try:
                         # Try the newest location (uvicorn >= 0.21.0)
                         from uvicorn.lifespan.state import LifespanState
                         try:
-                            # Try with logger parameter first
+                            # Try with just the app parameter
+                            self.lifespan = LifespanState(self.config.app)
+                            logger.info("Using LifespanState from uvicorn.lifespan.state (single parameter)")
+                        except TypeError:
+                            # Try with logger parameter
                             self.lifespan = LifespanState(
                                 self.config.app,
                                 logger=logger
                             )
-                        except TypeError:
-                            # If that fails, try without logger parameter
-                            self.lifespan = LifespanState(
-                                self.config.app
-                            )
+                            logger.info("Using LifespanState from uvicorn.lifespan.state (with logger)")
                         logger.info("Using LifespanState from uvicorn.lifespan.state")
-                    except (ImportError, AttributeError) as e:
-                        logger.debug(f"Failed to import LifespanState: {str(e)}")
+                    except (ImportError, AttributeError, TypeError) as e:
+                        logger.debug(f"Failed to import or initialize LifespanState: {str(e)}")
                         # Fallback to no lifespan
                         self.lifespan = None
                         logger.warning("Could not initialize lifespan - server may not handle startup/shutdown events properly")

@@ -2,6 +2,16 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.14 - 2025-03-11
+
+### Fixed
+
+- Fixed critical error: "LifespanOn.**init**() takes 2 positional arguments but 3 were given"
+- Enhanced lifespan initialization to handle different uvicorn versions with varying parameter requirements
+- Implemented comprehensive parameter testing for all lifespan classes to ensure compatibility
+- Added detailed logging for lifespan initialization to aid in troubleshooting
+- Improved error handling for all lifespan-related operations
+
 ## 0.4.13 - 2025-03-11
 
 ### Fixed
