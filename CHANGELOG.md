@@ -2,6 +2,17 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.12 - 2025-03-11
+
+### Fixed
+
+- Fixed critical server startup error related to uvicorn lifespan initialization
+- Fixed 'Config' object has no attribute 'logger' error during server startup
+- Fixed 'Config' object has no attribute 'loaded_app' error
+- Improved compatibility with different versions of uvicorn
+- Enhanced error handling during server startup
+- Fixed banner display functions to work with the latest server implementation
+
 ## 0.4.11 - 2025-03-11
 
 ### Fixed

@@ -204,36 +204,54 @@ class ServerWithCallback(uvicorn.Server):
         
         # Initialize lifespan attribute before startup
         # Handle different versions of uvicorn
+        self.lifespan = None
+        
         try:
             # Try the newer location first (uvicorn >= 0.18.0)
             from uvicorn.lifespan.on import LifespanOn
             self.lifespan = LifespanOn(
-                self.config.loaded_app,
-                self.config.lifespan_on if hasattr(self.config, "lifespan_on") else self.config.lifespan,
-                self.config.logger
+                self.config.app,
+                self.config.lifespan_on if hasattr(self.config, "lifespan_on") else "auto",
+                logger=logger
             )
-        except (ImportError, AttributeError):
+            logger.info("Using LifespanOn from uvicorn.lifespan.on")
+        except (ImportError, AttributeError) as e:
+            logger.debug(f"Failed to import LifespanOn: {str(e)}")
             try:
                 # Try the older location (uvicorn < 0.18.0)
                 from uvicorn.lifespan.lifespan import Lifespan
                 self.lifespan = Lifespan(
-                    self.config.loaded_app,
-                    self.config.lifespan,
-                    self.config.logger
+                    self.config.app,
+                    "auto",
+                    logger=logger
                 )
-            except (ImportError, AttributeError):
+                logger.info("Using Lifespan from uvicorn.lifespan.lifespan")
+            except (ImportError, AttributeError) as e:
+                logger.debug(f"Failed to import Lifespan from lifespan.lifespan: {str(e)}")
                 try:
                     # Try the oldest location
                     from uvicorn.lifespan import Lifespan
                     self.lifespan = Lifespan(
-                        self.config.loaded_app,
-                        self.config.lifespan,
-                        self.config.logger
+                        self.config.app,
+                        "auto",
+                        logger=logger
                     )
-                except (ImportError, AttributeError):
-                    # Fallback to no lifespan
-                    self.lifespan = None
-                    self.config.logger.warning("Could not initialize lifespan - server may not handle startup/shutdown events properly")
+                    logger.info("Using Lifespan from uvicorn.lifespan")
+                except (ImportError, AttributeError) as e:
+                    logger.debug(f"Failed to import Lifespan from uvicorn.lifespan: {str(e)}")
+                    try:
+                        # Try the newest location (uvicorn >= 0.21.0)
+                        from uvicorn.lifespan.state import LifespanState
+                        self.lifespan = LifespanState(
+                            self.config.app,
+                            logger=logger
+                        )
+                        logger.info("Using LifespanState from uvicorn.lifespan.state")
+                    except (ImportError, AttributeError) as e:
+                        logger.debug(f"Failed to import LifespanState: {str(e)}")
+                        # Fallback to no lifespan
+                        self.lifespan = None
+                        logger.warning("Could not initialize lifespan - server may not handle startup/shutdown events properly")
         
         await self.startup(sockets=sockets)
         
@@ -342,61 +360,22 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
         if startup_complete:
             return
         
-        # Update server status to running
+        # Set server status to running
         set_server_status("running")
-        print_running_banner(port, public_url)
         
-        # Print current system instructions
-        instructions_text = system_instructions.get_instructions()
-        print_system_instructions(instructions_text)
+        # Display the RUNNING banner
+        print_running_banner(__version__)
         
-        # Import here to avoid circular imports
-        from .core.app import model_manager
-        from .cli.config import get_config_value
+        # Display system resources
+        print_system_resources()
         
-        # Print model info if a model is loaded
-        if model_manager.current_model:
-            model_info = model_manager.get_model_info()
-            print_model_info(model_info)
-        else:
-            # Get model settings from config system
-            model_id = os.environ.get("HUGGINGFACE_MODEL", DEFAULT_MODEL)
-            
-            # Get optimization settings from config system
-            enable_quantization = get_config_value('enable_quantization', ENABLE_QUANTIZATION)
-            if isinstance(enable_quantization, str):
-                enable_quantization = enable_quantization.lower() not in ('false', '0', 'none', '')
-            
-            quantization_type = get_config_value('quantization_type', QUANTIZATION_TYPE)
-            
-            enable_attention_slicing = get_config_value('enable_attention_slicing', ENABLE_ATTENTION_SLICING)
-            if isinstance(enable_attention_slicing, str):
-                enable_attention_slicing = enable_attention_slicing.lower() not in ('false', '0', 'none', '')
-            
-            enable_flash_attention = get_config_value('enable_flash_attention', ENABLE_FLASH_ATTENTION)
-            if isinstance(enable_flash_attention, str):
-                enable_flash_attention = enable_flash_attention.lower() not in ('false', '0', 'none', '')
-            
-            enable_better_transformer = get_config_value('enable_better_transformer', ENABLE_BETTERTRANSFORMER)
-            if isinstance(enable_better_transformer, str):
-                enable_better_transformer = enable_better_transformer.lower() not in ('false', '0', 'none', '')
-            
-            # Print model settings
-            env_model_info = {
-                "model_id": model_id,
-                "model_name": model_id.split("/")[-1],
-                "parameters": "Unknown (not loaded yet)",
-                "device": "cpu" if not torch.cuda.is_available() else f"cuda:{torch.cuda.current_device()}",
-                "quantization": quantization_type if enable_quantization else "None",
-                "optimizations": {
-                    "attention_slicing": enable_attention_slicing,
-                    "flash_attention": enable_flash_attention,
-                    "better_transformer": enable_better_transformer
-                }
-            }
-            print_model_info(env_model_info)
+        # Display model information
+        print_model_info()
         
-        # Print API documentation
+        # Display system instructions
+        print_system_instructions()
+        
+        # Display API documentation
         print_api_docs()
         
         # Set flag to indicate startup is complete
@@ -435,14 +414,13 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
             server.on_startup_callback = on_startup  # Set the callback
             
             # Use the appropriate event loop method based on Python version
-            if sys.version_info >= (3, 10):
-                # Python 3.10+ - use get_event_loop
+            try:
+                asyncio.run(server.serve())
+            except RuntimeError as e:
+                # Handle "Event loop is already running" error
+                if "Event loop is already running" in str(e):
+                    logger.warning("Event loop is already running. Using get_event_loop instead.")
                 asyncio.get_event_loop().run_until_complete(server.serve())
-            else:
-                # Python 3.9 and below - use new_event_loop
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(server.serve())
         else:
             # Local environment
             logger.info(f"Starting server on port {port} (local mode)")
@@ -469,21 +447,12 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                     logger.warning("Event loop is already running. Using get_event_loop instead.")
                     asyncio.get_event_loop().run_until_complete(server.serve())
                 else:
+                    # Re-raise other errors
                     raise
     except Exception as e:
-        # Update server status on error
-        set_server_status("error")
-        
-        # Clean up ngrok if server fails to start
-        if use_ngrok and public_url:
-            try:
-                from pyngrok import ngrok
-                ngrok.disconnect(public_url)
-            except Exception as ngrok_e:
-                logger.error(f"Failed to disconnect ngrok: {str(ngrok_e)}")
-                
         logger.error(f"Server startup failed: {str(e)}")
         logger.error(traceback.format_exc())
+        set_server_status("error")
         raise
 
 def cli():

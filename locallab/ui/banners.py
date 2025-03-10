@@ -38,7 +38,7 @@ def print_initializing_banner(version: str):
     print(startup_banner, flush=True)
 
 
-def print_running_banner(port: int, public_url: Optional[str] = None):
+def print_running_banner(version: str):
     """
     Print the running banner with clear visual indication
     that the server is now ready to accept API requests
@@ -46,7 +46,7 @@ def print_running_banner(port: int, public_url: Optional[str] = None):
     running_banner = f"""
 {Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
 
-{Fore.GREEN}LocalLab Server{Style.RESET_ALL} - {Fore.YELLOW}READY FOR REQUESTS{Style.RESET_ALL}
+{Fore.GREEN}LocalLab Server v{version}{Style.RESET_ALL} - {Fore.YELLOW}READY FOR REQUESTS{Style.RESET_ALL}
 {Fore.CYAN}Your AI model is now running and ready to process requests{Style.RESET_ALL}
 
 {Fore.GREEN}
@@ -62,17 +62,17 @@ def print_running_banner(port: int, public_url: Optional[str] = None):
 {Fore.GREEN}✅ MODEL LOADING WILL CONTINUE IN BACKGROUND IF NOT FINISHED        ✅{Style.RESET_ALL}
 
 {Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
-
-🖥️ Local URL: {Fore.GREEN}http://localhost:{port}{Style.RESET_ALL}
 """
-    if public_url:
-        running_banner += f"🌐 Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}\n"
     
     print(running_banner, flush=True)
 
 
-def print_system_resources(resources: dict):
+def print_system_resources():
     """Print system resources in a formatted box"""
+    # Import here to avoid circular imports
+    from ..utils.system import get_system_info
+    
+    resources = get_system_info()
     ram_gb = resources.get('ram_gb', 0)
     cpu_count = resources.get('cpu_count', 0)
     gpu_available = resources.get('gpu_available', False)
@@ -97,76 +97,102 @@ def print_system_resources(resources: dict):
     return system_info
 
 
-def print_model_info(model_info: Dict[str, Any], optimization_settings: Dict[str, Any] = None):
-    """
-    Print model information and optimization settings
+def print_model_info():
+    """Print model information in a formatted box"""
+    # Import here to avoid circular imports
+    from ..config import (
+        DEFAULT_MODEL,
+        ENABLE_QUANTIZATION,
+        QUANTIZATION_TYPE,
+        ENABLE_ATTENTION_SLICING,
+        ENABLE_FLASH_ATTENTION,
+        ENABLE_BETTERTRANSFORMER
+    )
+    from ..cli.config import get_config_value
+    import os
     
-    Args:
-        model_info: Dictionary containing model information
-        optimization_settings: Dictionary containing optimization settings
-    """
-    # Get model information
-    model_id = model_info.get('model_id', 'Unknown')
-    model_name = model_info.get('model_name', model_id)
-    parameters = model_info.get('parameters', 'Unknown')
-    device = model_info.get('device', 'cpu')
-    architecture = model_info.get('architecture', 'Unknown')
-    max_length = model_info.get('max_length', 'Unknown')
-    memory_used = model_info.get('memory_used', 'Unknown')
+    try:
+        import torch
+        torch_available = True
+    except ImportError:
+        torch_available = False
     
-    # Get optimization settings
-    if not optimization_settings and 'optimizations' in model_info:
-        optimization_settings = model_info.get('optimizations', {})
+    # Get model settings from config system
+    model_id = os.environ.get("HUGGINGFACE_MODEL", DEFAULT_MODEL)
     
-    quantization = model_info.get('quantization', 'None')
-    attention_slicing = optimization_settings.get('attention_slicing', False) if optimization_settings else False
-    flash_attention = optimization_settings.get('flash_attention', False) if optimization_settings else False
-    better_transformer = optimization_settings.get('better_transformer', False) if optimization_settings else False
+    # Get optimization settings from config system
+    enable_quantization = get_config_value('enable_quantization', ENABLE_QUANTIZATION)
+    if isinstance(enable_quantization, str):
+        enable_quantization = enable_quantization.lower() not in ('false', '0', 'none', '')
     
-    model_info_banner = f"""
-{Fore.CYAN}════════════════════════════════════ Model Configuration ════════════════════════════════════{Style.RESET_ALL}
+    quantization_type = get_config_value('quantization_type', QUANTIZATION_TYPE)
+    
+    enable_attention_slicing = get_config_value('enable_attention_slicing', ENABLE_ATTENTION_SLICING)
+    if isinstance(enable_attention_slicing, str):
+        enable_attention_slicing = enable_attention_slicing.lower() not in ('false', '0', 'none', '')
+    
+    enable_flash_attention = get_config_value('enable_flash_attention', ENABLE_FLASH_ATTENTION)
+    if isinstance(enable_flash_attention, str):
+        enable_flash_attention = enable_flash_attention.lower() not in ('false', '0', 'none', '')
+    
+    enable_better_transformer = get_config_value('enable_better_transformer', ENABLE_BETTERTRANSFORMER)
+    if isinstance(enable_better_transformer, str):
+        enable_better_transformer = enable_better_transformer.lower() not in ('false', '0', 'none', '')
+    
+    # Print model settings
+    device = "cpu"
+    if torch_available and torch.cuda.is_available():
+        device = f"cuda:{torch.cuda.current_device()}"
+    
+    model_info = {
+        "model_id": model_id,
+        "model_name": model_id.split("/")[-1],
+        "parameters": "Unknown (not loaded yet)",
+        "device": device,
+        "quantization": quantization_type if enable_quantization else "None",
+        "optimizations": {
+            "attention_slicing": enable_attention_slicing,
+            "flash_attention": enable_flash_attention,
+            "better_transformer": enable_better_transformer
+        }
+    }
+    
+    # Print model info
+    model_info_text = f"""
+{Fore.CYAN}════════════════════════════════════ Model Configuration ═══════════════════════════════════{Style.RESET_ALL}
 
-🤖 Model: {Fore.GREEN}{model_name} ({model_id}){Style.RESET_ALL}
-📊 Parameters: {Fore.GREEN}{parameters}{Style.RESET_ALL}
-🧠 Architecture: {Fore.GREEN}{architecture}{Style.RESET_ALL}
-💽 Device: {Fore.GREEN}{device}{Style.RESET_ALL}
-📏 Max Length: {Fore.GREEN}{max_length}{Style.RESET_ALL}
-💾 Memory Used: {Fore.GREEN}{memory_used}{Style.RESET_ALL}
+🤖 Model: {Fore.GREEN}{model_info['model_id']}{Style.RESET_ALL}
+📊 Parameters: {Fore.GREEN}{model_info['parameters']}{Style.RESET_ALL}
+💾 Device: {Fore.GREEN}{model_info['device']}{Style.RESET_ALL}
+⚙️ Quantization: {Fore.GREEN}{model_info['quantization']}{Style.RESET_ALL}
 
-⚙️ Optimizations:
-  • Quantization: {Fore.GREEN if quantization != "None" else Fore.YELLOW}{quantization}{Style.RESET_ALL}
-  • Attention Slicing: {Fore.GREEN if attention_slicing else Fore.YELLOW}{str(attention_slicing)}{Style.RESET_ALL}
-  • Flash Attention: {Fore.GREEN if flash_attention else Fore.YELLOW}{str(flash_attention)}{Style.RESET_ALL}
-  • Better Transformer: {Fore.GREEN if better_transformer else Fore.YELLOW}{str(better_transformer)}{Style.RESET_ALL}
+🔧 Optimizations:
+   ├─ Attention Slicing: {Fore.GREEN if model_info['optimizations']['attention_slicing'] else Fore.RED}{model_info['optimizations']['attention_slicing']}{Style.RESET_ALL}
+   ├─ Flash Attention: {Fore.GREEN if model_info['optimizations']['flash_attention'] else Fore.RED}{model_info['optimizations']['flash_attention']}{Style.RESET_ALL}
+   └─ BetterTransformer: {Fore.GREEN if model_info['optimizations']['better_transformer'] else Fore.RED}{model_info['optimizations']['better_transformer']}{Style.RESET_ALL}
 
 {Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
 """
-    print(model_info_banner, flush=True)
-    return model_info_banner
+    print(model_info_text, flush=True)
+    return model_info_text
 
 
-def print_system_instructions(instructions: str):
-    """
-    Print the current system instructions
+def print_system_instructions():
+    """Print system instructions in a formatted box"""
+    # Import here to avoid circular imports
+    from ..config import system_instructions
     
-    Args:
-        instructions: The system instructions text
-    """
-    # Truncate instructions if they're too long
-    max_length = 400
-    displayed_instructions = instructions
-    if len(instructions) > max_length:
-        displayed_instructions = instructions[:max_length] + "..."
+    instructions_text = system_instructions.get_instructions()
     
-    instructions_banner = f"""
-{Fore.CYAN}════════════════════════════════════ System Instructions ════════════════════════════════════{Style.RESET_ALL}
+    system_instructions_text = f"""
+{Fore.CYAN}════════════════════════════════════ System Instructions ═══════════════════════════════════{Style.RESET_ALL}
 
-{format_multiline_text(displayed_instructions, prefix="")}
+{Fore.YELLOW}{instructions_text}{Style.RESET_ALL}
 
 {Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
 """
-    print(instructions_banner, flush=True)
-    return instructions_banner
+    print(system_instructions_text, flush=True)
+    return system_instructions_text
 
 
 def print_api_docs():
