@@ -2,6 +2,33 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.11 - 2025-03-11
+
+### Fixed
+
+- Fixed critical issue with `locallab start` failing due to uvicorn lifespan module errors
+- Fixed `locallab config` command not properly prompting for new settings when reconfiguring
+- Significantly improved CLI startup speed with optimized imports and conditional loading
+- Enhanced configuration system to include all available options (cache, logging, etc.)
+- Improved compatibility with different Python versions and environments
+- Added better error handling for ngrok authentication token
+- Fixed event loop handling for both local and Google Colab environments
+- Removed "What's New" sections from documentation in favor of directing users to the changelog
+- Restored option to skip advanced configuration settings for better user experience
+
+## 0.4.10 - 2025-03-11
+
+### Fixed
+
+- Fixed critical issue with `locallab start` failing due to uvicorn lifespan module errors
+- Fixed `locallab config` command not properly prompting for new settings when reconfiguring
+- Significantly improved CLI startup speed with optimized imports and conditional loading
+- Enhanced configuration system to include all available options (cache, logging, etc.)
+- Improved compatibility with different Python versions and environments
+- Added better error handling for ngrok authentication token
+- Fixed event loop handling for both local and Google Colab environments
+- Removed "What's New" sections from documentation in favor of directing users to the changelog
+
 ## 0.4.9 - 2025-03-11
 
 ### Fixed

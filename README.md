@@ -7,12 +7,7 @@
 
 LocalLab empowers users to run any Hugging Face AI model locally or on Google Colab with minimal setup required. It automatically configures an API using ngrok, enabling seamless integration into applications from any location. Designed for simplicity, LocalLab makes advanced AI accessible to all, regardless of technical expertise. With built-in model management, performance optimizations, and system monitoring, it ensures efficient and reliable AI operations for developers, researchers, and enthusiasts alike.
 
-## What's New in v0.4.9
-
-- **🔧 Fixed Configuration System**: The `locallab config` command now properly saves settings that are respected when running `locallab start`
-- **📋 Configuration Display**: The CLI now shows your current configuration before prompting for changes
-- **⏩ Skip Unnecessary Prompts**: Only prompts for settings that aren't already configured
-- **✅ Clear Feedback**: After saving configuration, the CLI shows what was saved and how to use it
+> **Note**: For the latest changes and updates, please see the [CHANGELOG.md](./CHANGELOG.md) file.
 
 ## What Problem Does LocalLab Solve?
 

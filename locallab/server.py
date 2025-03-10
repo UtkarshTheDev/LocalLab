@@ -10,7 +10,6 @@ import threading
 import traceback
 import socket
 import uvicorn
-import uvicorn.lifespan
 import os
 from colorama import Fore, Style, init
 init(autoreset=True)
@@ -204,11 +203,37 @@ class ServerWithCallback(uvicorn.Server):
         self.config.setup_event_loop()
         
         # Initialize lifespan attribute before startup
-        self.lifespan = uvicorn.lifespan.Lifespan(
-            self.config.loaded_app,
-            self.config.lifespan,
-            self.config.logger
-        )
+        # Handle different versions of uvicorn
+        try:
+            # Try the newer location first (uvicorn >= 0.18.0)
+            from uvicorn.lifespan.on import LifespanOn
+            self.lifespan = LifespanOn(
+                self.config.loaded_app,
+                self.config.lifespan_on if hasattr(self.config, "lifespan_on") else self.config.lifespan,
+                self.config.logger
+            )
+        except (ImportError, AttributeError):
+            try:
+                # Try the older location (uvicorn < 0.18.0)
+                from uvicorn.lifespan.lifespan import Lifespan
+                self.lifespan = Lifespan(
+                    self.config.loaded_app,
+                    self.config.lifespan,
+                    self.config.logger
+                )
+            except (ImportError, AttributeError):
+                try:
+                    # Try the oldest location
+                    from uvicorn.lifespan import Lifespan
+                    self.lifespan = Lifespan(
+                        self.config.loaded_app,
+                        self.config.lifespan,
+                        self.config.logger
+                    )
+                except (ImportError, AttributeError):
+                    # Fallback to no lifespan
+                    self.lifespan = None
+                    self.config.logger.warning("Could not initialize lifespan - server may not handle startup/shutdown events properly")
         
         await self.startup(sockets=sockets)
         
@@ -237,13 +262,13 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
         elif key == "ngrok_auth_token":
             os.environ["NGROK_AUTH_TOKEN"] = str(value)
         elif key in ["enable_quantization", "enable_attention_slicing", "enable_flash_attention", 
-                    "enable_better_transformer", "enable_cpu_offloading"]:
+                    "enable_better_transformer", "enable_cpu_offloading", "enable_cache", 
+                    "enable_file_logging"]:
             env_key = f"LOCALLAB_{key.upper()}"
             os.environ[env_key] = str(value).lower()
-        elif key == "quantization_type":
-            os.environ["LOCALLAB_QUANTIZATION_TYPE"] = str(value)
-        elif key == "model_timeout":
-            os.environ["LOCALLAB_MODEL_TIMEOUT"] = str(value)
+        elif key in ["quantization_type", "model_timeout", "cache_ttl", "log_level", "log_file"]:
+            env_key = f"LOCALLAB_{key.upper()}"
+            os.environ[env_key] = str(value)
     
     # Interactive CLI configuration if needed
     config = prompt_for_config(use_ngrok, port, ngrok_auth_token)
@@ -276,8 +301,14 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
     # Set up ngrok before starting server if requested
     public_url = None
     if use_ngrok:
+        # Check if we have an ngrok auth token
+        if not ngrok_auth_token and not os.environ.get("NGROK_AUTH_TOKEN"):
+            logger.error("Ngrok auth token is required for public access. Please set it in the configuration.")
+            logger.info("You can get a free token from: https://dashboard.ngrok.com/get-started/your-authtoken")
+            raise ValueError("Ngrok auth token is required for public access")
+            
         logger.info(f"{Fore.CYAN}Setting up ngrok tunnel to port {port}...{Style.RESET_ALL}")
-        public_url = setup_ngrok(port=port, auth_token=ngrok_auth_token)
+        public_url = setup_ngrok(port=port, auth_token=ngrok_auth_token or os.environ.get("NGROK_AUTH_TOKEN"))
         if public_url:
             ngrok_section = f"\n{Fore.CYAN}┌────────────────────────── Ngrok Tunnel Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🚀 Ngrok Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
             logger.info(ngrok_section)
@@ -373,11 +404,18 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
     
     # Start uvicorn server directly in the main process
     try:
-        if use_ngrok:
+        # Detect if we're in Google Colab
+        in_colab = is_in_colab()
+        
+        if in_colab or use_ngrok:
             # Colab environment setup
-            import nest_asyncio
-            nest_asyncio.apply()
-            logger.info(f"Starting server on port {port} (Colab mode)")
+            try:
+                import nest_asyncio
+                nest_asyncio.apply()
+            except ImportError:
+                logger.warning("nest_asyncio not available. This may cause issues in Google Colab.")
+                
+            logger.info(f"Starting server on port {port} (Colab/ngrok mode)")
             
             # Define the callback for Colab
             async def on_startup_async():
@@ -386,7 +424,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
             
             config = uvicorn.Config(
                 app, 
-                host="0.0.0.0", 
+                host="0.0.0.0",  # Bind to all interfaces in Colab
                 port=port, 
                 reload=False, 
                 log_level="info",
@@ -395,14 +433,23 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
             )
             server = ServerWithCallback(config)
             server.on_startup_callback = on_startup  # Set the callback
-            asyncio.get_event_loop().run_until_complete(server.serve())
+            
+            # Use the appropriate event loop method based on Python version
+            if sys.version_info >= (3, 10):
+                # Python 3.10+ - use get_event_loop
+                asyncio.get_event_loop().run_until_complete(server.serve())
+            else:
+                # Python 3.9 and below - use new_event_loop
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(server.serve())
         else:
             # Local environment
             logger.info(f"Starting server on port {port} (local mode)")
             # For local environment, we'll use a custom Server subclass
             config = uvicorn.Config(
                 app, 
-                host="127.0.0.1", 
+                host="127.0.0.1",  # Localhost only for local mode
                 port=port, 
                 reload=False, 
                 workers=1, 
@@ -412,7 +459,17 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
             )
             server = ServerWithCallback(config)
             server.on_startup_callback = on_startup  # Set the callback
-            asyncio.run(server.serve())
+            
+            # Use asyncio.run which is more reliable
+            try:
+                asyncio.run(server.serve())
+            except RuntimeError as e:
+                # Handle "Event loop is already running" error
+                if "Event loop is already running" in str(e):
+                    logger.warning("Event loop is already running. Using get_event_loop instead.")
+                    asyncio.get_event_loop().run_until_complete(server.serve())
+                else:
+                    raise
     except Exception as e:
         # Update server status on error
         set_server_status("error")
@@ -431,7 +488,12 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
 
 def cli():
     """Command line interface entry point for the package"""
+    # Only import click here to speed up initial import time
     import click
+    import sys
+    
+    # Avoid importing other modules until they're needed
+    # This significantly speeds up CLI startup
     
     @click.group()
     @click.version_option(__version__)
@@ -497,7 +559,7 @@ def cli():
                 return
         
         # This will run the interactive configuration without starting the server
-        config = prompt_for_config()
+        config = prompt_for_config(force_reconfigure=True)
         save_config(config)
         
         # Show the new configuration
@@ -550,6 +612,16 @@ def cli():
             click.echo(f"\n❌ Error retrieving system information: {str(e)}")
             click.echo("Please check that all required dependencies are installed.")
             return 1
+    
+    # Use sys.argv to check if we're just showing help
+    # This avoids importing modules unnecessarily
+    if len(sys.argv) <= 1 or sys.argv[1] == '--help' or sys.argv[1] == '-h':
+        return locallab_cli()
+    
+    # For specific commands, we can optimize further
+    if sys.argv[1] == 'info':
+        # For info command, we can bypass some imports
+        return locallab_cli(['info'])
     
     return locallab_cli()
 

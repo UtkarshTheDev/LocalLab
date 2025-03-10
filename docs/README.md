@@ -6,28 +6,7 @@ Welcome to the LocalLab documentation! This guide is your one-stop resource for 
 
 LocalLab empowers you to run AI inference servers either locally or through Google Colab. With advanced model management, performance optimizations, and robust system monitoring, LocalLab is built to deliver efficient, on-demand AI capabilities.
 
-## What's New in v0.4.9
-
-Our latest release brings significant improvements to the configuration system:
-
-- **🔧 Fixed Configuration Persistence**: The `locallab config` command now properly saves settings that are respected when running `locallab start`
-- **📋 Configuration Display**: The CLI now shows your current configuration before prompting for changes
-- **⏩ Skip Unnecessary Prompts**: Only prompts for settings that aren't already configured
-- **✅ Clear Feedback**: After saving configuration, the CLI shows what was saved and how to use it
-
-[Read the full changelog](../CHANGELOG.md) for more details.
-
-## What's New in v0.4.8
-
-Our previous release brought significant improvements to the LocalLab CLI:
-
-- **⚡ Lightning-Fast Startup**: Optimized for quick response time with lazy loading
-- **🛡️ Robust Error Handling**: Better diagnostics and recovery from common issues
-- **🔄 Unified Configuration**: Seamless integration between CLI options and environment variables
-- **📊 Enhanced System Information**: Improved hardware reporting with the `locallab info` command
-- **🔧 Fixed Critical Issues**: Resolved server startup errors and configuration conflicts
-
-[Read the full changelog](../CHANGELOG.md) for more details.
+> **Note**: For the latest changes and updates, please see the [CHANGELOG.md](../CHANGELOG.md) file.
 
 ## Visual Overview
 
