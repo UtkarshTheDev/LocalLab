@@ -2,6 +2,15 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.13 - 2025-03-11
+
+### Fixed
+
+- Fixed critical error with LifespanOn initialization: "LifespanOn.**init**() got an unexpected keyword argument 'logger'"
+- Improved compatibility with different versions of uvicorn by properly handling lifespan initialization
+- Enhanced error handling for different lifespan implementations
+- Added graceful fallbacks when lifespan initialization fails
+
 ## 0.4.12 - 2025-03-11
 
 ### Fixed
