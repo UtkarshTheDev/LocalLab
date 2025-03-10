@@ -2,6 +2,21 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.15 - 2025-03-11
+
+### Fixed
+
+- Fixed critical error: "'NoneType' object has no attribute 'startup'"
+- Implemented NoopLifespan class as a fallback when all lifespan initialization attempts fail
+- Ensured server can start even when lifespan initialization fails
+- Added proper error handling for startup and shutdown events
+- Enhanced server stability across different environments and uvicorn versions
+- Added robust error recovery during server startup process
+- Overrode uvicorn's startup and shutdown methods to add additional error handling
+- Improved logging for lifespan-related errors to aid in troubleshooting
+- Added graceful fallback mechanisms for all critical server operations
+- Ensured clean server shutdown even when lifespan shutdown fails
+
 ## 0.4.14 - 2025-03-11
 
 ### Fixed

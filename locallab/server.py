@@ -194,10 +194,65 @@ def signal_handler(signum, frame):
     threading.Thread(target=delayed_exit, daemon=True).start()
 
 
+class NoopLifespan:
+    """A no-operation lifespan implementation that provides the required methods but doesn't do anything."""
+    
+    def __init__(self, app):
+        self.app = app
+    
+    async def startup(self):
+        """No-op startup method."""
+        logger.warning("Using NoopLifespan - server may not handle startup/shutdown events properly")
+        pass
+    
+    async def shutdown(self):
+        """No-op shutdown method."""
+        pass
+
+
 class ServerWithCallback(uvicorn.Server):
     def install_signal_handlers(self):
         # Override to prevent uvicorn from installing its own handlers
         pass
+    
+    async def startup(self, sockets=None):
+        """Override the startup method to add error handling for lifespan startup."""
+        if self.should_exit:
+            return
+        
+        if sockets is not None:
+            self.servers = []
+            for socket in sockets:
+                server = await self.config.server_class(config=self.config, server=self)
+                await server.start()
+                self.servers.append(server)
+        else:
+            self.servers = [await self.config.server_class(config=self.config, server=self)]
+            await self.servers[0].start()
+        
+        if self.lifespan is not None:
+            try:
+                await self.lifespan.startup()
+            except Exception as e:
+                logger.error(f"Error during lifespan startup: {str(e)}")
+                logger.debug(f"Lifespan startup error details: {traceback.format_exc()}")
+                # Replace with NoopLifespan if startup fails
+                self.lifespan = NoopLifespan(self.config.app)
+                logger.warning("Replaced failed lifespan with NoopLifespan")
+    
+    async def shutdown(self, sockets=None):
+        """Override the shutdown method to add error handling for lifespan shutdown."""
+        if self.servers:
+            for server in self.servers:
+                await server.shutdown()
+        
+        if self.lifespan is not None:
+            try:
+                await self.lifespan.shutdown()
+            except Exception as e:
+                logger.error(f"Error during lifespan shutdown: {str(e)}")
+                logger.debug(f"Lifespan shutdown error details: {traceback.format_exc()}")
+                logger.warning("Continuing shutdown despite lifespan error")
     
     async def serve(self, sockets=None):
         self.config.setup_event_loop()
@@ -296,19 +351,25 @@ class ServerWithCallback(uvicorn.Server):
                         logger.info("Using LifespanState from uvicorn.lifespan.state")
                     except (ImportError, AttributeError, TypeError) as e:
                         logger.debug(f"Failed to import or initialize LifespanState: {str(e)}")
-                        # Fallback to no lifespan
-                        self.lifespan = None
-                        logger.warning("Could not initialize lifespan - server may not handle startup/shutdown events properly")
+                        # Fallback to NoopLifespan
+                        self.lifespan = NoopLifespan(self.config.app)
+                        logger.warning("Using NoopLifespan - server may not handle startup/shutdown events properly")
         
-        await self.startup(sockets=sockets)
-        
-        # Call our callback before processing requests
-        # We need to access the on_startup function from the outer scope
-        if hasattr(self, 'on_startup_callback') and callable(self.on_startup_callback):
-            self.on_startup_callback()
-        
-        await self.main_loop()
-        await self.shutdown()
+        try:
+            await self.startup(sockets=sockets)
+            
+            # Call our callback before processing requests
+            # We need to access the on_startup function from the outer scope
+            if hasattr(self, 'on_startup_callback') and callable(self.on_startup_callback):
+                self.on_startup_callback()
+            
+            await self.main_loop()
+            await self.shutdown()
+        except Exception as e:
+            logger.error(f"Error during server operation: {str(e)}")
+            logger.debug(f"Server error details: {traceback.format_exc()}")
+            # Re-raise to allow proper error handling
+            raise
 
 
 def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Optional[str] = None):
