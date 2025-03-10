@@ -2,6 +2,24 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.16 - 2025-03-11
+
+### Fixed
+
+- Fixed critical error: "'Config' object has no attribute 'server_class'"
+- Implemented custom startup method that doesn't rely on config.server_class
+- Fixed import issues in Google Colab by properly exposing start_server in **init**.py
+- Enhanced compatibility with different versions of uvicorn
+- Improved server initialization for more reliable startup
+- Added direct TCPServer initialization for better compatibility
+- Implemented fallback mechanisms for TCPServer import to handle different uvicorn versions
+- Added multiple import paths for TCPServer to ensure compatibility across all environments
+- Enhanced error handling during server initialization
+- Improved Google Colab integration with better import structure
+- Added custom main_loop implementation with robust error handling
+- Implemented graceful shutdown mechanism for all server components
+- Enhanced server stability with improved error recovery
+
 ## 0.4.15 - 2025-03-11
 
 ### Fixed

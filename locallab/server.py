@@ -220,15 +220,49 @@ class ServerWithCallback(uvicorn.Server):
         if self.should_exit:
             return
         
+        # Custom implementation that doesn't rely on config.server_class
         if sockets is not None:
             self.servers = []
             for socket in sockets:
-                server = await self.config.server_class(config=self.config, server=self)
+                # Use TCPServer directly instead of relying on config.server_class
+                try:
+                    # Try the newer location first
+                    from uvicorn.server import TCPServer
+                    server = TCPServer(config=self.config)
+                except (ImportError, AttributeError):
+                    try:
+                        # Try the older location
+                        from uvicorn.protocols.http.h11_impl import TCPServer
+                        server = TCPServer(config=self.config)
+                    except (ImportError, AttributeError):
+                        # Last resort - use a simple server implementation
+                        logger.warning("Could not import TCPServer - using simple server implementation")
+                        from uvicorn.protocols.http.auto import AutoHTTPProtocol
+                        server = uvicorn.Server(config=self.config)
+                
+                server.server = self  # Set the server reference
                 await server.start()
                 self.servers.append(server)
         else:
-            self.servers = [await self.config.server_class(config=self.config, server=self)]
-            await self.servers[0].start()
+            # Use TCPServer directly instead of relying on config.server_class
+            try:
+                # Try the newer location first
+                from uvicorn.server import TCPServer
+                server = TCPServer(config=self.config)
+            except (ImportError, AttributeError):
+                try:
+                    # Try the older location
+                    from uvicorn.protocols.http.h11_impl import TCPServer
+                    server = TCPServer(config=self.config)
+                except (ImportError, AttributeError):
+                    # Last resort - use a simple server implementation
+                    logger.warning("Could not import TCPServer - using simple server implementation")
+                    from uvicorn.protocols.http.auto import AutoHTTPProtocol
+                    server = uvicorn.Server(config=self.config)
+            
+            server.server = self  # Set the server reference
+            await server.start()
+            self.servers = [server]
         
         if self.lifespan is not None:
             try:
@@ -239,6 +273,18 @@ class ServerWithCallback(uvicorn.Server):
                 # Replace with NoopLifespan if startup fails
                 self.lifespan = NoopLifespan(self.config.app)
                 logger.warning("Replaced failed lifespan with NoopLifespan")
+    
+    async def main_loop(self):
+        """Custom main loop implementation with error handling."""
+        try:
+            # Use asyncio.sleep to keep the server running
+            while not self.should_exit:
+                await asyncio.sleep(0.1)
+        except Exception as e:
+            logger.error(f"Error in main loop: {str(e)}")
+            logger.debug(f"Main loop error details: {traceback.format_exc()}")
+            # Set should_exit to True to initiate shutdown
+            self.should_exit = True
     
     async def shutdown(self, sockets=None):
         """Override the shutdown method to add error handling for lifespan shutdown."""

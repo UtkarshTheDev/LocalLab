@@ -2,10 +2,13 @@
 LocalLab - A lightweight AI inference server for running LLMs locally
 """
 
-__version__ = "0.4.15"
+__version__ = "0.4.16"
 
 # Only import what's necessary initially, lazy-load the rest
 from .logger import get_logger
+
+# Explicitly expose start_server for direct import
+from .server import start_server, cli
 
 # Other imports will be lazy-loaded when needed
 
