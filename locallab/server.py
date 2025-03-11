@@ -203,8 +203,10 @@ def signal_handler(signum, frame):
         except Exception:
             pass
         
-        # Force exit if we're still running
-        sys.exit(0)
+        # Force exit the process completely - use os._exit instead of sys.exit
+        # This ensures all threads are terminated
+        logger.info("Forcing process termination to ensure clean shutdown")
+        os._exit(0)
         
     threading.Thread(target=delayed_exit, daemon=True).start()
 
@@ -236,7 +238,6 @@ class SimpleTCPServer:
         self.started = False
         self._serve_task = None
         self._socket = None
-        self._running = False
         self.app = config.app
     
     async def start(self):
@@ -902,6 +903,14 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                 except Exception as e:
                     logger.error(f"Error displaying API documentation: {str(e)}")
                     logger.debug(f"API documentation error details: {traceback.format_exc()}")
+                    
+                try:
+                    # Display footer with author information
+                    from .ui.banners import print_footer
+                    print_footer()
+                except Exception as e:
+                    logger.error(f"Error displaying footer: {str(e)}")
+                    logger.debug(f"Footer display error details: {traceback.format_exc()}")
                 
                 # Set flag to indicate startup is complete
                 startup_complete = True

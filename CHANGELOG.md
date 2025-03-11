@@ -2,6 +2,23 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.22 - 2025-03-12
+
+### Fixed
+
+- Fixed critical issue with server not terminating properly when Ctrl+C is pressed
+- Improved process termination by using os.\_exit() instead of sys.exit() for clean shutdown
+- Added CPU compatibility by disabling quantization when CUDA is not available
+- Fixed bitsandbytes error for CPU-only systems with clear warning messages
+- Enhanced user experience with better error handling for non-GPU environments
+
+### Added
+
+- Added beautiful footer section with author information and social media links
+- Included GitHub, Twitter, and Instagram links in the footer
+- Added project repository link with star request
+- Enhanced server startup display with comprehensive information
+
 ## 0.4.21 - 2025-03-12
 
 ### Fixed

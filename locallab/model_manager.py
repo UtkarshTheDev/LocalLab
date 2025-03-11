@@ -68,6 +68,15 @@ class ModelManager:
         # Use the config system to get the value, which checks environment variables and config file
         from .cli.config import get_config_value
         
+        # First check if CUDA is available - if not, we can't use bitsandbytes quantization
+        if not torch.cuda.is_available():
+            logger.warning("CUDA not available - quantization with bitsandbytes requires CUDA")
+            logger.info("Disabling quantization and using CPU-compatible settings")
+            return {
+                "torch_dtype": torch.float32,
+                "device_map": "auto"
+            }
+        
         enable_quantization = get_config_value('enable_quantization', ENABLE_QUANTIZATION)
         # Convert string values to boolean if needed
         if isinstance(enable_quantization, str):

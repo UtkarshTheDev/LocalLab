@@ -273,4 +273,23 @@ def print_api_docs():
 def format_multiline_text(text: str, prefix: str = "") -> str:
     """Format multiline text for display in a banner"""
     lines = text.strip().split('\n')
-    return '\n'.join([f"{prefix}{line}" for line in lines]) 
+    return '\n'.join([f"{prefix}{line}" for line in lines])
+
+
+def print_footer():
+    """Print a footer with author information and social media links."""
+    footer = f"""
+{Fore.CYAN}┌────────────────────────── Made with ❤️ ───────────────────────────┐{Style.RESET_ALL}
+│                                                                    │
+│  {Fore.YELLOW}Created by:{Style.RESET_ALL} Utkarsh Tiwari                                    │
+│  {Fore.BLUE}GitHub:{Style.RESET_ALL} https://github.com/UtkarshTheDev                   │
+│  {Fore.MAGENTA}Twitter:{Style.RESET_ALL} https://twitter.com/UtkarshTheDev                   │
+│  {Fore.RED}Instagram:{Style.RESET_ALL} https://instagram.com/UtkarshTheDev                 │
+│                                                                    │
+│  {Fore.GREEN}⭐ Star this project:{Style.RESET_ALL} https://github.com/UtkarshTheDev/LocalLab  │
+│                                                                    │
+│  {Fore.YELLOW}Thank you for using LocalLab! Feedback and contributions welcome!{Style.RESET_ALL}  │
+│                                                                    │
+{Fore.CYAN}└────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
+"""
+    print(footer, flush=True) 
