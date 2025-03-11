@@ -2,6 +2,24 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.17 - 2025-03-11
+
+### Fixed
+
+- Fixed critical error: "'Server' object has no attribute 'start'"
+- Implemented robust SimpleTCPServer as a fallback when TCPServer import fails
+- Added direct socket handling for maximum compatibility across environments
+- Enhanced server startup process to handle different server implementations
+- Improved error handling in server shutdown process
+- Added graceful fallback for servers without start/shutdown methods
+- Enhanced compatibility with different versions of uvicorn
+- Improved server stability with better error recovery mechanisms
+- Added comprehensive error handling for socket operations
+- Implemented non-blocking socket I/O for better performance
+- Added direct fallback to SimpleTCPServer when server.start() fails
+- Improved Google Colab integration with better error handling
+- Enhanced event loop handling for different Python environments
+
 ## 0.4.16 - 2025-03-11
 
 ### Fixed

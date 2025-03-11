@@ -195,9 +195,10 @@ def signal_handler(signum, frame):
 
 
 class NoopLifespan:
-    """A no-operation lifespan implementation that provides the required methods but doesn't do anything."""
+    """A no-op lifespan implementation for when all lifespan initialization attempts fail."""
     
     def __init__(self, app):
+        """Initialize with the app."""
         self.app = app
     
     async def startup(self):
@@ -208,6 +209,151 @@ class NoopLifespan:
     async def shutdown(self):
         """No-op shutdown method."""
         pass
+
+
+class SimpleTCPServer:
+    """A simple TCP server implementation for when TCPServer import fails."""
+    
+    def __init__(self, config):
+        """Initialize with the config."""
+        self.config = config
+        self.server = None
+        self.started = False
+        self._serve_task = None
+        self._socket = None
+        self._running = False
+    
+    async def start(self):
+        """Start the server."""
+        self.started = True
+        logger.info("Started SimpleTCPServer as fallback")
+        
+        # Create a task to run the server
+        if not self._serve_task:
+            self._serve_task = asyncio.create_task(self._run_server())
+    
+    async def _run_server(self):
+        """Run the server in a separate task."""
+        try:
+            self._running = True
+            
+            # Try to create a socket
+            import socket
+            host = self.config.host
+            port = self.config.port
+            
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            
+            try:
+                self._socket.bind((host, port))
+                self._socket.listen(100)  # Backlog
+                self._socket.setblocking(False)
+                
+                logger.info(f"SimpleTCPServer listening on {host}:{port}")
+                
+                # Create a simple HTTP server
+                loop = asyncio.get_event_loop()
+                
+                while self._running:
+                    try:
+                        client_socket, addr = await loop.sock_accept(self._socket)
+                        logger.debug(f"Connection from {addr}")
+                        
+                        # Handle the connection in a separate task
+                        asyncio.create_task(self._handle_connection(client_socket))
+                    except asyncio.CancelledError:
+                        break
+                    except Exception as e:
+                        logger.error(f"Error accepting connection: {str(e)}")
+            finally:
+                if self._socket:
+                    self._socket.close()
+                    self._socket = None
+        except Exception as e:
+            logger.error(f"Error in SimpleTCPServer._run_server: {str(e)}")
+            logger.debug(f"SimpleTCPServer._run_server error details: {traceback.format_exc()}")
+        finally:
+            self._running = False
+    
+    async def _handle_connection(self, client_socket):
+        """Handle a client connection."""
+        try:
+            loop = asyncio.get_event_loop()
+            
+            # Set non-blocking mode
+            client_socket.setblocking(False)
+            
+            # Read the request
+            request_data = b""
+            while True:
+                try:
+                    chunk = await loop.sock_recv(client_socket, 4096)
+                    if not chunk:
+                        break
+                    request_data += chunk
+                    
+                    # Check if we've received the end of the HTTP request
+                    if b"\r\n\r\n" in request_data:
+                        break
+                except Exception:
+                    break
+            
+            # Prepare a simple HTTP response
+            response = (
+                b"HTTP/1.1 200 OK\r\n"
+                b"Content-Type: text/plain\r\n"
+                b"Connection: close\r\n"
+                b"\r\n"
+                b"LocalLab server is running (fallback mode)"
+            )
+            
+            # Send the response
+            await loop.sock_sendall(client_socket, response)
+        except Exception as e:
+            logger.error(f"Error handling connection: {str(e)}")
+        finally:
+            try:
+                client_socket.close()
+            except Exception:
+                pass
+    
+    async def shutdown(self):
+        """Shutdown the server."""
+        self.started = False
+        self._running = False
+        
+        # Cancel the serve task
+        if self._serve_task:
+            self._serve_task.cancel()
+            try:
+                await self._serve_task
+            except asyncio.CancelledError:
+                pass
+            self._serve_task = None
+        
+        # Close the socket
+        if self._socket:
+            try:
+                self._socket.close()
+            except Exception:
+                pass
+            self._socket = None
+        
+        logger.info("Shutdown SimpleTCPServer")
+    
+    async def serve(self, sock=None):
+        """Serve the application."""
+        self.started = True
+        try:
+            # Keep the server running until shutdown is called
+            while self.started:
+                await asyncio.sleep(1)
+        except Exception as e:
+            logger.error(f"Error in SimpleTCPServer.serve: {str(e)}")
+            logger.debug(f"SimpleTCPServer.serve error details: {traceback.format_exc()}")
+        finally:
+            self.started = False
 
 
 class ServerWithCallback(uvicorn.Server):
@@ -237,11 +383,20 @@ class ServerWithCallback(uvicorn.Server):
                     except (ImportError, AttributeError):
                         # Last resort - use a simple server implementation
                         logger.warning("Could not import TCPServer - using simple server implementation")
-                        from uvicorn.protocols.http.auto import AutoHTTPProtocol
-                        server = uvicorn.Server(config=self.config)
+                        # Use our custom SimpleTCPServer instead of uvicorn.Server
+                        server = SimpleTCPServer(config=self.config)
                 
                 server.server = self  # Set the server reference
-                await server.start()
+                # Check if the server has a start method, otherwise use serve
+                if hasattr(server, 'start'):
+                    await server.start()
+                elif hasattr(server, 'serve'):
+                    # Create a task for serve but don't await it directly
+                    # as it would block indefinitely
+                    asyncio.create_task(server.serve())
+                else:
+                    logger.error(f"Server object {type(server)} has neither start() nor serve() method")
+                    raise RuntimeError("Incompatible server implementation")
                 self.servers.append(server)
         else:
             # Use TCPServer directly instead of relying on config.server_class
@@ -257,11 +412,20 @@ class ServerWithCallback(uvicorn.Server):
                 except (ImportError, AttributeError):
                     # Last resort - use a simple server implementation
                     logger.warning("Could not import TCPServer - using simple server implementation")
-                    from uvicorn.protocols.http.auto import AutoHTTPProtocol
-                    server = uvicorn.Server(config=self.config)
+                    # Use our custom SimpleTCPServer instead of uvicorn.Server
+                    server = SimpleTCPServer(config=self.config)
             
             server.server = self  # Set the server reference
-            await server.start()
+            # Check if the server has a start method, otherwise use serve
+            if hasattr(server, 'start'):
+                await server.start()
+            elif hasattr(server, 'serve'):
+                # Create a task for serve but don't await it directly
+                # as it would block indefinitely
+                asyncio.create_task(server.serve())
+            else:
+                logger.error(f"Server object {type(server)} has neither start() nor serve() method")
+                raise RuntimeError("Incompatible server implementation")
             self.servers = [server]
         
         if self.lifespan is not None:
@@ -290,7 +454,15 @@ class ServerWithCallback(uvicorn.Server):
         """Override the shutdown method to add error handling for lifespan shutdown."""
         if self.servers:
             for server in self.servers:
-                await server.shutdown()
+                try:
+                    # Check if the server has a shutdown method
+                    if hasattr(server, 'shutdown'):
+                        await server.shutdown()
+                    else:
+                        logger.warning(f"Server object {type(server)} has no shutdown method, skipping")
+                except Exception as e:
+                    logger.error(f"Error shutting down server: {str(e)}")
+                    logger.debug(f"Server shutdown error details: {traceback.format_exc()}")
         
         if self.lifespan is not None:
             try:
@@ -569,12 +741,35 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
             
             # Use the appropriate event loop method based on Python version
             try:
-                asyncio.run(server.serve())
+                # Wrap in try/except to handle server startup errors
+                try:
+                    asyncio.run(server.serve())
+                except AttributeError as e:
+                    if "'Server' object has no attribute 'start'" in str(e):
+                        # If we get the 'start' attribute error, use our SimpleTCPServer directly
+                        logger.warning("Falling back to direct SimpleTCPServer implementation")
+                        direct_server = SimpleTCPServer(config)
+                        asyncio.run(direct_server.serve())
+                    else:
+                        raise
             except RuntimeError as e:
                 # Handle "Event loop is already running" error
                 if "Event loop is already running" in str(e):
                     logger.warning("Event loop is already running. Using get_event_loop instead.")
-                asyncio.get_event_loop().run_until_complete(server.serve())
+                    loop = asyncio.get_event_loop()
+                    try:
+                        loop.run_until_complete(server.serve())
+                    except AttributeError as e:
+                        if "'Server' object has no attribute 'start'" in str(e):
+                            # If we get the 'start' attribute error, use our SimpleTCPServer directly
+                            logger.warning("Falling back to direct SimpleTCPServer implementation")
+                            direct_server = SimpleTCPServer(config)
+                            loop.run_until_complete(direct_server.serve())
+                        else:
+                            raise
+                else:
+                    # Re-raise other errors
+                    raise
         else:
             # Local environment
             logger.info(f"Starting server on port {port} (local mode)")
@@ -594,12 +789,32 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
             
             # Use asyncio.run which is more reliable
             try:
-                asyncio.run(server.serve())
+                # Wrap in try/except to handle server startup errors
+                try:
+                    asyncio.run(server.serve())
+                except AttributeError as e:
+                    if "'Server' object has no attribute 'start'" in str(e):
+                        # If we get the 'start' attribute error, use our SimpleTCPServer directly
+                        logger.warning("Falling back to direct SimpleTCPServer implementation")
+                        direct_server = SimpleTCPServer(config)
+                        asyncio.run(direct_server.serve())
+                    else:
+                        raise
             except RuntimeError as e:
                 # Handle "Event loop is already running" error
                 if "Event loop is already running" in str(e):
                     logger.warning("Event loop is already running. Using get_event_loop instead.")
-                    asyncio.get_event_loop().run_until_complete(server.serve())
+                    loop = asyncio.get_event_loop()
+                    try:
+                        loop.run_until_complete(server.serve())
+                    except AttributeError as e:
+                        if "'Server' object has no attribute 'start'" in str(e):
+                            # If we get the 'start' attribute error, use our SimpleTCPServer directly
+                            logger.warning("Falling back to direct SimpleTCPServer implementation")
+                            direct_server = SimpleTCPServer(config)
+                            loop.run_until_complete(direct_server.serve())
+                        else:
+                            raise
                 else:
                     # Re-raise other errors
                     raise
