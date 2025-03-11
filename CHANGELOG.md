@@ -2,6 +2,33 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.20 - 2025-03-12
+
+### Fixed
+
+- Enhanced server compatibility with different versions of uvicorn
+- Improved lifespan initialization with comprehensive fallback mechanisms
+- Fixed server startup issues with newer versions of uvicorn (0.34.0+)
+- Added robust error handling for lifespan initialization
+- Implemented multiple initialization strategies for different uvicorn versions
+- Improved logging during server startup to better diagnose initialization issues
+- Enhanced server stability with proper error recovery during startup
+- Fixed "Using NoopLifespan" warning by properly initializing lifespan components
+- Ensured compatibility with both older and newer versions of uvicorn
+- Improved server reliability in various Python environments
+
+## 0.4.19 - 2025-03-11
+
+### Fixed
+
+- Fixed critical issue with SimpleTCPServer not properly handling API requests
+- Implemented proper ASGI server in SimpleTCPServer for handling API requests
+- Added support for uvicorn's H11Protocol for better request handling
+- Improved fallback server implementation with proper HTTP request parsing
+- Enhanced API documentation to show correct URLs based on environment
+- Fixed API examples to show local URL or ngrok URL based on configuration
+- Ensured server works correctly in both local and Google Colab environments
+
 ## 0.4.18 - 2025-03-11
 
 ### Fixed

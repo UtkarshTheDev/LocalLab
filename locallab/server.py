@@ -222,6 +222,7 @@ class SimpleTCPServer:
         self._serve_task = None
         self._socket = None
         self._running = False
+        self.app = config.app
     
     async def start(self):
         """Start the server."""
@@ -255,13 +256,43 @@ class SimpleTCPServer:
                 # Create a simple HTTP server
                 loop = asyncio.get_event_loop()
                 
+                # Try to import uvicorn's HTTP protocol implementation
+                try:
+                    from uvicorn.protocols.http.h11_impl import H11Protocol
+                    from uvicorn.protocols.utils import get_remote_addr, get_local_addr
+                    from uvicorn.config import Config
+                    
+                    # Create a config for the protocol
+                    protocol_config = Config(app=self.app, host=host, port=port)
+                    
+                    # Use uvicorn's protocol implementation if available
+                    use_uvicorn_protocol = True
+                    logger.info("Using uvicorn's H11Protocol for request handling")
+                except ImportError:
+                    use_uvicorn_protocol = False
+                    logger.warning("Could not import uvicorn's H11Protocol, using basic request handling")
+                
                 while self._running:
                     try:
                         client_socket, addr = await loop.sock_accept(self._socket)
                         logger.debug(f"Connection from {addr}")
                         
                         # Handle the connection in a separate task
-                        asyncio.create_task(self._handle_connection(client_socket))
+                        if use_uvicorn_protocol:
+                            server = self.server if hasattr(self, 'server') else None
+                            remote_addr = get_remote_addr(client_socket)
+                            local_addr = get_local_addr(client_socket)
+                            protocol = H11Protocol(
+                                config=protocol_config,
+                                server=server,
+                                client=client_socket,
+                                server_state={"total_requests": 0},
+                                client_addr=remote_addr,
+                                root_path="",
+                            )
+                            asyncio.create_task(protocol.run_asgi(self.app))
+                        else:
+                            asyncio.create_task(self._handle_connection(client_socket))
                     except asyncio.CancelledError:
                         break
                     except Exception as e:
@@ -277,7 +308,7 @@ class SimpleTCPServer:
             self._running = False
     
     async def _handle_connection(self, client_socket):
-        """Handle a client connection."""
+        """Handle a client connection using a basic ASGI implementation."""
         try:
             loop = asyncio.get_event_loop()
             
@@ -299,17 +330,106 @@ class SimpleTCPServer:
                 except Exception:
                     break
             
-            # Prepare a simple HTTP response
-            response = (
-                b"HTTP/1.1 200 OK\r\n"
-                b"Content-Type: text/plain\r\n"
-                b"Connection: close\r\n"
-                b"\r\n"
-                b"LocalLab server is running (fallback mode)"
-            )
+            if not request_data:
+                return
             
-            # Send the response
-            await loop.sock_sendall(client_socket, response)
+            # Parse the HTTP request
+            try:
+                # Basic HTTP request parsing
+                request_line, *headers_data = request_data.split(b"\r\n")
+                method, path, _ = request_line.decode('utf-8').split(' ', 2)
+                
+                # Parse headers
+                headers = {}
+                for header in headers_data:
+                    if b":" in header:
+                        key, value = header.split(b":", 1)
+                        headers[key.decode('utf-8').strip()] = value.decode('utf-8').strip()
+                
+                # Extract query string
+                path_parts = path.split('?', 1)
+                path_without_query = path_parts[0]
+                query_string = path_parts[1].encode('utf-8') if len(path_parts) > 1 else b""
+                
+                # Extract body
+                body = b""
+                if b"\r\n\r\n" in request_data:
+                    body = request_data.split(b"\r\n\r\n", 1)[1]
+                
+                # Create ASGI scope
+                scope = {
+                    "type": "http",
+                    "asgi": {"version": "3.0", "spec_version": "2.0"},
+                    "http_version": "1.1",
+                    "method": method,
+                    "scheme": "http",
+                    "path": path_without_query,
+                    "raw_path": path.encode('utf-8'),
+                    "query_string": query_string,
+                    "headers": [[k.lower().encode('utf-8'), v.encode('utf-8')] for k, v in headers.items()],
+                    "client": ("127.0.0.1", 0),
+                    "server": (self.config.host, self.config.port),
+                }
+                
+                # Create response writer
+                async def send(message):
+                    if message["type"] == "http.response.start":
+                        status = message["status"]
+                        headers = message.get("headers", [])
+                        
+                        # Prepare response line
+                        response_line = f"HTTP/1.1 {status} OK\r\n"
+                        
+                        # Prepare headers
+                        header_lines = []
+                        for name, value in headers:
+                            header_lines.append(f"{name.decode('utf-8')}: {value.decode('utf-8')}")
+                        
+                        # Add default headers if not present
+                        if not any(name.lower() == b"content-type" for name, _ in headers):
+                            header_lines.append("Content-Type: text/plain")
+                        
+                        # Add connection close header
+                        header_lines.append("Connection: close")
+                        
+                        # Combine headers
+                        header_block = "\r\n".join(header_lines) + "\r\n\r\n"
+                        
+                        # Send response line and headers
+                        await loop.sock_sendall(client_socket, (response_line + header_block).encode('utf-8'))
+                    
+                    elif message["type"] == "http.response.body":
+                        body = message.get("body", b"")
+                        await loop.sock_sendall(client_socket, body)
+                        
+                        # Close the connection if more_body is False or not specified
+                        if not message.get("more_body", False):
+                            client_socket.close()
+                
+                # Create request body iterator
+                async def receive():
+                    return {
+                        "type": "http.request",
+                        "body": body,
+                        "more_body": False,
+                    }
+                
+                # Run the ASGI application
+                await self.app(scope, receive, send)
+                
+            except Exception as e:
+                logger.error(f"Error parsing request or running ASGI app: {str(e)}")
+                logger.debug(f"Request parsing error details: {traceback.format_exc()}")
+                
+                # Send a 500 error response
+                error_response = (
+                    b"HTTP/1.1 500 Internal Server Error\r\n"
+                    b"Content-Type: text/plain\r\n"
+                    b"Connection: close\r\n"
+                    b"\r\n"
+                    b"Internal Server Error: The server encountered an error processing your request."
+                )
+                await loop.sock_sendall(client_socket, error_response)
         except Exception as e:
             logger.error(f"Error handling connection: {str(e)}")
         finally:
@@ -366,67 +486,40 @@ class ServerWithCallback(uvicorn.Server):
         if self.should_exit:
             return
         
-        # Custom implementation that doesn't rely on config.server_class
+        # In newer versions of uvicorn (0.34.0+), TCPServer is no longer available
+        # Instead, we should use the Server class directly
         if sockets is not None:
-            self.servers = []
-            for socket in sockets:
-                # Use TCPServer directly instead of relying on config.server_class
-                try:
-                    # Try the newer location first
-                    from uvicorn.server import TCPServer
-                    server = TCPServer(config=self.config)
-                except (ImportError, AttributeError):
-                    try:
-                        # Try the older location
-                        from uvicorn.protocols.http.h11_impl import TCPServer
-                        server = TCPServer(config=self.config)
-                    except (ImportError, AttributeError):
-                        # Last resort - use a simple server implementation
-                        logger.warning("Could not import TCPServer - using simple server implementation")
-                        # Use our custom SimpleTCPServer instead of uvicorn.Server
-                        server = SimpleTCPServer(config=self.config)
-                
-                server.server = self  # Set the server reference
-                # Check if the server has a start method, otherwise use serve
-                if hasattr(server, 'start'):
-                    await server.start()
-                elif hasattr(server, 'serve'):
-                    # Create a task for serve but don't await it directly
-                    # as it would block indefinitely
-                    asyncio.create_task(server.serve())
-                else:
-                    logger.error(f"Server object {type(server)} has neither start() nor serve() method")
-                    raise RuntimeError("Incompatible server implementation")
-                self.servers.append(server)
-        else:
-            # Use TCPServer directly instead of relying on config.server_class
+            # For newer versions of uvicorn, we don't need to create separate servers
+            # Just use the built-in functionality
             try:
-                # Try the newer location first
-                from uvicorn.server import TCPServer
-                server = TCPServer(config=self.config)
-            except (ImportError, AttributeError):
-                try:
-                    # Try the older location
-                    from uvicorn.protocols.http.h11_impl import TCPServer
-                    server = TCPServer(config=self.config)
-                except (ImportError, AttributeError):
-                    # Last resort - use a simple server implementation
-                    logger.warning("Could not import TCPServer - using simple server implementation")
-                    # Use our custom SimpleTCPServer instead of uvicorn.Server
+                # Call the parent class's startup method
+                await super().startup(sockets=sockets)
+                logger.info("Using uvicorn's built-in Server implementation")
+            except Exception as e:
+                logger.error(f"Error during server startup: {str(e)}")
+                logger.debug(f"Server startup error details: {traceback.format_exc()}")
+                # If the parent class's startup method fails, fall back to our custom implementation
+                self.servers = []
+                for socket in sockets:
                     server = SimpleTCPServer(config=self.config)
-            
-            server.server = self  # Set the server reference
-            # Check if the server has a start method, otherwise use serve
-            if hasattr(server, 'start'):
+                    server.server = self  # Set the server reference
+                    await server.start()
+                    self.servers.append(server)
+        else:
+            # For newer versions of uvicorn, we don't need to create separate servers
+            # Just use the built-in functionality
+            try:
+                # Call the parent class's startup method
+                await super().startup(sockets=None)
+                logger.info("Using uvicorn's built-in Server implementation")
+            except Exception as e:
+                logger.error(f"Error during server startup: {str(e)}")
+                logger.debug(f"Server startup error details: {traceback.format_exc()}")
+                # If the parent class's startup method fails, fall back to our custom implementation
+                server = SimpleTCPServer(config=self.config)
+                server.server = self  # Set the server reference
                 await server.start()
-            elif hasattr(server, 'serve'):
-                # Create a task for serve but don't await it directly
-                # as it would block indefinitely
-                asyncio.create_task(server.serve())
-            else:
-                logger.error(f"Server object {type(server)} has neither start() nor serve() method")
-                raise RuntimeError("Incompatible server implementation")
-            self.servers = [server]
+                self.servers = [server]
         
         if self.lifespan is not None:
             try:
@@ -479,99 +572,8 @@ class ServerWithCallback(uvicorn.Server):
         # Handle different versions of uvicorn
         self.lifespan = None
         
-        try:
-            # Try the newer location first (uvicorn >= 0.18.0)
-            from uvicorn.lifespan.on import LifespanOn
-            # LifespanOn may only accept app parameter in some versions
-            try:
-                # Try with just the app parameter
-                self.lifespan = LifespanOn(self.config.app)
-                logger.info("Using LifespanOn from uvicorn.lifespan.on (single parameter)")
-            except TypeError:
-                # If that fails, try with both parameters
-                try:
-                    self.lifespan = LifespanOn(
-                        self.config.app,
-                        self.config.lifespan_on if hasattr(self.config, "lifespan_on") else "auto"
-                    )
-                    logger.info("Using LifespanOn from uvicorn.lifespan.on (two parameters)")
-                except TypeError:
-                    logger.debug("LifespanOn initialization failed with both one and two parameters")
-                    raise
-        except (ImportError, AttributeError, TypeError) as e:
-            logger.debug(f"Failed to import or initialize LifespanOn: {str(e)}")
-            try:
-                # Try the older location (uvicorn < 0.18.0)
-                from uvicorn.lifespan.lifespan import Lifespan
-                try:
-                    # Try with just the app parameter
-                    self.lifespan = Lifespan(self.config.app)
-                    logger.info("Using Lifespan from uvicorn.lifespan.lifespan (single parameter)")
-                except TypeError:
-                    try:
-                        # Try with two parameters
-                        self.lifespan = Lifespan(
-                            self.config.app,
-                            "auto"
-                        )
-                        logger.info("Using Lifespan from uvicorn.lifespan.lifespan (two parameters)")
-                    except TypeError:
-                        # Try with three parameters
-                        self.lifespan = Lifespan(
-                            self.config.app,
-                            "auto",
-                            logger
-                        )
-                        logger.info("Using Lifespan from uvicorn.lifespan.lifespan (three parameters)")
-                logger.info("Using Lifespan from uvicorn.lifespan.lifespan")
-            except (ImportError, AttributeError, TypeError) as e:
-                logger.debug(f"Failed to import or initialize Lifespan from lifespan.lifespan: {str(e)}")
-                try:
-                    # Try the oldest location
-                    from uvicorn.lifespan import Lifespan
-                    try:
-                        # Try with just the app parameter
-                        self.lifespan = Lifespan(self.config.app)
-                        logger.info("Using Lifespan from uvicorn.lifespan (single parameter)")
-                    except TypeError:
-                        try:
-                            # Try with two parameters
-                            self.lifespan = Lifespan(
-                                self.config.app,
-                                "auto"
-                            )
-                            logger.info("Using Lifespan from uvicorn.lifespan (two parameters)")
-                        except TypeError:
-                            # Try with three parameters
-                            self.lifespan = Lifespan(
-                                self.config.app,
-                                "auto",
-                                logger
-                            )
-                            logger.info("Using Lifespan from uvicorn.lifespan (three parameters)")
-                    logger.info("Using Lifespan from uvicorn.lifespan")
-                except (ImportError, AttributeError, TypeError) as e:
-                    logger.debug(f"Failed to import or initialize Lifespan from uvicorn.lifespan: {str(e)}")
-                    try:
-                        # Try the newest location (uvicorn >= 0.21.0)
-                        from uvicorn.lifespan.state import LifespanState
-                        try:
-                            # Try with just the app parameter
-                            self.lifespan = LifespanState(self.config.app)
-                            logger.info("Using LifespanState from uvicorn.lifespan.state (single parameter)")
-                        except TypeError:
-                            # Try with logger parameter
-                            self.lifespan = LifespanState(
-                                self.config.app,
-                                logger=logger
-                            )
-                            logger.info("Using LifespanState from uvicorn.lifespan.state (with logger)")
-                        logger.info("Using LifespanState from uvicorn.lifespan.state")
-                    except (ImportError, AttributeError, TypeError) as e:
-                        logger.debug(f"Failed to import or initialize LifespanState: {str(e)}")
-                        # Fallback to NoopLifespan
-                        self.lifespan = NoopLifespan(self.config.app)
-                        logger.warning("Using NoopLifespan - server may not handle startup/shutdown events properly")
+        # Try different approaches to initialize the lifespan
+        self._initialize_lifespan()
         
         try:
             await self.startup(sockets=sockets)
@@ -588,6 +590,129 @@ class ServerWithCallback(uvicorn.Server):
             logger.debug(f"Server error details: {traceback.format_exc()}")
             # Re-raise to allow proper error handling
             raise
+            
+    def _initialize_lifespan(self):
+        """Initialize the lifespan attribute with appropriate implementation based on uvicorn version."""
+        # Try LifespanOn from uvicorn.lifespan.on (newer versions)
+        try:
+            from uvicorn.lifespan.on import LifespanOn
+            
+            # Try with config parameter (for newer versions like 0.34.0)
+            try:
+                self.lifespan = LifespanOn(config=self.config)
+                logger.info("Using LifespanOn from uvicorn.lifespan.on with config parameter")
+                return
+            except TypeError:
+                pass
+                
+            # Try with app parameter (for older versions)
+            try:
+                self.lifespan = LifespanOn(self.config.app)
+                logger.info("Using LifespanOn from uvicorn.lifespan.on with app parameter")
+                return
+            except TypeError:
+                pass
+                
+            # Try with both parameters
+            try:
+                lifespan_on = self.config.lifespan_on if hasattr(self.config, "lifespan_on") else "auto"
+                self.lifespan = LifespanOn(self.config.app, lifespan_on)
+                logger.info("Using LifespanOn from uvicorn.lifespan.on with app and lifespan_on parameters")
+                return
+            except TypeError:
+                pass
+                
+        except (ImportError, AttributeError):
+            logger.debug("Could not import LifespanOn from uvicorn.lifespan.on")
+            
+        # Try Lifespan from uvicorn.lifespan.lifespan (older versions)
+        try:
+            from uvicorn.lifespan.lifespan import Lifespan
+            
+            # Try with app parameter
+            try:
+                self.lifespan = Lifespan(self.config.app)
+                logger.info("Using Lifespan from uvicorn.lifespan.lifespan with app parameter")
+                return
+            except TypeError:
+                pass
+                
+            # Try with two parameters
+            try:
+                self.lifespan = Lifespan(self.config.app, "auto")
+                logger.info("Using Lifespan from uvicorn.lifespan.lifespan with app and lifespan_on parameters")
+                return
+            except TypeError:
+                pass
+                
+            # Try with three parameters
+            try:
+                self.lifespan = Lifespan(self.config.app, "auto", logger)
+                logger.info("Using Lifespan from uvicorn.lifespan.lifespan with app, lifespan_on, and logger parameters")
+                return
+            except TypeError:
+                pass
+                
+        except (ImportError, AttributeError):
+            logger.debug("Could not import Lifespan from uvicorn.lifespan.lifespan")
+            
+        # Try Lifespan from uvicorn.lifespan (oldest versions)
+        try:
+            from uvicorn.lifespan import Lifespan
+            
+            # Try with app parameter
+            try:
+                self.lifespan = Lifespan(self.config.app)
+                logger.info("Using Lifespan from uvicorn.lifespan with app parameter")
+                return
+            except TypeError:
+                pass
+                
+            # Try with two parameters
+            try:
+                self.lifespan = Lifespan(self.config.app, "auto")
+                logger.info("Using Lifespan from uvicorn.lifespan with app and lifespan_on parameters")
+                return
+            except TypeError:
+                pass
+                
+            # Try with three parameters
+            try:
+                self.lifespan = Lifespan(self.config.app, "auto", logger)
+                logger.info("Using Lifespan from uvicorn.lifespan with app, lifespan_on, and logger parameters")
+                return
+            except TypeError:
+                pass
+                
+        except (ImportError, AttributeError):
+            logger.debug("Could not import Lifespan from uvicorn.lifespan")
+            
+        # Try LifespanState from uvicorn.lifespan.state (newest versions)
+        try:
+            from uvicorn.lifespan.state import LifespanState
+            
+            # Try with app parameter
+            try:
+                self.lifespan = LifespanState(self.config.app)
+                logger.info("Using LifespanState from uvicorn.lifespan.state with app parameter")
+                return
+            except TypeError:
+                pass
+                
+            # Try with logger parameter
+            try:
+                self.lifespan = LifespanState(self.config.app, logger=logger)
+                logger.info("Using LifespanState from uvicorn.lifespan.state with app and logger parameters")
+                return
+            except TypeError:
+                pass
+                
+        except (ImportError, AttributeError):
+            logger.debug("Could not import LifespanState from uvicorn.lifespan.state")
+            
+        # Fallback to NoopLifespan if all attempts fail
+        self.lifespan = NoopLifespan(self.config.app)
+        logger.warning("Using NoopLifespan - server may not handle startup/shutdown events properly")
 
 
 def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Optional[str] = None):
@@ -650,20 +775,32 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
         # Set up ngrok before starting server if requested
         public_url = None
         if use_ngrok:
+            # Set environment variable to indicate ngrok is enabled
+            os.environ["LOCALLAB_USE_NGROK"] = "true"
+            
             # Check if we have an ngrok auth token
             if not ngrok_auth_token and not os.environ.get("NGROK_AUTH_TOKEN"):
                 logger.error("Ngrok auth token is required for public access. Please set it in the configuration.")
                 logger.info("You can get a free token from: https://dashboard.ngrok.com/get-started/your-authtoken")
                 raise ValueError("Ngrok auth token is required for public access")
-            
+                
             logger.info(f"{Fore.CYAN}Setting up ngrok tunnel to port {port}...{Style.RESET_ALL}")
             public_url = setup_ngrok(port=port, auth_token=ngrok_auth_token or os.environ.get("NGROK_AUTH_TOKEN"))
             if public_url:
+                # Set environment variable with the ngrok URL
+                os.environ["LOCALLAB_NGROK_URL"] = public_url
+                
                 ngrok_section = f"\n{Fore.CYAN}┌────────────────────────── Ngrok Tunnel Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🚀 Ngrok Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
                 logger.info(ngrok_section)
                 print(ngrok_section)
             else:
                 logger.warning(f"{Fore.YELLOW}Failed to set up ngrok tunnel. Server will run locally on port {port}.{Style.RESET_ALL}")
+        else:
+            # Set environment variable to indicate ngrok is not enabled
+            os.environ["LOCALLAB_USE_NGROK"] = "false"
+        
+        # Set environment variable with the port
+        os.environ["LOCALLAB_PORT"] = str(port)
         
         # Server info section
         server_section = f"\n{Fore.CYAN}┌────────────────────────── Server Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🖥️ Local URL: {Fore.GREEN}http://localhost:{port}{Style.RESET_ALL}\n│  ⚙️ Status: {Fore.GREEN}Starting{Style.RESET_ALL}\n│  🔄 Model Loading: {Fore.YELLOW}In Progress{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"

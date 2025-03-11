@@ -5,6 +5,7 @@ ASCII art banners and UI elements for LocalLab
 from colorama import Fore, Style, init
 init(autoreset=True)
 from typing import Optional, Dict, Any, List
+import os
 
 
 def print_initializing_banner(version: str):
@@ -182,6 +183,24 @@ def print_system_instructions():
 
 def print_api_docs():
     """Print API documentation with examples"""
+    # Check if ngrok is enabled and get the public URL
+    # Get the port from environment or use default
+    port = os.environ.get("LOCALLAB_PORT", "8000")
+    
+    # Check if ngrok is enabled
+    use_ngrok = os.environ.get("LOCALLAB_USE_NGROK", "").lower() in ("true", "1", "yes")
+    
+    # Get the ngrok URL if available
+    ngrok_url = os.environ.get("LOCALLAB_NGROK_URL", "")
+    
+    # Determine the server URL to display in examples
+    if use_ngrok and ngrok_url:
+        server_url = ngrok_url
+        url_description = "ngrok public URL"
+    else:
+        server_url = f"http://localhost:{port}"
+        url_description = "local URL"
+    
     api_docs = f"""
 {Fore.CYAN}════════════════════════════════════ API Documentation ════════════════════════════════════{Style.RESET_ALL}
 
@@ -198,7 +217,7 @@ def print_api_docs():
     }}
 
   • Example:
-    curl -X POST "<server-ngrok-public-url>/generate" \\
+    curl -X POST "{server_url}/generate" \\
     -H "Content-Type: application/json" \\
     -d '{{"prompt": "Write a story about a dragon", "max_tokens": 100}}'
 
@@ -215,7 +234,7 @@ def print_api_docs():
     }}
 
   • Example:
-    curl -X POST "<server-ngrok-public-url>/chat" \\
+    curl -X POST "{server_url}/chat" \\
     -H "Content-Type: application/json" \\
     -d '{{"messages": [{{"role": "user", "content": "Hello, who are you?"}}]}}'
 
@@ -223,12 +242,12 @@ def print_api_docs():
 
 1️⃣ /models - List available models
   • GET
-  • Example: curl "<server-ngrok-public-url>/models"
+  • Example: curl "{server_url}/models"
 
 2️⃣ /models/load - Load a specific model
   • POST with JSON body: {{ "model_id": "microsoft/phi-2" }}
   • Example:
-    curl -X POST "<server-ngrok-public-url>/models/load" \\
+    curl -X POST "{server_url}/models/load" \\
     -H "Content-Type: application/json" \\
     -d '{{"model_id": "microsoft/phi-2"}}'
 
@@ -236,14 +255,14 @@ def print_api_docs():
 
 1️⃣ /system/info - Get system information
   • GET
-  • Example: curl "<server-ngrok-public-url>/system/info"
+  • Example: curl "{server_url}/system/info"
 
 2️⃣ /system/resources - Get detailed system resources
   • GET
-  • Example: curl "<server-ngrok-public-url>/system/resources"
+  • Example: curl "{server_url}/system/resources"
 
 3️⃣ /docs - Interactive API documentation (Swagger UI)
-  • Open in browser: <server-ngrok-public-url>/docs
+  • Open in browser: {server_url}/docs
 
 {Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
 """
