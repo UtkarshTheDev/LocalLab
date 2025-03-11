@@ -2,6 +2,31 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.18 - 2025-03-11
+
+### Fixed
+
+- Fixed import error: "cannot import name 'get_system_info' from 'locallab.utils.system'"
+- Added backward compatibility function for system information retrieval
+- Ensured proper display of system resources during server startup
+- Enhanced compatibility between UI components and system utilities
+- Improved error handling during server startup display
+- Added graceful error recovery for UI component failures
+- Ensured server continues to run even if display components fail
+- Enhanced robustness of startup process with comprehensive error handling
+- Added fallback mechanisms for all UI components to handle import errors
+- Improved system resource display with multiple fallback options
+- Enhanced model information display with graceful degradation
+- Ensured server can start even with missing or incompatible dependencies
+
+### Added
+
+- Added minimal mode fallback server for critical initialization failures
+- Implemented comprehensive error handling for configuration loading
+- Created fallback endpoints for basic server functionality
+- Added detailed error reporting in minimal mode
+- Enhanced server resilience with multi-level fallback mechanisms
+
 ## 0.4.17 - 2025-03-11
 
 ### Fixed

@@ -70,9 +70,26 @@ def print_running_banner(version: str):
 def print_system_resources():
     """Print system resources in a formatted box"""
     # Import here to avoid circular imports
-    from ..utils.system import get_system_info
+    try:
+        from ..utils.system import get_system_info
+        
+        resources = get_system_info()
+    except ImportError:
+        # Fallback if get_system_info is not available
+        try:
+            from ..utils.system import get_system_resources
+            resources = get_system_resources()
+        except ImportError:
+            # Ultimate fallback if neither function is available
+            import psutil
+            resources = {
+                'cpu_count': psutil.cpu_count(),
+                'cpu_usage': psutil.cpu_percent(),
+                'ram_gb': psutil.virtual_memory().total / (1024 * 1024 * 1024),
+                'gpu_available': False,
+                'gpu_info': []
+            }
     
-    resources = get_system_info()
     ram_gb = resources.get('ram_gb', 0)
     cpu_count = resources.get('cpu_count', 0)
     gpu_available = resources.get('gpu_available', False)
@@ -100,81 +117,49 @@ def print_system_resources():
 def print_model_info():
     """Print model information in a formatted box"""
     # Import here to avoid circular imports
-    from ..config import (
-        DEFAULT_MODEL,
-        ENABLE_QUANTIZATION,
-        QUANTIZATION_TYPE,
-        ENABLE_ATTENTION_SLICING,
-        ENABLE_FLASH_ATTENTION,
-        ENABLE_BETTERTRANSFORMER
-    )
-    from ..cli.config import get_config_value
-    import os
-    
     try:
-        import torch
-        torch_available = True
-    except ImportError:
-        torch_available = False
-    
-    # Get model settings from config system
-    model_id = os.environ.get("HUGGINGFACE_MODEL", DEFAULT_MODEL)
-    
-    # Get optimization settings from config system
-    enable_quantization = get_config_value('enable_quantization', ENABLE_QUANTIZATION)
-    if isinstance(enable_quantization, str):
-        enable_quantization = enable_quantization.lower() not in ('false', '0', 'none', '')
-    
-    quantization_type = get_config_value('quantization_type', QUANTIZATION_TYPE)
-    
-    enable_attention_slicing = get_config_value('enable_attention_slicing', ENABLE_ATTENTION_SLICING)
-    if isinstance(enable_attention_slicing, str):
-        enable_attention_slicing = enable_attention_slicing.lower() not in ('false', '0', 'none', '')
-    
-    enable_flash_attention = get_config_value('enable_flash_attention', ENABLE_FLASH_ATTENTION)
-    if isinstance(enable_flash_attention, str):
-        enable_flash_attention = enable_flash_attention.lower() not in ('false', '0', 'none', '')
-    
-    enable_better_transformer = get_config_value('enable_better_transformer', ENABLE_BETTERTRANSFORMER)
-    if isinstance(enable_better_transformer, str):
-        enable_better_transformer = enable_better_transformer.lower() not in ('false', '0', 'none', '')
-    
-    # Print model settings
-    device = "cpu"
-    if torch_available and torch.cuda.is_available():
-        device = f"cuda:{torch.cuda.current_device()}"
-    
-    model_info = {
-        "model_id": model_id,
-        "model_name": model_id.split("/")[-1],
-        "parameters": "Unknown (not loaded yet)",
-        "device": device,
-        "quantization": quantization_type if enable_quantization else "None",
-        "optimizations": {
-            "attention_slicing": enable_attention_slicing,
-            "flash_attention": enable_flash_attention,
-            "better_transformer": enable_better_transformer
-        }
-    }
-    
-    # Print model info
-    model_info_text = f"""
-{Fore.CYAN}════════════════════════════════════ Model Configuration ═══════════════════════════════════{Style.RESET_ALL}
+        from ..config import get_env_var
+        from ..model_manager import ModelManager
+        
+        # Get model information
+        model_id = get_env_var("HUGGINGFACE_MODEL", default="microsoft/phi-2")
+        
+        # Get optimization settings
+        enable_quantization = get_env_var("LOCALLAB_ENABLE_QUANTIZATION", default="false").lower() == "true"
+        quantization_type = get_env_var("LOCALLAB_QUANTIZATION_TYPE", default="int8")
+        enable_attention_slicing = get_env_var("LOCALLAB_ENABLE_ATTENTION_SLICING", default="false").lower() == "true"
+        enable_flash_attention = get_env_var("LOCALLAB_ENABLE_FLASH_ATTENTION", default="false").lower() == "true"
+        enable_better_transformer = get_env_var("LOCALLAB_ENABLE_BETTERTRANSFORMER", default="false").lower() == "true"
+        enable_cpu_offloading = get_env_var("LOCALLAB_ENABLE_CPU_OFFLOADING", default="false").lower() == "true"
+        
+        # Format model information
+        model_info = f"""
+{Fore.CYAN}════════════════════════════════════ Model Configuration ════════════════════════════════════{Style.RESET_ALL}
 
-🤖 Model: {Fore.GREEN}{model_info['model_id']}{Style.RESET_ALL}
-📊 Parameters: {Fore.GREEN}{model_info['parameters']}{Style.RESET_ALL}
-💾 Device: {Fore.GREEN}{model_info['device']}{Style.RESET_ALL}
-⚙️ Quantization: {Fore.GREEN}{model_info['quantization']}{Style.RESET_ALL}
+🤖 Model: {Fore.GREEN}{model_id}{Style.RESET_ALL}
 
-🔧 Optimizations:
-   ├─ Attention Slicing: {Fore.GREEN if model_info['optimizations']['attention_slicing'] else Fore.RED}{model_info['optimizations']['attention_slicing']}{Style.RESET_ALL}
-   ├─ Flash Attention: {Fore.GREEN if model_info['optimizations']['flash_attention'] else Fore.RED}{model_info['optimizations']['flash_attention']}{Style.RESET_ALL}
-   └─ BetterTransformer: {Fore.GREEN if model_info['optimizations']['better_transformer'] else Fore.RED}{model_info['optimizations']['better_transformer']}{Style.RESET_ALL}
+⚙️ Optimizations:
+  • Quantization: {Fore.GREEN if enable_quantization else Fore.RED}{enable_quantization}{Style.RESET_ALL} {f"({quantization_type})" if enable_quantization else ""}
+  • Attention Slicing: {Fore.GREEN if enable_attention_slicing else Fore.RED}{enable_attention_slicing}{Style.RESET_ALL}
+  • Flash Attention: {Fore.GREEN if enable_flash_attention else Fore.RED}{enable_flash_attention}{Style.RESET_ALL}
+  • BetterTransformer: {Fore.GREEN if enable_better_transformer else Fore.RED}{enable_better_transformer}{Style.RESET_ALL}
+  • CPU Offloading: {Fore.GREEN if enable_cpu_offloading else Fore.RED}{enable_cpu_offloading}{Style.RESET_ALL}
 
-{Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
+{Fore.CYAN}═══════════════════════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
 """
-    print(model_info_text, flush=True)
-    return model_info_text
+    except ImportError as e:
+        # Fallback if imports fail
+        model_info = f"""
+{Fore.CYAN}════════════════════════════════════ Model Configuration ════════════════════════════════════{Style.RESET_ALL}
+
+🤖 Model: {Fore.YELLOW}Default model will be used{Style.RESET_ALL}
+
+⚙️ Optimizations: {Fore.YELLOW}Using default settings{Style.RESET_ALL}
+
+{Fore.CYAN}═══════════════════════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
+"""
+    
+    print(model_info, flush=True)
 
 
 def print_system_instructions():

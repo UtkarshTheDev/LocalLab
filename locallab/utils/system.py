@@ -240,4 +240,10 @@ def get_memory_info() -> Dict[str, Any]:
         "available": mem.available,
         "used": mem.used,
         "percent": mem.percent
-    } 
+    }
+
+
+# Add this function for backward compatibility
+def get_system_info() -> Dict[str, Any]:
+    """Get system resource information (alias for get_system_resources)"""
+    return get_system_resources() 
