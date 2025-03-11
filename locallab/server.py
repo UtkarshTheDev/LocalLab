@@ -188,7 +188,22 @@ def signal_handler(signum, frame):
     
     # Exit after a short delay to allow cleanup
     def delayed_exit():
-        time.sleep(2)  # Give some time for cleanup
+        # Give more time for cleanup - increased from 2 to 5 seconds
+        # This allows the server to complete its shutdown process
+        time.sleep(5)
+        
+        # Check if we need to force exit
+        try:
+            # Import here to avoid circular imports
+            from .core.app import app
+            if hasattr(app, "state") and hasattr(app.state, "server") and app.state.server:
+                logger.debug("Server still running after timeout, forcing exit")
+            else:
+                logger.debug("Server shutdown completed successfully")
+        except Exception:
+            pass
+        
+        # Force exit if we're still running
         sys.exit(0)
         
     threading.Thread(target=delayed_exit, daemon=True).start()
@@ -479,7 +494,16 @@ class SimpleTCPServer:
 class ServerWithCallback(uvicorn.Server):
     def install_signal_handlers(self):
         # Override to prevent uvicorn from installing its own handlers
-        pass
+        # but still handle the should_exit flag for clean shutdown
+        
+        def handle_exit(signum, frame):
+            self.should_exit = True
+            logger.debug(f"Signal {signum} received in ServerWithCallback, setting should_exit=True")
+        
+        # Register our own minimal signal handlers that just set should_exit
+        # This allows the main process signal handler to handle the actual shutdown
+        signal.signal(signal.SIGINT, handle_exit)
+        signal.signal(signal.SIGTERM, handle_exit)
     
     async def startup(self, sockets=None):
         """Override the startup method to add error handling for lifespan startup."""
@@ -536,34 +560,50 @@ class ServerWithCallback(uvicorn.Server):
         try:
             # Use asyncio.sleep to keep the server running
             while not self.should_exit:
-                await asyncio.sleep(0.1)
+                # Check more frequently to respond to shutdown signals faster
+                await asyncio.sleep(0.05)
+                
+                # Check if we've received a shutdown signal
+                if self.should_exit:
+                    logger.debug("Shutdown signal detected in main_loop")
+                    break
         except Exception as e:
             logger.error(f"Error in main loop: {str(e)}")
             logger.debug(f"Main loop error details: {traceback.format_exc()}")
             # Set should_exit to True to initiate shutdown
             self.should_exit = True
+        
+        logger.debug("Exiting main_loop")
     
     async def shutdown(self, sockets=None):
         """Override the shutdown method to add error handling for lifespan shutdown."""
+        logger.debug("Starting server shutdown process")
+        
+        # First, shut down all servers
         if self.servers:
             for server in self.servers:
                 try:
-                    # Check if the server has a shutdown method
-                    if hasattr(server, 'shutdown'):
-                        await server.shutdown()
-                    else:
-                        logger.warning(f"Server object {type(server)} has no shutdown method, skipping")
+                    server.close()
+                    await server.wait_closed()
+                    logger.debug("Server closed successfully")
                 except Exception as e:
-                    logger.error(f"Error shutting down server: {str(e)}")
-                    logger.debug(f"Server shutdown error details: {traceback.format_exc()}")
+                    logger.error(f"Error closing server: {str(e)}")
+                    logger.debug(f"Server close error details: {traceback.format_exc()}")
         
+        # Then, shut down the lifespan
         if self.lifespan is not None:
             try:
                 await self.lifespan.shutdown()
+                logger.debug("Lifespan shutdown completed")
             except Exception as e:
                 logger.error(f"Error during lifespan shutdown: {str(e)}")
                 logger.debug(f"Lifespan shutdown error details: {traceback.format_exc()}")
-                logger.warning("Continuing shutdown despite lifespan error")
+        
+        # Clear all references to help with garbage collection
+        self.servers = []
+        self.lifespan = None
+        
+        logger.debug("Server shutdown process completed")
     
     async def serve(self, sockets=None):
         self.config.setup_event_loop()

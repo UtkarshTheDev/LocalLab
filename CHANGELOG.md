@@ -2,6 +2,19 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.21 - 2025-03-12
+
+### Fixed
+
+- Fixed critical issue with server not shutting down properly when Ctrl+C is pressed
+- Improved signal handling in ServerWithCallback class to ensure clean shutdown
+- Enhanced main_loop method to respond faster to shutdown signals
+- Implemented more robust server shutdown process with proper resource cleanup
+- Added additional logging during shutdown to help diagnose issues
+- Increased shutdown timeout to allow proper cleanup of all resources
+- Fixed multiple shutdown attempts when Ctrl+C is pressed repeatedly
+- Ensured all server components are properly closed during shutdown
+
 ## 0.4.20 - 2025-03-12
 
 ### Fixed
