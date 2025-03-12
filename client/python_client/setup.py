@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name="locallab-client",
     version="1.0.1",
-    author="Your Name",
+    author="Utkarsh Tiwari",
     author_email="your.email@example.com",
     description="Official Python client for LocalLab - A local LLM server",
     long_description=long_description,
@@ -50,4 +50,4 @@ setup(
         "Documentation": "https://github.com/yourusername/locallab-client#readme",
         "Source Code": "https://github.com/yourusername/locallab-client",
     },
-) 
+)

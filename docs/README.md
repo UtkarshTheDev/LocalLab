@@ -133,7 +133,7 @@ stateDiagram-v2
 - Use the navigation above to find specific topics
 - Check [FAQ](./guides/faq.md) for quick answers
 - Visit [Troubleshooting](./guides/troubleshooting.md) for common issues
-- Open an [Issue](https://github.com/Developer-Utkarsh/LocalLab/issues) for support
+- Open an [Issue](https://github.com/UtkarshTheDev/LocalLab/issues) for support
 
 ## 🌟 Features
 
@@ -146,8 +146,8 @@ stateDiagram-v2
 
 ## 📚 Additional Resources
 
-- [GitHub Repository](https://github.com/Developer-Utkarsh/LocalLab)
-- [Community Forum](https://github.com/Developer-Utkarsh/LocalLab/discussions)
+- [GitHub Repository](https://github.com/UtkarshTheDev/LocalLab)
+- [Community Forum](https://github.com/UtkarshTheDev/LocalLab/discussions)
 - [Contributing Guidelines](./guides/contributing.md)
 
 ---

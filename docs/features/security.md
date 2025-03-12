@@ -33,5 +33,4 @@ You may also enable compression and other settings to guard against overuse of r
 export LOCALLAB_ENABLE_COMPRESSION="true"
 ```
 
-For more advanced security configurations (such as API key based authentication), please explore further customizations or open an issue on the [LocalLab GitHub repository](https://github.com/Developer-Utkarsh/LocalLab/issues).
-
+For more advanced security configurations (such as API key based authentication), please explore further customizations or open an issue on the [LocalLab GitHub repository](https://github.com/UtkarshTheDev/LocalLab/issues).

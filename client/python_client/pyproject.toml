@@ -42,10 +42,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Developer-Utkarsh/LocalLab"
-Documentation = "https://github.com/Developer-Utkarsh/LocalLab#readme"
-Repository = "https://github.com/Developer-Utkarsh/LocalLab.git"
-Issues = "https://github.com/Developer-Utkarsh/LocalLab/issues"
+Homepage = "https://github.com/UtkarshTheDev/LocalLab"
+Documentation = "https://github.com/UtkarshTheDev/LocalLab#readme"
+Repository = "https://github.com/UtkarshTheDev/LocalLab.git"
+Issues = "https://github.com/UtkarshTheDev/LocalLab/issues"
 
 [tool.black]
 line-length = 100

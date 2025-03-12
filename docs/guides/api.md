@@ -9,6 +9,7 @@
 Generate text using the loaded model.
 
 **Request Body:**
+
 ```json
 {
   "prompt": "string",
@@ -21,6 +22,7 @@ Generate text using the loaded model.
 ```
 
 **Response:**
+
 ```json
 {
   "response": "string",
@@ -33,6 +35,7 @@ Generate text using the loaded model.
 ```
 
 **Error Responses:**
+
 - `400 Bad Request`: Invalid parameters
 - `413 Payload Too Large`: Input too long
 - `429 Too Many Requests`: Rate limit exceeded
@@ -45,6 +48,7 @@ Generate text using the loaded model.
 Chat completion endpoint similar to OpenAI's API.
 
 **Request Body:**
+
 ```json
 {
   "messages": [
@@ -62,6 +66,7 @@ Chat completion endpoint similar to OpenAI's API.
 ```
 
 **Response:**
+
 ```json
 {
   "choices": [
@@ -84,9 +89,11 @@ Chat completion endpoint similar to OpenAI's API.
 ### Model Management
 
 #### POST `/models/load`
+
 Load a specific model.
 
 **Request Body:**
+
 ```json
 {
   "model_id": "string"
@@ -94,28 +101,34 @@ Load a specific model.
 ```
 
 #### GET `/models/current`
+
 Get information about the currently loaded model.
 
 #### GET `/models/available`
+
 List all available models in the registry.
 
 ### System Information
 
 #### GET `/system/info`
+
 Get detailed system information.
 
 #### GET `/health`
+
 Check the health status of the server.
 
 ## Error Handling
 
 All endpoints return appropriate HTTP status codes:
+
 - `200`: Success
 - `400`: Bad Request
 - `404`: Not Found
 - `500`: Internal Server Error
 
 Error responses include a detail message:
+
 ```json
 {
   "detail": "Error message describing what went wrong"
@@ -123,15 +136,18 @@ Error responses include a detail message:
 ```
 
 ## Rate Limiting
+
 - 60 requests per minute
 - Burst size of 10 requests
 
 ## Related Documentation
+
 - [Getting Started](./getting-started.md)
 - [Features Guide](./features/README.md)
 - [Local Deployment](./local_deployment.md)
 - [Troubleshooting Guide](./TROUBLESHOOTING.md)
 
 ---
+
 Made with ❤️ by Utkarsh Tiwari  
-GitHub: [Developer-Utkarsh](https://github.com/Developer-Utkarsh) | Twitter: [@UtkarshTheDev](https://twitter.com/UtkarshTheDev) | LinkedIn: [utkarshthedev](https://linkedin.com/in/utkarshthedev)
+GitHub: [UtkarshTheDev](https://github.com/UtkarshTheDev) | Twitter: [@UtkarshTheDev](https://twitter.com/UtkarshTheDev) | LinkedIn: [utkarshthedev](https://linkedin.com/in/utkarshthedev)

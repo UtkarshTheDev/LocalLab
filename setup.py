@@ -48,7 +48,7 @@ setup(
     description="LocalLab: Run language models locally or in Google Collab with a friendly API",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/Developer-Utkarsh/LocalLab",
+    url="https://github.com/UtkarshTheDev/LocalLab",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",

@@ -1,9 +1,9 @@
 # 🚀 LocalLab: Run AI Models Easily
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/Developer-Utkarsh/LocalLab/publish.yml?style=flat-square)](https://github.com/Developer-Utkarsh/LocalLab/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/UtkarshTheDev/LocalLab/publish.yml?style=flat-square)](https://github.com/UtkarshTheDev/LocalLab/actions)
 [![LocalLab Version](https://img.shields.io/pypi/v/locallab.svg?style=flat-square)](https://pypi.org/project/locallab/)
 [![Python Version](https://img.shields.io/pypi/pyversions/locallab.svg?style=flat-square)](https://pypi.org/project/locallab/)
-[![License](https://img.shields.io/github/license/Developer-Utkarsh/LocalLab.svg?style=flat-square)](https://github.com/Developer-Utkarsh/LocalLab/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/UtkarshTheDev/LocalLab.svg?style=flat-square)](https://github.com/UtkarshTheDev/LocalLab/blob/main/LICENSE)
 
 LocalLab empowers users to run any Hugging Face AI model locally or on Google Colab with minimal setup required. It automatically configures an API using ngrok, enabling seamless integration into applications from any location. Designed for simplicity, LocalLab makes advanced AI accessible to all, regardless of technical expertise. With built-in model management, performance optimizations, and system monitoring, it ensures efficient and reliable AI operations for developers, researchers, and enthusiasts alike.
 
@@ -78,15 +78,15 @@ sequenceDiagram
 
 ## Documentation & Usage Guides
 
-For full documentation and detailed guides, please visit our [documentation page](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/README.md).
+For full documentation and detailed guides, please visit our [documentation page](https://github.com/UtkarshTheDev/LocalLab/blob/main/docs/README.md).
 
-- [Getting Started Guide](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/guides/getting-started.md)
-- [CLI Guide](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/guides/cli.md)
-- [Python Client](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/clients/python/README.md)
-- [Node.js Client](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/clients/nodejs/README.md)
-- [Client Comparison](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/clients/comparison.md)
-- [Google Colab Guide](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/colab/README.md)
-- [API Reference](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/guides/api.md)
+- [Getting Started Guide](https://github.com/UtkarshTheDev/LocalLab/blob/main/docs/guides/getting-started.md)
+- [CLI Guide](https://github.com/UtkarshTheDev/LocalLab/blob/main/docs/guides/cli.md)
+- [Python Client](https://github.com/UtkarshTheDev/LocalLab/blob/main/docs/clients/python/README.md)
+- [Node.js Client](https://github.com/UtkarshTheDev/LocalLab/blob/main/docs/clients/nodejs/README.md)
+- [Client Comparison](https://github.com/UtkarshTheDev/LocalLab/blob/main/docs/clients/comparison.md)
+- [Google Colab Guide](https://github.com/UtkarshTheDev/LocalLab/blob/main/docs/colab/README.md)
+- [API Reference](https://github.com/UtkarshTheDev/LocalLab/blob/main/docs/guides/api.md)
 
 ## Get Started
 
@@ -180,9 +180,9 @@ locallab info
 
 ## Join the Community
 
-- Report issues on our [GitHub Issues](https://github.com/Developer-Utkarsh/LocalLab/issues).
-- Participate in discussions on our [Community Forum](https://github.com/Developer-Utkarsh/LocalLab/discussions).
-- Learn how to contribute by reading our [Contributing Guidelines](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/guides/contributing.md).
+- Report issues on our [GitHub Issues](https://github.com/UtkarshTheDev/LocalLab/issues).
+- Participate in discussions on our [Community Forum](https://github.com/UtkarshTheDev/LocalLab/discussions).
+- Learn how to contribute by reading our [Contributing Guidelines](https://github.com/UtkarshTheDev/LocalLab/blob/main/docs/guides/contributing.md).
 
 ---
 

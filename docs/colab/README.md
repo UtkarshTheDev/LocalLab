@@ -10,7 +10,7 @@ The fastest way to get started is to use our [Interactive Colab Guide](./localla
 - System monitoring
 - Troubleshooting help
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Developer-Utkarsh/LocalLab/blob/main/docs/colab/locallab_colab_guide.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/UtkarshTheDev/LocalLab/blob/main/docs/colab/locallab_colab_guide.ipynb)
 
 ## Features Available in Colab
 
@@ -36,7 +36,7 @@ The fastest way to get started is to use our [Interactive Colab Guide](./localla
 
 - Check our [Troubleshooting Guide](./troubleshooting.md)
 - Visit our [FAQ](./faq.md)
-- Open an [Issue](https://github.com/Developer-Utkarsh/LocalLab/issues)
+- Open an [Issue](https://github.com/UtkarshTheDev/LocalLab/issues)
 
 ```mermaid
 graph TD

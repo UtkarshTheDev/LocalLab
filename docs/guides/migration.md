@@ -139,4 +139,4 @@ If you encounter any issues during migration, please:
 
 1. Check the full [Logger Documentation](../server/logger.md)
 2. Review the [API Reference](api.md)
-3. Open an issue on our [GitHub repository](https://github.com/Developer-Utkarsh/LocalLab/issues)
+3. Open an issue on our [GitHub repository](https://github.com/UtkarshTheDev/LocalLab/issues)

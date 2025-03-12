@@ -153,4 +153,4 @@ responses = await client.batch_generate([
 
 - See [FAQ](./faq.md)
 - Visit [Troubleshooting](./troubleshooting.md)
-- Join our [Community](https://github.com/Developer-Utkarsh/LocalLab/discussions)
+- Join our [Community](https://github.com/UtkarshTheDev/LocalLab/discussions)

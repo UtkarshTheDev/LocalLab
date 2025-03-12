@@ -13,16 +13,19 @@
 ## Getting Started
 
 1. **Fork the Repository**
-   - Visit [LocalLab on GitHub](https://github.com/Developer-Utkarsh/LocalLab)
+
+   - Visit [LocalLab on GitHub](https://github.com/UtkarshTheDev/LocalLab)
    - Click the "Fork" button
 
 2. **Clone Your Fork**
+
    ```bash
    git clone https://github.com/your-username/LocalLab.git
    cd LocalLab
    ```
 
 3. **Set Up Development Environment**
+
    ```bash
    # Create virtual environment
    python -m venv venv
@@ -49,6 +52,7 @@ pre-commit install
 ## Code Style
 
 We follow these guidelines:
+
 - PEP 8 for Python code style
 - Type hints for function arguments and returns
 - Docstrings for all public functions
@@ -56,6 +60,7 @@ We follow these guidelines:
 - Maximum line length of 100 characters
 
 Example:
+
 ```python
 from typing import List, Optional
 
@@ -81,16 +86,19 @@ def process_text(
 ## Making Changes
 
 1. **Create a Branch**
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
 
 2. **Make Your Changes**
+
    - Follow code style guidelines
    - Add tests for new features
    - Update documentation
 
 3. **Run Tests**
+
    ```bash
    # Run all tests
    pytest
@@ -142,6 +150,7 @@ pytest --cov=locallab --cov-report=html
 - Update relevant documentation files
 
 Example:
+
 ```python
 class ModelManager:
     """Manages AI model loading and inference.
@@ -171,24 +180,26 @@ make html
 ## Submitting Changes
 
 1. **Commit Your Changes**
+
    ```bash
    git add .
    git commit -m "feat: add new feature"
    ```
 
 2. **Push to Your Fork**
+
    ```bash
    git push origin feature/your-feature-name
    ```
 
 3. **Create Pull Request**
-   - Go to the [LocalLab repository](https://github.com/Developer-Utkarsh/LocalLab)
+   - Go to the [LocalLab repository](https://github.com/UtkarshTheDev/LocalLab)
    - Click "New Pull Request"
    - Select your branch
    - Fill in the PR template
 
 ## Need Help?
 
-- Check our [Troubleshooting Guide](https://github.com/Developer-Utkarsh/LocalLab/blob/main/docs/troubleshooting.md)
+- Check our [Troubleshooting Guide](https://github.com/UtkarshTheDev/LocalLab/blob/main/docs/troubleshooting.md)
 - Join our [Discord Community](https://discord.gg/locallab)
-- Open an [Issue](https://github.com/Developer-Utkarsh/LocalLab/issues)
+- Open an [Issue](https://github.com/UtkarshTheDev/LocalLab/issues)
