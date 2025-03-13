@@ -97,17 +97,18 @@ MODEL_REGISTRY = {
         "description": "Microsoft's 2.7B parameter model",
         "size": "2.7B",
         "requirements": {
-            "min_ram": 8,  # GB
-            "min_vram": 6  # GB if using GPU
-        }
+            "min_ram": 6,  # Reduced from 8GB
+            "min_vram": 4  # Reduced from 6GB
+        },
+        "fallback": "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
     },
     "TinyLlama/TinyLlama-1.1B-Chat-v1.0": {
         "name": "TinyLlama Chat",
         "description": "Lightweight 1.1B chat model",
         "size": "1.1B",
         "requirements": {
-            "min_ram": 4,
-            "min_vram": 3
+            "min_ram": 3,  # Reduced from 4GB
+            "min_vram": 2  # Reduced from 3GB
         }
     }
 }
@@ -124,20 +125,37 @@ def can_run_model(model_id: str) -> bool:
     model = MODEL_REGISTRY[model_id]
     requirements = model["requirements"]
 
+    # Get available memory with a buffer
+    available_ram = (psutil.virtual_memory().available / (1024 ** 3)) * 0.8  # 80% of available RAM in GB
+    
+    # Adjust requirements based on optimizations
+    if get_env_var("LOCALLAB_ENABLE_QUANTIZATION", default=False, var_type=bool):
+        # Quantization reduces memory usage
+        requirements["min_ram"] *= 0.5
+        if "min_vram" in requirements:
+            requirements["min_vram"] *= 0.5
+    
+    if get_env_var("LOCALLAB_ENABLE_CPU_OFFLOADING", default=False, var_type=bool):
+        # CPU offloading allows running with less RAM
+        requirements["min_ram"] *= 0.7
+    
     # Check RAM
-    available_ram = psutil.virtual_memory().available / (1024 ** 3)  # Convert to GB
     if available_ram < requirements["min_ram"]:
+        logger.warning(f"Insufficient RAM. Available: {available_ram:.1f}GB, Required: {requirements['min_ram']}GB")
+        logger.info("Consider enabling quantization or CPU offloading to reduce memory usage")
         return False
 
     # Check VRAM if GPU available
-    if torch.cuda.is_available():
+    if torch.cuda.is_available() and "min_vram" in requirements:
         try:
             import pynvml
             pynvml.nvmlInit()
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
             info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-            available_vram = info.free / (1024 ** 3)  # Convert to GB
+            available_vram = (info.free / (1024 ** 3)) * 0.8  # 80% of available VRAM in GB
             if available_vram < requirements["min_vram"]:
+                logger.warning(f"Insufficient VRAM. Available: {available_vram:.1f}GB, Required: {requirements['min_vram']}GB")
+                logger.info("Consider enabling quantization or using CPU offloading")
                 return False
         except:
             pass

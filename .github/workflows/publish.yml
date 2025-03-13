@@ -4,10 +4,19 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'locallab/**'
+      - 'client/python_client/**'
+      - 'setup.py'
+      - 'client/python_client/setup.py'
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: ['locallab', 'client/python_client']
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -23,10 +32,28 @@ jobs:
           pip install build twine
 
       - name: Build package
-        run: python -m build --sdist --wheel
+        run: |
+          cd ${{ matrix.package }}
+          python -m build --sdist --wheel
 
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@v1.4.2
         with:
+          packages_dir: ${{ matrix.package }}/dist/
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: Release v${{ github.run_number }}
+          body: |
+            Release v${{ github.run_number }}
+            
+            Changes in this release:
+            - See CHANGELOG.md for details
+          draft: false
+          prerelease: false

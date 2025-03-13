@@ -5,13 +5,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="locallab-client",
-    version="1.0.1",
+    version="1.1.0",
     author="Utkarsh Tiwari",
-    author_email="your.email@example.com",
+    author_email="utkarshweb2023@gmail.com",
     description="Official Python client for LocalLab - A local LLM server",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/locallab-client",
+    url="https://github.com/UtkarshTheDev/LocalLab",
     packages=find_packages(include=["locallab", "locallab.*"]),
     classifiers=[
         "Development Status :: 5 - Production/Stable",
@@ -29,8 +29,7 @@ setup(
     ],
     python_requires=">=3.7",
     install_requires=[
-        "requests>=2.25.0",
-        "websockets>=10.0",
+        "aiohttp>=3.8.0",
         "typing-extensions>=4.0.0",
         "pydantic>=2.0.0",
     ],
@@ -46,8 +45,8 @@ setup(
         ],
     },
     project_urls={
-        "Bug Tracker": "https://github.com/yourusername/locallab-client/issues",
-        "Documentation": "https://github.com/yourusername/locallab-client#readme",
-        "Source Code": "https://github.com/yourusername/locallab-client",
+        "Bug Tracker": "https://github.com/UtkarshTheDev/LocalLab/issues",
+        "Documentation": "https://github.com/UtkarshTheDev/LocalLab#readme",
+        "Source Code": "https://github.com/UtkarshTheDev/LocalLab",
     },
 )

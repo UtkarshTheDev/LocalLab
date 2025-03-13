@@ -1,155 +1,134 @@
-# 🚀 LocalLab Documentation
+# 📚 LocalLab Documentation Guide
 
-Welcome to the LocalLab documentation! This guide is your one-stop resource for everything you need to get started, deploy, and maximize the capabilities of LocalLab.
+Welcome! This guide will help you navigate LocalLab's documentation and get the most out of the package.
 
-## Overview
+## 🎯 How to Use This Documentation
 
-LocalLab empowers you to run AI inference servers either locally or through Google Colab. With advanced model management, performance optimizations, and robust system monitoring, LocalLab is built to deliver efficient, on-demand AI capabilities.
+### 1. Start Here First
 
-> **Note**: For the latest changes and updates, please see the [CHANGELOG.md](../CHANGELOG.md) file.
+If you're new to LocalLab, follow this path:
 
-## Visual Overview
+1. **[Getting Started Guide](./guides/getting-started.md)**
+   - Basic installation and setup
+   - Your first AI interaction
+   - Understanding key concepts
 
-### Architecture Diagram
+2. **[CLI Guide](./guides/cli.md)**
+   - Running the server
+   - Configuration options
+   - Common commands
 
-This diagram illustrates the overall architecture of LocalLab:
+3. **[Basic Examples](./guides/examples.md)**
+   - Simple text generation
+   - Chat conversations
+   - Batch processing
 
-```mermaid
-graph TD;
-    A["User"] --> B["LocalLab Client (Python/Node.js)"];
-    B --> C["LocalLab Server"];
-    C --> D["Model Manager"];
-    D --> E["Hugging Face Models"];
-    C --> F["Optimizations"];
-    C --> G["Resource Monitoring"];
-```
+### 2. Choose Your Learning Path
 
-### Google Colab Workflow
+#### For Application Developers
+1. **[Python Client Guide](./clients/python/README.md)**
+   - Client setup
+   - Basic operations
+   - Error handling
 
-When using Google Colab, LocalLab leverages ngrok to provide public access:
+2. **[API Reference](./guides/api.md)**
+   - All available endpoints
+   - Request/response formats
+   - Parameters and options
 
-```mermaid
-sequenceDiagram
-    participant U as User (Colab)
-    participant S as LocalLab Server
-    participant N as Ngrok Tunnel
-    U->>S: Execute start_server(ngrok=True)
-    S->>N: Establish public tunnel
-    N->>U: Provide public URL
-    U->>S: Connect LocalLab Client via public URL
-```
+3. **[Advanced Features](./guides/advanced.md)**
+   - Streaming responses
+   - Batch processing
+   - Custom models
 
-## 📚 Documentation Structure
+#### For ML Engineers
+1. **[Model Management](./features/models.md)**
+   - Loading models
+   - Memory optimization
+   - Custom model support
+
+2. **[Performance Guide](./features/performance.md)**
+   - Resource optimization
+   - GPU utilization
+   - Memory management
+
+### 3. When You Need Help
+
+1. **[FAQ](./guides/faq.md)**
+   - Common questions
+   - Quick solutions
+   - Best practices
+
+2. **[Troubleshooting](./guides/troubleshooting.md)**
+   - Error solutions
+   - Common issues
+   - Debug tips
+
+## 📂 Documentation Structure
 
 ```
 docs/
-├── guides/           # Start here for comprehensive guides
-│   ├── getting-started.md  # Begin your journey
-│   ├── cli.md             # Command-line interface guide
-│   ├── api.md             # API documentation
+├── guides/           # Core guides
+│   ├── getting-started.md  # Start here
+│   ├── cli.md             # Command line usage
+│   ├── api.md             # API reference
+│   ├── examples.md        # Code examples
 │   ├── faq.md            # Common questions
-│   ├── troubleshooting.md # Solve common issues
-│   ├── advanced.md       # Advanced usage
-│   └── contributing.md   # Contribution guidelines
+│   └── troubleshooting.md # Problem solving
 │
-├── clients/          # Client library documentation
-│   ├── python/      # Python client guide
-│   ├── nodejs/      # Node.js client guide
-│   └── comparison.md # Compare client features
+├── clients/          # Client libraries
+│   ├── python/      # Python client docs
+│   └── nodejs/      # Node.js client docs
 │
-├── deployment/       # Deployment guides
-│   ├── local.md     # Local deployment
-│   └── production.md # Production setup
+├── features/        # Feature documentation
+│   ├── models.md    # Model management
+│   └── performance.md # Optimization guide
 │
-├── colab/           # Google Colab integration
-│   └── guide.ipynb  # Interactive notebook
-│
-└── features/        # Feature documentation
-    ├── models.md    # Model management
-    └── performance.md # Performance guide
+└── deployment/      # Deployment guides
+    ├── local.md     # Local setup
+    └── colab.md     # Google Colab setup
 ```
 
-## 🚀 Quick Navigation
+## 🚀 Quick Links
 
-### For New Users
+### Getting Started
+- [Installation Guide](./guides/getting-started.md#installation)
+- [First Steps](./guides/getting-started.md#first-steps)
+- [Basic Examples](./guides/examples.md)
 
-1. Start with our [Getting Started Guide](./guides/getting-started.md)
-2. Explore the [CLI Guide](./guides/cli.md) for interactive setup
-3. Choose your client: [Python](./clients/python/README.md) or [Node.js](./clients/nodejs/README.md)
-4. Pick your deployment: [Local](./deployment/local.md) or [Google Colab](./colab/README.md)
+### Development
+- [Python Client](./clients/python/README.md)
+- [Node.js Client](./clients/nodejs/README.md)
+- [API Reference](./guides/api.md)
 
-### Deployment Decision Guide
-
-```mermaid
-graph TD
-    A[Start] --> B{Have GPU?}
-    B -->|Yes| C[Local Deployment]
-    B -->|No| D{Need GPU?}
-    D -->|Yes| E[Google Colab]
-    D -->|No| F{RAM > 8GB?}
-    F -->|Yes| C
-    F -->|No| E
-    C --> G[Follow Local Guide]
-    E --> H[Follow Colab Guide]
-```
-
-### Model Loading States
-
-```mermaid
-stateDiagram-v2
-    [*] --> Initializing
-    Initializing --> Loading
-    Loading --> Optimizing: Resource Check
-    Loading --> Ready: Direct Load
-    Optimizing --> Ready
-    Ready --> Processing
-    Processing --> Ready
-    Ready --> Unloading: Timeout/Memory
-    Unloading --> [*]
-```
-
-## 📖 How to Read This Documentation
-
-1. **New Users**
-
-   - Start with [Getting Started](./guides/getting-started.md)
-   - Explore the [CLI Guide](./guides/cli.md) for interactive setup
-   - Check [FAQ](./guides/faq.md) for common questions
-   - Use [Troubleshooting](./guides/troubleshooting.md) when stuck
-
-2. **Developers**
-
-   - Review [API Reference](./guides/api.md)
-   - Choose your [Client Library](./clients/README.md)
-   - Follow [Deployment Guide](./deployment/README.md)
-
-3. **Advanced Users**
-   - Explore [Advanced Features](./guides/advanced.md)
-   - Learn about [Performance](./features/performance.md)
-   - Consider [Contributing](./guides/contributing.md)
-
-## 🔍 Finding Help
-
-- Use the navigation above to find specific topics
-- Check [FAQ](./guides/faq.md) for quick answers
-- Visit [Troubleshooting](./guides/troubleshooting.md) for common issues
-- Open an [Issue](https://github.com/UtkarshTheDev/LocalLab/issues) for support
-
-## 🌟 Features
-
-- **Interactive CLI**: Configure and run your server with an intuitive command-line interface
-- **Multiple Model Support:** Pre-configured models and custom model loading
-- **Advanced Optimizations:** Quantization, attention slicing, and more
-- **Resource Management:** Automatic monitoring and optimization
-- **Flexible Deployment:** Local or Google Colab options
-- **Client Libraries:** Python and Node.js support
-
-## 📚 Additional Resources
-
-- [GitHub Repository](https://github.com/UtkarshTheDev/LocalLab)
+### Help & Support
+- [FAQ](./guides/faq.md)
+- [Troubleshooting](./guides/troubleshooting.md)
 - [Community Forum](https://github.com/UtkarshTheDev/LocalLab/discussions)
-- [Contributing Guidelines](./guides/contributing.md)
+
+## 🌟 Best Practices
+
+1. **Start Small**
+   - Begin with basic examples
+   - Use smaller models first
+   - Add features gradually
+
+2. **Follow the Guides**
+   - Complete getting started tutorial
+   - Try all basic examples
+   - Read relevant guides fully
+
+3. **Get Help Early**
+   - Check FAQ first
+   - Use troubleshooting guide
+   - Ask in community forum
+
+## 🔄 Keep Updated
+
+- Watch our [GitHub repository](https://github.com/UtkarshTheDev/LocalLab)
+- Check [CHANGELOG.md](../CHANGELOG.md) for updates
+- Join our [Community](https://github.com/UtkarshTheDev/LocalLab/discussions)
 
 ---
 
-This documentation is designed to help you quickly navigate LocalLab's features—from installation and basic usage to advanced optimization and troubleshooting. Choose your path from the navigation above and enjoy exploring LocalLab!
+Need help? [Open an issue](https://github.com/UtkarshTheDev/LocalLab/issues) or ask in our [discussions](https://github.com/UtkarshTheDev/LocalLab/discussions).

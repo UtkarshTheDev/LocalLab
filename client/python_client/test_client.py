@@ -56,4 +56,4 @@ if __name__ == "__main__":
     server_url = input("Enter the server URL from Colab (e.g., https://xxxx-xx-xx-xxx-xx.ngrok.io): ").strip()
     
     # Run tests
-    asyncio.run(test_client(server_url)) 
+    asyncio.run(test_client(server_url))

@@ -2,12 +2,32 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## 0.4.23 - 2025-03-13
+
+### Fixed
+
+- Fixed critical issue with BERT model loading by removing device_map for BERT models
+- Added proper BERT model configuration for text generation
+- Improved model loading process with better architecture detection
+- Enhanced error handling for different model architectures
+- Fixed memory management for CPU-only environments
+- Added automatic model type detection and configuration
+- Improved compatibility with various model architectures
+- Enhanced error messages for better debugging
+
+### Added
+
+- Added support for BERT models in text generation mode
+- Implemented automatic model architecture detection
+- Added proper model-specific configurations
+- Enhanced memory optimization for different model types
+
 ## 0.4.22 - 2025-03-12
 
 ### Fixed
 
 - Fixed critical issue with server not terminating properly when Ctrl+C is pressed
-- Improved process termination by using os.\_exit() instead of sys.exit() for clean shutdown
+- Improved process termination by using os._exit() instead of sys.exit() for clean shutdown
 - Added CPU compatibility by disabling quantization when CUDA is not available
 - Fixed bitsandbytes error for CPU-only systems with clear warning messages
 - Enhanced user experience with better error handling for non-GPU environments
@@ -55,7 +75,7 @@ All notable changes to LocalLab will be documented in this file.
 - Implemented proper ASGI server in SimpleTCPServer for handling API requests
 - Added support for uvicorn's H11Protocol for better request handling
 - Improved fallback server implementation with proper HTTP request parsing
-- Enhanced API documentation to show correct URLs based on environment
+- Fixed API documentation to show correct URLs based on environment
 - Fixed API examples to show local URL or ngrok URL based on configuration
 - Ensured server works correctly in both local and Google Colab environments
 
@@ -108,7 +128,7 @@ All notable changes to LocalLab will be documented in this file.
 
 - Fixed critical error: "'Config' object has no attribute 'server_class'"
 - Implemented custom startup method that doesn't rely on config.server_class
-- Fixed import issues in Google Colab by properly exposing start_server in **init**.py
+- Fixed import issues in Google Colab by properly exposing start_server in __init__.py
 - Enhanced compatibility with different versions of uvicorn
 - Improved server initialization for more reliable startup
 - Added direct TCPServer initialization for better compatibility
@@ -139,7 +159,7 @@ All notable changes to LocalLab will be documented in this file.
 
 ### Fixed
 
-- Fixed critical error: "LifespanOn.**init**() takes 2 positional arguments but 3 were given"
+- Fixed critical error: "LifespanOn.__init__() takes 2 positional arguments but 3 were given"
 - Enhanced lifespan initialization to handle different uvicorn versions with varying parameter requirements
 - Implemented comprehensive parameter testing for all lifespan classes to ensure compatibility
 - Added detailed logging for lifespan initialization to aid in troubleshooting
@@ -149,7 +169,7 @@ All notable changes to LocalLab will be documented in this file.
 
 ### Fixed
 
-- Fixed critical error with LifespanOn initialization: "LifespanOn.**init**() got an unexpected keyword argument 'logger'"
+- Fixed critical error with LifespanOn initialization: "LifespanOn.__init__() got an unexpected keyword argument 'logger'"
 - Improved compatibility with different versions of uvicorn by properly handling lifespan initialization
 - Enhanced error handling for different lifespan implementations
 - Added graceful fallbacks when lifespan initialization fails
@@ -487,4 +507,4 @@ All notable changes to LocalLab will be documented in this file.
 - Refactored `run_server_proc` in the spawned process to initialize a dedicated logger ("locallab.spawn") to avoid inheriting SemLock objects from a fork context.
 - Ensured that the log queue is created using the multiprocessing spawn context, preventing runtime errors in Google Colab.
 - Updated Mermaid diagrams in `README.md` and `docs/colab/README.md` to enclose node labels in double quotes, resolving parse errors in GitHub rendering.
-- Removed duplicate architecture diagrams from the root `
+- Removed duplicate architecture diagrams from the root `README.md` file.

@@ -11,17 +11,24 @@ pip install locallab
 ## 🚀 Quick Start
 
 ```python
+import asyncio
 from locallab.client import LocalLabClient
 
-# Initialize client
-client = LocalLabClient("http://localhost:8000")
+async def main():
+    # Initialize client
+    client = LocalLabClient("http://localhost:8000")
+    
+    try:
+        # Basic text generation
+        response = await client.generate("Write a story about a robot")
+        print(response)
+    except Exception as e:
+        print(f"Generation failed: {str(e)}")
+    finally:
+        await client.close()
 
-# Basic text generation
-try:
-    response = client.generate("Write a story about a robot")
-    print(response)
-except Exception as e:
-    print(f"Generation failed: {str(e)}")
+# Run the async function
+asyncio.run(main())
 ```
 
 ## 📚 API Reference
@@ -33,10 +40,7 @@ from locallab.client import LocalLabClient
 
 client = LocalLabClient(
     base_url: str,
-    timeout: int = 30,
-    retries: int = 3,
-    headers: dict = None,
-    validate_status: bool = True
+    timeout: float = 30.0
 )
 ```
 
@@ -45,7 +49,7 @@ client = LocalLabClient(
 #### Basic Generation
 
 ```python
-response = client.generate(
+response = await client.generate(
     prompt: str,
     model_id: str = None,
     temperature: float = 0.7,
@@ -57,10 +61,12 @@ response = client.generate(
 #### Streaming Generation
 
 ```python
-for token in client.generate(
+async for token in client.stream_generate(
     prompt: str,
-    stream: bool = True,
-    temperature: float = 0.7
+    model_id: str = None,
+    temperature: float = 0.7,
+    max_length: int = None,
+    top_p: float = 0.9
 ):
     print(token, end="", flush=True)
 ```
@@ -68,7 +74,7 @@ for token in client.generate(
 ### Chat Completion
 
 ```python
-response = client.chat(
+response = await client.chat(
     messages: list[dict],
     model_id: str = None,
     temperature: float = 0.7,
@@ -84,14 +90,14 @@ messages = [
     {"role": "system", "content": "You are a helpful assistant."},
     {"role": "user", "content": "Hello!"}
 ]
-response = client.chat(messages)
+response = await client.chat(messages)
 print(response["choices"][0]["message"]["content"])
 ```
 
 ### Batch Generation
 
 ```python
-responses = client.batch_generate(
+responses = await client.batch_generate(
     prompts: list[str],
     model_id: str = None,
     temperature: float = 0.7,
@@ -108,7 +114,7 @@ prompts = [
     "Tell a joke",
     "Give a fun fact"
 ]
-responses = client.batch_generate(prompts)
+responses = await client.batch_generate(prompts)
 for prompt, response in zip(prompts, responses["responses"]):
     print(f"\nPrompt: {prompt}")
     print(f"Response: {response}")
@@ -122,7 +128,7 @@ Common issues and solutions:
 
 ```python
 try:
-    client.generate("Test")
+    await client.generate("Test")
 except ConnectionError as e:
     print("Server not running:", str(e))
 ```
@@ -132,17 +138,16 @@ except ConnectionError as e:
 ```python
 client = LocalLabClient(
     "http://localhost:8000",
-    timeout=60,
-    retries=3
+    timeout=60.0
 )
 ```
 
 3. **Memory Management**
 
 ```python
-def memory_warning(usage: float):
+async def memory_warning(usage: float):
     print(f"High memory usage: {usage}%")
-    client.unload_model()
+    await client.unload_model()
 
 client.on_memory_warning = memory_warning
 ```

@@ -267,82 +267,88 @@ class ModelManager:
                 log_model_unloaded(prev_model)
 
             # Set CUDA memory allocation configuration to avoid fragmentation
-            os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-            
-            # Configure torch.compile to suppress errors and fall back to eager mode
-            if hasattr(torch, "_dynamo"):
-                torch._dynamo.config.suppress_errors = True
-                logger.info("Configured torch._dynamo to suppress errors and fall back to eager mode")
-
-            hf_token = os.getenv("HF_TOKEN")
-            
-            # Import the config system
-            from .cli.config import get_config_value
-            
-            # Check quantization settings from config system
-            enable_quantization = get_config_value('enable_quantization', ENABLE_QUANTIZATION)
-            if isinstance(enable_quantization, str):
-                enable_quantization = enable_quantization.lower() not in ('false', '0', 'none', '')
-            
-            quantization_type = get_config_value('quantization_type', QUANTIZATION_TYPE) if enable_quantization else "None"
-            
-            # Get configuration based on quantization settings
-            config = self._get_quantization_config() if enable_quantization else {
-                "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
-                "device_map": "auto"  # Always use device_map="auto" for automatic placement
-            }
-
-            if config and config.get("quantization_config"):
-                logger.info(f"Using quantization config: {quantization_type}")
-            else:
-                precision = "fp16" if torch.cuda.is_available() else "fp32"
-                logger.info(f"Using {precision} precision (no quantization)")
-
+            os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"   
             try:
+                # First, try to get model config to check architecture
+                from transformers import AutoConfig, BertLMHeadModel, AutoModelForCausalLM
+                model_config = AutoConfig.from_pretrained(
+                    model_id,
+                    trust_remote_code=True,
+                    token=hf_token
+                )
+
+                # First, try to get model config to check architecture
+                from transformers import AutoConfig
+                model_config = AutoConfig.from_pretrained(
+                    model_id,
+                    trust_remote_code=True,
+                    token=hf_token
+                )
+
+                # Check if it's a BERT-based model
+                is_bert_based = any(arch.lower().startswith('bert') for arch in model_config.architectures) if hasattr(model_config, 'architectures') else False
+
+                # If it's BERT-based, set is_decoder=True
+                if is_bert_based:
+                    logger.info("Detected BERT-based model, configuring for generation...")
+                    model_config.is_decoder = True
+                    if hasattr(model_config, 'add_cross_attention'):
+                        model_config.add_cross_attention = False
+
+                # Load tokenizer first
                 self.tokenizer = AutoTokenizer.from_pretrained(
                     model_id,
                     trust_remote_code=True,
                     token=hf_token
                 )
 
-                # Load the model with device_map="auto" to let the library handle device placement
+                # Determine if we should use CPU offloading
+                use_cpu_offload = not torch.cuda.is_available() or torch.cuda.get_device_properties(0).total_memory < 4 * 1024 * 1024 * 1024  # Less than 4GB VRAM
+
+                if use_cpu_offload:
+                    logger.info("Using CPU offloading due to limited GPU memory or CPU-only environment")
+                    config["device_map"] = {
+                        "": "cpu"
+                    }
+                    config["offload_folder"] = "offload"
+                    if "torch_dtype" in config:
+                        # Use lower precision for CPU to save memory
+                        config["torch_dtype"] = torch.float32
+
+                # Load the model with the modified config
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_id,
+                    config=model_config,
                     trust_remote_code=True,
                     token=hf_token,
+                    low_cpu_mem_usage=True,  # Enable low memory usage
                     **config
                 )
                 
                 logger.info(f"Model loaded with device_map='auto' for automatic placement")
 
+                # Apply memory optimizations
+                if use_cpu_offload:
+                    # Enable gradient checkpointing for memory efficiency
+                    if hasattr(self.model, "gradient_checkpointing_enable"):
+                        self.model.gradient_checkpointing_enable()
+                        logger.info("Enabled gradient checkpointing for memory efficiency")
+
+                    # Enable CPU offloading if available
+                    if hasattr(self.model, "enable_cpu_offload"):
+                        self.model.enable_cpu_offload()
+                        logger.info("Enabled CPU offloading")
+
                 # Apply optimizations if needed
                 self.model = self._apply_optimizations(self.model)
                 
-                # Try to compile the model for faster inference if PyTorch version supports it
-                # But with more robust error handling
-                try:
-                    if hasattr(torch, 'compile') and torch.cuda.is_available():
-                        # Only attempt compilation if we have enough GPU memory
-                        free_memory = torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_allocated()
-                        if free_memory > 2 * 1024 * 1024 * 1024:  # Only compile if we have >2GB free
-                            logger.info("Attempting to compile model with torch.compile() for faster inference...")
-                            try:
-                                # Use a safer compilation mode
-                                self.model = torch.compile(
-                                    self.model, 
-                                    mode="reduce-overhead",
-                                    fullgraph=False,
-                                    dynamic=True  # Better for variable input sizes
-                                )
-                                self.compiled_model = True
-                                logger.info(f"{Fore.GREEN}Model successfully compiled with torch.compile(){Style.RESET_ALL}")
-                            except Exception as compile_error:
-                                logger.warning(f"Model compilation failed with specific error: {str(compile_error)}")
-                                logger.info("Continuing with uncompiled model")
-                        else:
-                            logger.info("Skipping model compilation due to limited GPU memory")
-                except Exception as e:
-                    logger.warning(f"Could not compile model: {str(e)}. Continuing with uncompiled model.")
+                # Set model to evaluation mode
+                self.model.eval()
+                
+                # Clear any unused memory
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                gc.collect()
 
                 # Capture model parameters after loading
                 model_architecture = self.model.config.architectures[0] if hasattr(self.model.config, 'architectures') else 'Unknown'
@@ -370,11 +376,9 @@ class ModelManager:
                     torch.cuda.empty_cache()
                     gc.collect()
 
-                fallback_model = None
-                if self.model_config and self.model_config.get("fallback") and self.model_config.get("fallback") != model_id:
-                    fallback_model = self.model_config.get("fallback")
-
-                if fallback_model:
+                # Try to load a smaller fallback model
+                fallback_model = "microsoft/phi-2"  # A smaller model that works well
+                if model_id != fallback_model:
                     logger.warning(f"{Fore.YELLOW}! Attempting to load fallback model: {fallback_model}{Style.RESET_ALL}")
                     return await self.load_model(fallback_model)
                 else:
