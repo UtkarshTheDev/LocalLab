@@ -304,6 +304,8 @@ class ModelManager:
                     trust_remote_code=True,
                     token=hf_token
                 )
+                # Get quantization configuration
+                config = self._get_quantization_config()
 
                 # Determine if we should use CPU offloading
                 use_cpu_offload = not torch.cuda.is_available() or torch.cuda.get_device_properties(0).total_memory < 4 * 1024 * 1024 * 1024  # Less than 4GB VRAM
