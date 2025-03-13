@@ -256,5 +256,17 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
             os.environ["LOCALLAB_LOG_FILE"] = log_file
             config["log_file"] = log_file
     
+    # Ask about HuggingFace token
+    hf_token = config.get("huggingface_token") or os.environ.get("HUGGINGFACE_TOKEN")
+    if not hf_token or force_reconfigure:
+        hf_token = click.prompt(
+            "🔑 Enter your HuggingFace token (optional, press Enter to skip)",
+            default="",
+            hide_input=True
+        )
+        if hf_token:
+            os.environ["HUGGINGFACE_TOKEN"] = hf_token
+            config["huggingface_token"] = hf_token
+    
     click.echo("\n✅ Configuration complete!\n")
-    return config 
+    return config

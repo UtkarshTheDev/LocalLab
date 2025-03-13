@@ -6,6 +6,7 @@ import psutil
 from huggingface_hub import model_info, HfApi
 import logging
 from pathlib import Path
+import click
 
 
 def get_env_var(key: str, *, default: Any = None, var_type: Type = str) -> Any:
@@ -512,3 +513,8 @@ class SystemInstructions:
 
 # Initialize system instructions
 system_instructions = SystemInstructions()
+
+
+
+
+

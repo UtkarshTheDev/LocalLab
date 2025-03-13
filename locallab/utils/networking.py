@@ -82,8 +82,8 @@ def setup_ngrok(port: int = 8000, auth_token: Optional[str] = None) -> Optional[
     # Create new tunnel with improved error handling
     try:
         # Start the tunnel without health checks or validation
-        # which was causing errors for some users
-        public_url = ngrok.connect(port, bind_tls=True)
+        tunnel = ngrok.connect(port, bind_tls=True)
+        public_url = str(tunnel.public_url)  # Convert NgrokTunnel to string
         logger.info(f"{Fore.GREEN}Ngrok tunnel established: {public_url}{Style.RESET_ALL}")
         return public_url
     except Exception as e:
@@ -188,4 +188,4 @@ async def get_public_ip() -> str:
             logger.warning(f"{Fore.YELLOW}Neither httpx nor requests packages found. Cannot determine public IP.{Style.RESET_ALL}")
     
     # If we couldn't get the IP from any service, return empty string
-    return "" 
+    return ""

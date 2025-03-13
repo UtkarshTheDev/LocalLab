@@ -175,7 +175,7 @@ def print_system_instructions():
 
 {Fore.YELLOW}{instructions_text}{Style.RESET_ALL}
 
-{Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
+{Fore.CYAN}═══════════════════════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
 """
     print(system_instructions_text, flush=True)
     return system_instructions_text
@@ -279,17 +279,15 @@ def format_multiline_text(text: str, prefix: str = "") -> str:
 def print_footer():
     """Print a footer with author information and social media links."""
     footer = f"""
-{Fore.CYAN}┌────────────────────────── Made with ❤️ ───────────────────────────┐{Style.RESET_ALL}
-│                                                                    │
-│  {Fore.YELLOW}Created by:{Style.RESET_ALL} Utkarsh Tiwari                                    │
-│  {Fore.BLUE}GitHub:{Style.RESET_ALL} https://github.com/UtkarshTheDev                   │
-│  {Fore.MAGENTA}Twitter:{Style.RESET_ALL} https://twitter.com/UtkarshTheDev                   │
-│  {Fore.RED}Instagram:{Style.RESET_ALL} https://instagram.com/UtkarshTheDev                 │
-│                                                                    │
-│  {Fore.GREEN}⭐ Star this project:{Style.RESET_ALL} https://github.com/UtkarshTheDev/LocalLab  │
-│                                                                    │
-│  {Fore.YELLOW}Thank you for using LocalLab! Feedback and contributions welcome!{Style.RESET_ALL}  │
-│                                                                    │
-{Fore.CYAN}└────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
+{Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
+  Created by: Utkarsh Tiwari                                    
+  GitHub: https://github.com/UtkarshTheDev                   
+  Twitter: https://twitter.com/UtkarshTheDev                   
+  Instagram: https://instagram.com/UtkarshTheDev                 
+                                                                    
+  ⭐ Star this project: https://github.com/UtkarshTheDev/LocalLab  
+                                                                    
+  Thank you for using LocalLab! Feedback and contributions welcome!  
+{Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
 """
-    print(footer, flush=True) 
+    print(footer, flush=True)

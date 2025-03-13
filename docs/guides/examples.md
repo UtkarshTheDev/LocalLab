@@ -3,6 +3,7 @@
 This guide provides practical examples of using LocalLab in your projects. Each example includes code snippets and explanations.
 
 ## 📚 Table of Contents
+
 - [Basic Usage](#basic-usage)
 - [Text Generation](#text-generation)
 - [Chat Completion](#chat-completion)
@@ -21,15 +22,15 @@ from locallab.client import LocalLabClient
 
 async def main():
     # Initialize client
-    client = LocalLabClient("http://localhost:8000")
-    
+    client = LocalLabClient("http://localhost:8000") # or "https://your-ngrok-url.ngrok.app"
+
     try:
         # Check if server is healthy
         is_healthy = await client.health_check()
         print(f"Server status: {'Ready' if is_healthy else 'Not Ready'}")
-        
+
         # Your code here...
-        
+
     finally:
         # Always close the client when done
         await client.close()
@@ -41,11 +42,12 @@ asyncio.run(main())
 ## Text Generation
 
 ### Simple Generation
+
 Generate text with default settings:
 
 ```python
 async def generate_text():
-    client = LocalLabClient("http://localhost:8000")
+    client = LocalLabClient("http://localhost:8000") # or "https://your-ngrok-url.ngrok.app"
     try:
         response = await client.generate(
             "Write a short story about a robot"
@@ -56,6 +58,7 @@ async def generate_text():
 ```
 
 ### Custom Parameters
+
 Control the generation with parameters:
 
 ```python
@@ -70,11 +73,12 @@ response = await client.generate(
 ## Chat Completion
 
 ### Basic Chat
+
 Have a simple conversation:
 
 ```python
 async def chat_example():
-    client = LocalLabClient("http://localhost:8000")
+    client = LocalLabClient("http://localhost:8000") # or "https://your-ngrok-url.ngrok.app"
     try:
         response = await client.chat([
             {"role": "system", "content": "You are a helpful assistant."},
@@ -86,6 +90,7 @@ async def chat_example():
 ```
 
 ### Multi-turn Conversation
+
 Maintain a conversation thread:
 
 ```python
@@ -101,11 +106,12 @@ response = await client.chat(messages)
 ## Streaming Responses
 
 ### Stream Text Generation
+
 Get responses token by token:
 
 ```python
 async def stream_example():
-    client = LocalLabClient("http://localhost:8000")
+    client = LocalLabClient("http://localhost:8000") # or "https://your-ngrok-url.ngrok.app"
     try:
         print("Generating story: ", end="", flush=True)
         async for token in client.stream_generate("Once upon a time"):
@@ -116,6 +122,7 @@ async def stream_example():
 ```
 
 ### Stream Chat
+
 Stream chat responses:
 
 ```python
@@ -129,6 +136,7 @@ async def stream_chat():
 ## Batch Processing
 
 ### Process Multiple Prompts
+
 Generate responses for multiple prompts efficiently:
 
 ```python
@@ -138,9 +146,9 @@ async def batch_example():
         "Tell a joke",
         "Give a fun fact"
     ]
-    
+
     responses = await client.batch_generate(prompts)
-    
+
     for prompt, response in zip(prompts, responses["responses"]):
         print(f"\nPrompt: {prompt}")
         print(f"Response: {response}")
@@ -149,27 +157,28 @@ async def batch_example():
 ## Model Management
 
 ### Load Different Models
+
 Switch between different models:
 
 ```python
 async def model_management():
-    client = LocalLabClient("http://localhost:8000")
+    client = LocalLabClient("http://localhost:8000") # or "https://your-ngrok-url.ngrok.app"
     try:
         # List available models
         models = await client.list_models()
         print("Available models:", models)
-        
+
         # Load a specific model
         await client.load_model("microsoft/phi-2")
-        
+
         # Get current model info
         model_info = await client.get_current_model()
         print("Current model:", model_info)
-        
+
         # Generate with loaded model
         response = await client.generate("Hello!")
         print(response)
-        
+
     finally:
         await client.close()
 ```
@@ -177,26 +186,27 @@ async def model_management():
 ## Error Handling
 
 ### Handle Common Errors
+
 Properly handle potential errors:
 
 ```python
 async def error_handling():
     try:
         # Try to connect
-        client = LocalLabClient("http://localhost:8000")
-        
+        client = LocalLabClient("http://localhost:8000") # or "https://your-ngrok-url.ngrok.app"
+
         # Check server health
         if not await client.health_check():
             print("Server is not responding")
             return
-            
+
         # Try generation
         try:
             response = await client.generate("Hello!")
             print(response)
         except Exception as e:
             print(f"Generation failed: {str(e)}")
-            
+
     except ConnectionError:
         print("Could not connect to server")
     except Exception as e:
@@ -208,6 +218,7 @@ async def error_handling():
 ## Best Practices
 
 1. **Always Close the Client**
+
    ```python
    try:
        # Your code here
@@ -216,6 +227,7 @@ async def error_handling():
    ```
 
 2. **Check Server Health**
+
    ```python
    if not await client.health_check():
        print("Server not ready")
@@ -223,6 +235,7 @@ async def error_handling():
    ```
 
 3. **Use Proper Error Handling**
+
    ```python
    try:
        response = await client.generate(prompt)

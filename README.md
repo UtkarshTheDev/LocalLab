@@ -13,18 +13,23 @@ graph LR
 ```
 
 ### The Server (Your AI Engine)
+
 Think of the server as your personal AI engine. It:
+
 - Downloads and runs AI models on your computer
 - Manages memory and resources automatically
 - Optimizes performance based on your hardware
 - Provides a simple API for accessing models
 
 You can run it:
+
 - On your computer (local mode)
 - On Google Colab (free GPU mode)
 
 ### The Client (Your AI Controller)
+
 The client is how your code talks to the AI. It:
+
 - Connects to your LocalLab server
 - Sends requests for text generation
 - Handles chat conversations
@@ -36,15 +41,18 @@ The client is how your code talks to the AI. It:
 When you use LocalLab:
 
 1. **Server Setup**
+
    ```python
    from locallab import start_server
    start_server()  # Server starts and loads AI model
    ```
 
 2. **Client Connection**
+
    ```python
    from locallab.client import LocalLabClient
-   client = LocalLabClient("http://localhost:8000")
+   server_url = "http://localhost:8000" # or "https://your-ngrok-url.ngrok.app"
+   client = LocalLabClient(server_url)
    ```
 
 3. **AI Interaction**
@@ -77,11 +85,13 @@ responses = await client.batch_generate([
 ## 💻 Requirements
 
 **Local Computer:**
+
 - Python 3.8+
 - 4GB RAM minimum
 - GPU optional (but recommended)
 
 **Google Colab:**
+
 - Just a Google account!
 - Free tier works fine
 
@@ -90,11 +100,13 @@ responses = await client.batch_generate([
 ### 1. Choose Your Path
 
 **New to AI/Programming?**
+
 1. Start with our [Getting Started Guide](./docs/guides/getting-started.md)
 2. Try the [Basic Examples](./docs/guides/examples.md)
 3. Join our [Community](https://github.com/UtkarshTheDev/LocalLab/discussions)
 
 **Developer?**
+
 1. Check [API Reference](./docs/guides/api.md)
 2. See [Client Libraries](./docs/clients/README.md)
 3. Read [Advanced Features](./docs/guides/advanced.md)
@@ -102,6 +114,7 @@ responses = await client.batch_generate([
 ### 2. Read the Docs
 
 Our [Documentation Guide](./docs/README.md) will help you:
+
 - Understand LocalLab's features
 - Learn best practices
 - Find solutions to common issues

@@ -151,10 +151,9 @@ locallab info
 
 ## Environment Variables
 
-The CLI respects environment variables that you've already set. If an environment variable is set, the CLI won't prompt for that setting unless you explicitly run the configuration wizard.
-
 Key environment variables:
 
+- `HUGGINGFACE_TOKEN`: HuggingFace API token for accessing models (optional)
 - `HUGGINGFACE_MODEL`: Model to load
 - `NGROK_AUTH_TOKEN`: Ngrok authentication token
 - `LOCALLAB_ENABLE_QUANTIZATION`: Enable/disable quantization
@@ -166,7 +165,11 @@ Key environment variables:
 
 ## Configuration Storage
 
-The CLI stores your configuration in `~/.locallab/config.json` for future use. This means you don't have to re-enter your settings each time you run LocalLab.
+The CLI stores your configuration in `~/.locallab/config.json` for future use. This includes:
+- HuggingFace token (if provided)
+- Model settings
+- Server configuration
+- Optimization settings
 
 To view your stored configuration:
 

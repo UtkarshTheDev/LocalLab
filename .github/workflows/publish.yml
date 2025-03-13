@@ -12,6 +12,9 @@ on:
       - '.github/workflows/publish.yml'
       - 'CHANGELOG.md'
 
+permissions:
+  contents: write
+
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
