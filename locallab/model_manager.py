@@ -255,8 +255,8 @@ class ModelManager:
             start_time = time.time()
             logger.info(f"\n{Fore.CYAN}Loading model: {model_id}{Style.RESET_ALL}")
         
-        from .config import get_hf_token
-        hf_token = get_hf_token(interactive=True)
+            from .config import get_hf_token
+            hf_token = get_hf_token(interactive=True)
 
             if self.model is not None:
                 prev_model = self.current_model

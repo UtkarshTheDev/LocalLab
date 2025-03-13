@@ -259,11 +259,26 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
     # Ask about HuggingFace token
     hf_token = config.get("huggingface_token") or os.environ.get("HUGGINGFACE_TOKEN")
     if not hf_token or force_reconfigure:
-        hf_token = click.prompt(
-            "🔑 Enter your HuggingFace token (optional, press Enter to skip)",
-            default="",
-            hide_input=True
-        )
+        click.echo("\n🔑 Enter your HuggingFace token (optional)")
+        click.echo("   Get your token from: https://huggingface.co/settings/tokens")
+        click.echo("   Press Enter to skip or paste your token (it will be hidden): ", nl=False)
+        hf_token = click.getchar()
+        if hf_token and hf_token != '\r' and hf_token != '\n':
+            # Read the rest of the token
+            token_chars = [hf_token]
+            while True:
+                char = click.getchar()
+                if char in ('\r', '\n'):
+                    break
+                token_chars.append(char)
+                click.echo('*', nl=False)  # Show * for each character
+            hf_token = ''.join(token_chars)
+            click.echo()  # New line after token input
+            click.echo("✅ Token saved!")
+        else:
+            click.echo("\nSkipping HuggingFace token...")
+            hf_token = ""
+        
         if hf_token:
             os.environ["HUGGINGFACE_TOKEN"] = hf_token
             config["huggingface_token"] = hf_token
