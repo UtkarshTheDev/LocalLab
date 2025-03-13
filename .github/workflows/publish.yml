@@ -9,6 +9,8 @@ on:
       - 'client/python_client/**'
       - 'setup.py'
       - 'client/python_client/setup.py'
+      - '.github/workflows/publish.yml'
+      - 'CHANGELOG.md'
 
 jobs:
   build-and-publish:
@@ -46,6 +48,7 @@ jobs:
           packages_dir: ${{ matrix.path }}/dist/
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
+          skip_existing: true
 
       - name: Create Release
         uses: actions/create-release@v1
