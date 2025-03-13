@@ -15,7 +15,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        package: ['locallab', 'client/python_client']
+        include:
+          - package: 'locallab'
+            path: '.'  # Root directory for locallab package
+          - package: 'python-client'
+            path: 'client/python_client'  # Python client directory
     
     steps:
       - name: Checkout code
@@ -33,13 +37,13 @@ jobs:
 
       - name: Build package
         run: |
-          cd ${{ matrix.package }}
+          cd ${{ matrix.path }}
           python -m build --sdist --wheel
 
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@v1.4.2
         with:
-          packages_dir: ${{ matrix.package }}/dist/
+          packages_dir: ${{ matrix.path }}/dist/
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
 
@@ -48,10 +52,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ github.run_number }}
-          release_name: Release v${{ github.run_number }}
+          tag_name: ${{ matrix.package }}-v${{ github.run_number }}
+          release_name: ${{ matrix.package }} Release v${{ github.run_number }}
           body: |
-            Release v${{ github.run_number }}
+            ${{ matrix.package }} Release v${{ github.run_number }}
             
             Changes in this release:
             - See CHANGELOG.md for details
