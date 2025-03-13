@@ -262,26 +262,24 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
         click.echo("\n🔑 Enter your HuggingFace token (optional)")
         click.echo("   Get your token from: https://huggingface.co/settings/tokens")
         click.echo("   Press Enter to skip or paste your token (it will be hidden): ", nl=False)
-        hf_token = click.getchar()
-        if hf_token and hf_token != '\r' and hf_token != '\n':
-            # Read the rest of the token
-            token_chars = [hf_token]
-            while True:
-                char = click.getchar()
-                if char in ('\r', '\n'):
-                    break
-                token_chars.append(char)
-                click.echo('*', nl=False)  # Show * for each character
-            hf_token = ''.join(token_chars)
-            click.echo()  # New line after token input
-            click.echo("✅ Token saved!")
-        else:
-            click.echo("\nSkipping HuggingFace token...")
-            hf_token = ""
+        
+        # Read token character by character
+        chars = []
+        while True:
+            char = click.getchar()
+            if char in ('\r', '\n'):
+                break
+            chars.append(char)
+            click.echo('*', nl=False)  # Show * for each character
+            
+        hf_token = ''.join(chars)
         
         if hf_token:
+            click.echo("\n✅ Token saved!")
             os.environ["HUGGINGFACE_TOKEN"] = hf_token
             config["huggingface_token"] = hf_token
+        else:
+            click.echo("\nSkipping HuggingFace token...")
     
     click.echo("\n✅ Configuration complete!\n")
     return config

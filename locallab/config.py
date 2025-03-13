@@ -515,6 +515,43 @@ class SystemInstructions:
 system_instructions = SystemInstructions()
 
 
-
-
-
+def get_hf_token(interactive: bool = False) -> Optional[str]:
+    """Get HuggingFace token from environment or config"""
+    # First check environment
+    token = os.environ.get("HUGGINGFACE_TOKEN")
+    
+    # Then check config
+    if not token:
+        try:
+            from .cli.config import get_config_value
+            token = get_config_value("huggingface_token")
+        except:
+            pass
+    
+    # If interactive and still no token, prompt user
+    if not token and interactive:
+        try:
+            click.echo("\n🔑 HuggingFace token is recommended for better model access.")
+            click.echo("Get your token from: https://huggingface.co/settings/tokens")
+            click.echo("Enter token (press Enter to skip): ", nl=False)
+            
+            # Read token character by character
+            chars = []
+            while True:
+                char = click.getchar()
+                if char in ('\r', '\n'):
+                    break
+                chars.append(char)
+                click.echo('*', nl=False)  # Show * for each character
+            
+            token = ''.join(chars)
+            if token:
+                click.echo("\n✅ Token saved!")
+                os.environ["HUGGINGFACE_TOKEN"] = token
+            else:
+                click.echo("\nSkipping token...")
+        except:
+            # If there's any error in interactive mode, just return None
+            pass
+            
+    return token
