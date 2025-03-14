@@ -704,8 +704,771 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                 ngrok_section = f"\n{Fore.CYAN}┌────────────────────────── Ngrok Tunnel Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🚀 Ngrok Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
                 print(ngrok_section)
             
-        # Start the server logic goes here...
-        
+            else:
+
+ 
+
+                logger.warning(f"{Fore.YELLOW}Failed to set up ngrok tunnel. Server will run locally on port {port}.{Style.RESET_ALL}")
+ 
+
+        else:
+            # Set environment variable to indicate ngrok is not enabled
+            os.environ["LOCALLAB_USE_NGROK"] = "false"
+        # Set environment variable with the port
+        os.environ["LOCALLAB_PORT"] = str(port)
+        # Server info section
+        server_section = f"\n{Fore.CYAN}┌────────────────────────── Server Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🖥️ Local URL: {Fore.GREEN}http://localhost:{port}{Style.RESET_ALL}\n│  ⚙️ Status: {Fore.GREEN}Starting{Style.RESET_ALL}\n│  🔄 Model Loading: {Fore.YELLOW}In Progress{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
+        print(server_section, flush=True)
+ 
+        # Set up signal handlers for graceful shutdown
+
+        signal.signal(signal.SIGINT, signal_handler)
+
+        signal.signal(signal.SIGTERM, signal_handler)
+
+        # Import app here to avoid circular imports
+
+        try:
+            from .core.app import app
+        except ImportError as e:
+            logger.error(f"{Fore.RED}Failed to import app: {str(e)}{Style.RESET_ALL}")
+            logger.error(f"{Fore.RED}This could be due to circular imports or missing dependencies.{Style.RESET_ALL}")
+            logger.error(f"{Fore.YELLOW}Please ensure all dependencies are installed: pip install -e .{Style.RESET_ALL}")
+            raise
+
+        # Create a function to display the Running banner when the server is ready
+        startup_complete = False  # Flag to track if startup has been completed
+
+        def on_startup():
+ 
+
+            # Use a flag to ensure this function only runs once
+ 
+
+            nonlocal startup_complete
+ 
+
+            if startup_complete:
+ 
+
+                return
+ 
+
+ 
+
+            try:
+ 
+
+                # Set server status to running
+ 
+
+                set_server_status("running")
+ 
+
+                
+ 
+
+                # Display the RUNNING banner
+ 
+
+                print_running_banner(__version__)
+ 
+
+                
+ 
+
+                try:
+ 
+
+                    # Display system resources
+ 
+
+                    print_system_resources()
+ 
+
+                except Exception as e:
+ 
+
+                    logger.error(f"Error displaying system resources: {str(e)}")
+ 
+
+                    logger.debug(f"System resources error details: {traceback.format_exc()}")
+ 
+
+                
+ 
+
+                try:
+ 
+
+                    # Display model information
+ 
+
+                    print_model_info()
+ 
+
+                except Exception as e:
+ 
+
+                    logger.error(f"Error displaying model information: {str(e)}")
+ 
+
+                    logger.debug(f"Model information error details: {traceback.format_exc()}")
+ 
+
+                
+ 
+
+                try:
+ 
+
+                    # Display system instructions
+ 
+
+                    print_system_instructions()
+ 
+
+                except Exception as e:
+ 
+
+                    logger.error(f"Error displaying system instructions: {str(e)}")
+ 
+
+                    logger.debug(f"System instructions error details: {traceback.format_exc()}")
+ 
+
+                
+ 
+
+                try:
+ 
+
+                    # Display API documentation
+ 
+
+                    print_api_docs()
+ 
+
+                except Exception as e:
+ 
+
+                    logger.error(f"Error displaying API documentation: {str(e)}")
+ 
+
+                    logger.debug(f"API documentation error details: {traceback.format_exc()}")
+ 
+
+                    
+ 
+
+                try:
+ 
+
+                    # Display footer with author information
+ 
+
+                    from .ui.banners import print_footer
+ 
+
+                    print_footer()
+ 
+
+                except Exception as e:
+ 
+
+                    logger.error(f"Error displaying footer: {str(e)}")
+ 
+
+                    logger.debug(f"Footer display error details: {traceback.format_exc()}")
+ 
+
+                
+ 
+
+                # Set flag to indicate startup is complete
+ 
+
+                startup_complete = True
+ 
+
+            except Exception as e:
+ 
+
+                logger.error(f"Error during server startup display: {str(e)}")
+ 
+
+                logger.debug(f"Startup display error details: {traceback.format_exc()}")
+ 
+
+                # Still mark startup as complete to avoid repeated attempts
+ 
+
+                startup_complete = True
+ 
+
+                # Ensure server status is set to running even if display fails
+ 
+
+                set_server_status("running")
+
+               # Start uvicorn server directly in the main process
+
+ 
+
+        try:
+ 
+
+            # Detect if we're in Google Colab
+ 
+
+            in_colab = is_in_colab()
+ 
+
+            
+ 
+
+            if in_colab or use_ngrok:
+ 
+
+                # Colab environment setup
+ 
+
+                try:
+ 
+
+                    import nest_asyncio
+ 
+
+                    nest_asyncio.apply()
+ 
+
+                except ImportError:
+ 
+
+                    logger.warning("nest_asyncio not available. This may cause issues in Google Colab.")
+ 
+
+                    
+ 
+
+                logger.info(f"Starting server on port {port} (Colab/ngrok mode)")
+ 
+
+                
+ 
+
+                # Define the callback for Colab
+ 
+
+                async def on_startup_async():
+ 
+
+                    # This will only run once due to the flag in on_startup
+ 
+
+                    on_startup()
+ 
+
+                
+ 
+
+                config = uvicorn.Config(
+ 
+
+                    app, 
+ 
+
+                    host="0.0.0.0",  # Bind to all interfaces in Colab
+ 
+
+                    port=port, 
+ 
+
+                    reload=False, 
+ 
+
+                    log_level="info",
+ 
+
+                    # Use an async callback function, not a list
+ 
+
+                    callback_notify=on_startup_async
+ 
+
+                )
+ 
+
+                
+ 
+
+                server = ServerWithCallback(config)
+ 
+
+                server.on_startup_callback = on_startup  # Set the callback
+ 
+
+                
+ 
+
+                # Use the appropriate event loop method based on Python version
+ 
+
+                try:
+ 
+
+                    # Wrap in try/except to handle server startup errors
+ 
+
+                    try:
+ 
+
+                        asyncio.run(server.serve())
+ 
+
+                    except AttributeError as e:
+ 
+
+                        if "'Server' object has no attribute 'start'" in str(e):
+ 
+
+                            # If we get the 'start' attribute error, use our SimpleTCPServer directly
+ 
+
+                            logger.warning("Falling back to direct SimpleTCPServer implementation")
+ 
+
+                            direct_server = SimpleTCPServer(config)
+ 
+
+                            asyncio.run(direct_server.serve())
+ 
+
+                        else:
+ 
+
+                            raise
+ 
+
+                except RuntimeError as e:
+ 
+
+                    # Handle "Event loop is already running" error
+ 
+
+                    if "Event loop is already running" in str(e):
+ 
+
+                        logger.warning("Event loop is already running. Using get_event_loop instead.")
+ 
+
+                        loop = asyncio.get_event_loop()
+ 
+
+                        try:
+ 
+
+                            loop.run_until_complete(server.serve())
+ 
+
+                        except AttributeError as e:
+ 
+
+                            if "'Server' object has no attribute 'start'" in str(e):
+ 
+
+                                # If we get the 'start' attribute error, use our SimpleTCPServer directly
+ 
+
+                                logger.warning("Falling back to direct SimpleTCPServer implementation")
+ 
+
+                                direct_server = SimpleTCPServer(config)
+ 
+
+                                loop.run_until_complete(direct_server.serve())
+ 
+
+                            else:
+ 
+
+                                raise
+ 
+
+                    else:
+ 
+
+                        # Re-raise other errors
+ 
+
+                        raise
+ 
+
+            else:
+ 
+
+                # Local environment
+ 
+
+                logger.info(f"Starting server on port {port} (local mode)")
+ 
+
+                # For local environment, we'll use a custom Server subclass
+ 
+
+                config = uvicorn.Config(
+ 
+
+                    app, 
+ 
+
+                    host="127.0.0.1",  # Localhost only for local mode
+ 
+
+                    port=port, 
+ 
+
+                    reload=False, 
+ 
+
+                    workers=1, 
+ 
+
+                    log_level="info",
+ 
+
+                    # This won't be used directly, as we call on_startup in the ServerWithCallback class
+ 
+
+                    callback_notify=None
+ 
+
+                )
+ 
+
+                server = ServerWithCallback(config)
+ 
+
+                server.on_startup_callback = on_startup  # Set the callback
+ 
+
+                
+ 
+
+                # Use asyncio.run which is more reliable
+ 
+
+                try:
+ 
+
+                    # Wrap in try/except to handle server startup errors
+ 
+
+                    try:
+ 
+
+                        asyncio.run(server.serve())
+ 
+
+                    except AttributeError as e:
+ 
+
+                        if "'Server' object has no attribute 'start'" in str(e):
+ 
+
+                            # If we get the 'start' attribute error, use our SimpleTCPServer directly
+ 
+
+                            logger.warning("Falling back to direct SimpleTCPServer implementation")
+ 
+
+                            direct_server = SimpleTCPServer(config)
+ 
+
+                            asyncio.run(direct_server.serve())
+ 
+
+                        else:
+ 
+
+                            raise
+ 
+
+                except RuntimeError as e:
+ 
+
+                    # Handle "Event loop is already running" error
+ 
+
+                    if "Event loop is already running" in str(e):
+ 
+
+                        logger.warning("Event loop is already running. Using get_event_loop instead.")
+ 
+
+                        loop = asyncio.get_event_loop()
+ 
+
+                        try:
+ 
+
+                            loop.run_until_complete(server.serve())
+ 
+
+                        except AttributeError as e:
+ 
+
+                            if "'Server' object has no attribute 'start'" in str(e):
+ 
+
+                                # If we get the 'start' attribute error, use our SimpleTCPServer directly
+ 
+
+                                logger.warning("Falling back to direct SimpleTCPServer implementation")
+ 
+
+                                direct_server = SimpleTCPServer(config)
+ 
+
+                                loop.run_until_complete(direct_server.serve())
+ 
+
+                            else:
+ 
+
+                                raise
+ 
+
+                    else:
+ 
+
+                        # Re-raise other errors
+ 
+
+                        raise
+ 
+
+        except Exception as e:
+ 
+
+            logger.error(f"Server startup failed: {str(e)}")
+ 
+
+            logger.error(traceback.format_exc())
+ 
+
+            set_server_status("error")
+ 
+
+            
+ 
+
+            # Try to start a minimal server as a last resort
+ 
+
+            try:
+ 
+
+                logger.warning("Attempting to start minimal server as fallback")
+ 
+
+                # Create a minimal config
+ 
+
+                minimal_config = uvicorn.Config(
+ 
+
+                    app="locallab.core.minimal:app",  # Use a minimal app if available, or create one
+ 
+
+                    host="127.0.0.1",
+ 
+
+                    port=port or 8000,
+ 
+
+                    log_level="info"
+ 
+
+                )
+ 
+
+                
+ 
+
+                # Create a simple server
+ 
+
+                direct_server = SimpleTCPServer(config=minimal_config)
+ 
+
+                
+ 
+
+                # Start the server
+ 
+
+                logger.info("Starting minimal server")
+ 
+
+                asyncio.run(direct_server.serve())
+ 
+
+            except Exception as e2:
+ 
+
+                logger.error(f"Minimal server startup also failed: {str(e2)}")
+ 
+
+                logger.error(traceback.format_exc())
+ 
+
+                raise RuntimeError(f"Server startup failed: {str(e)}. Minimal server also failed: {str(e2)}")
+ 
+
+            
+ 
+
+            raise
+ 
     except Exception as e:
-        logger.error(f"Error starting server: {str(e)}")
-        raise
+ 
+
+        logger.error(f"Fatal error during server initialization: {str(e)}")
+ 
+
+        logger.error(traceback.format_exc())
+ 
+
+        set_server_status("error")
+ 
+def cli():
+    """Command line interface entry point for the package"""
+    import click
+    import sys
+    
+    @click.group()
+    @click.version_option(__version__)
+    def locallab_cli():
+        """LocalLab - Your lightweight AI inference server for running LLMs locally"""
+        pass
+    
+    @locallab_cli.command()
+    @click.option('--use-ngrok', is_flag=True, help='Enable ngrok for public access')
+    @click.option('--port', default=None, type=int, help='Port to run the server on')
+    @click.option('--ngrok-auth-token', help='Ngrok authentication token')
+    @click.option('--model', help='Model to load (e.g., microsoft/phi-2)')
+    @click.option('--quantize', is_flag=True, help='Enable quantization')
+    @click.option('--quantize-type', type=click.Choice(['int8', 'int4']), help='Quantization type')
+    @click.option('--attention-slicing', is_flag=True, help='Enable attention slicing')
+    @click.option('--flash-attention', is_flag=True, help='Enable flash attention')
+    @click.option('--better-transformer', is_flag=True, help='Enable BetterTransformer')
+    def start(use_ngrok, port, ngrok_auth_token, model, quantize, quantize_type, 
+              attention_slicing, flash_attention, better_transformer):
+        """Start the LocalLab server"""
+        from .cli.config import set_config_value
+        
+        # Set configuration values from command line options
+        if model:
+            os.environ["HUGGINGFACE_MODEL"] = model
+        
+        if quantize:
+            set_config_value('enable_quantization', 'true')
+            if quantize_type:
+                set_config_value('quantization_type', quantize_type)
+        
+        if attention_slicing:
+            set_config_value('enable_attention_slicing', 'true')
+        
+        if flash_attention:
+            set_config_value('enable_flash_attention', 'true')
+        
+        if better_transformer:
+            set_config_value('enable_better_transformer', 'true')
+        
+        # Start the server
+        start_server(use_ngrok=use_ngrok, port=port, ngrok_auth_token=ngrok_auth_token)
+    
+    @locallab_cli.command()
+    def config():
+        """Configure LocalLab settings"""
+        from .cli.interactive import prompt_for_config
+        from .cli.config import save_config, load_config, get_all_config
+        
+        # Show current configuration if it exists
+        current_config = load_config()
+        if current_config:
+            click.echo("\n📋 Current Configuration:")
+            for key, value in current_config.items():
+                click.echo(f"  {key}: {value}")
+            click.echo("")
+            
+            # Ask if user wants to reconfigure
+            if not click.confirm("Would you like to reconfigure these settings?", default=True):
+                click.echo("Configuration unchanged.")
+                return
+        
+        # Run the interactive configuration
+        config = prompt_for_config(force_reconfigure=True)
+        save_config(config)
+        
+        # Show the new configuration
+        click.echo("\n📋 New Configuration:")
+        for key, value in config.items():
+            click.echo(f"  {key}: {value}")
+        
+        click.echo("\n✅ Configuration saved successfully!")
+        click.echo("You can now run 'locallab start' to start the server with these settings.")
+    
+    @locallab_cli.command()
+    def info():
+        """Display system information"""
+        from .utils.system import get_system_resources
+        
+        try:
+            resources = get_system_resources()
+            
+            click.echo("\n🖥️ System Information:")
+            click.echo(f"  CPU: {resources.get('cpu_count', 'Unknown')} cores")
+            
+            ram_gb = resources.get('ram_total', 0) / (1024 * 1024 * 1024) if 'ram_total' in resources else 0
+            click.echo(f"  RAM: {ram_gb:.1f} GB")
+            
+            if resources.get('gpu_available', False):
+                click.echo("\n🎮 GPU Information:")
+                for i, gpu in enumerate(resources.get('gpu_info', [])):
+                    click.echo(f"  GPU {i}: {gpu.get('name', 'Unknown')}")
+                    vram_gb = gpu.get('total_memory', 0) / (1024 * 1024 * 1024) if 'total_memory' in gpu else 0
+                    click.echo(f"    VRAM: {vram_gb:.1f} GB")
+            else:
+                click.echo("\n⚠️ No GPU detected")
+            
+            # Display Python version
+            click.echo(f"\n🐍 Python: {sys.version.split()[0]}")
+            
+            # Display LocalLab version
+            click.echo(f"📦 LocalLab: {__version__}")
+            
+            # Display configuration location
+            from pathlib import Path
+            config_path = Path.home() / ".locallab" / "config.json"
+            if config_path.exists():
+                click.echo(f"\n⚙️ Configuration: {config_path}")
+            
+        except Exception as e:
+            click.echo(f"\n❌ Error retrieving system information: {str(e)}")
+            click.echo("Please check that all required dependencies are installed.")
+            return 1
+    
+    # Use sys.argv to check if we're just showing help
+    if len(sys.argv) <= 1 or sys.argv[1] == '--help' or sys.argv[1] == '-h':
+        return locallab_cli()
+    
+    # For specific commands, we can optimize further
+    if sys.argv[1] == 'info':
+        return locallab_cli(['info'])
+    
+    return locallab_cli()
+
+if __name__ == "__main__":
+    cli()
