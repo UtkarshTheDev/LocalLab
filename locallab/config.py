@@ -531,7 +531,7 @@ def get_hf_token(interactive: bool = False) -> Optional[str]:
     # If interactive and still no token, prompt user
     if not token and interactive:
         try:
-            click.echo("\n🔑 HuggingFace token is recommended for better model access.")
+            click.echo("\n🔑 HuggingFace token is required for accessing this model.")
             click.echo("Get your token from: https://huggingface.co/settings/tokens")
             click.echo("Enter token (press Enter to skip): ", nl=False)
             
@@ -546,8 +546,16 @@ def get_hf_token(interactive: bool = False) -> Optional[str]:
             
             token = ''.join(chars)
             if token:
+                if len(token) < 20:  # Basic validation
+                    click.echo("\n❌ Invalid token format. Please check your token.")
+                    return None
+                    
                 click.echo("\n✅ Token saved!")
                 os.environ["HUGGINGFACE_TOKEN"] = token
+                
+                # Save to config
+                from .cli.config import set_config_value
+                set_config_value("huggingface_token", token)
             else:
                 click.echo("\nSkipping token...")
         except:

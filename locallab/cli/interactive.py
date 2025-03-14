@@ -269,30 +269,49 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
             os.environ["LOCALLAB_LOG_FILE"] = log_file
             config["log_file"] = log_file
     
-    # Ask about HuggingFace token
+    # Ask about HuggingFace token with improved UX
     hf_token = config.get("huggingface_token") or os.environ.get("HUGGINGFACE_TOKEN")
     if not hf_token or force_reconfigure:
-        click.echo("\n🔑 Enter your HuggingFace token (optional)")
-        click.echo("   Get your token from: https://huggingface.co/settings/tokens")
-        click.echo("   Press Enter to skip or paste your token (it will be hidden): ", nl=False)
+        click.echo("\n�� HuggingFace Token Configuration")
+        click.echo("───────────────────────────────")
+        click.echo("A token is required to download models like microsoft/phi-2")
+        click.echo("Get your token from: https://huggingface.co/settings/tokens")
         
-        # Read token character by character
+        if hf_token:
+            click.echo(f"\nCurrent token: {hf_token[:4]}...{hf_token[-4:]}")
+            if not click.confirm("Would you like to update your token?", default=False):
+                click.echo("Keeping existing token...")
+                return config
+        
+        click.echo("\nEnter your HuggingFace token (press Enter to skip): ", nl=False)
+        
+        # Read token character by character for secure input
         chars = []
         while True:
             char = click.getchar()
             if char in ('\r', '\n'):
                 break
             chars.append(char)
-            click.echo('*', nl=False)  # Show * for each character
+            click.echo('*', nl=False)
             
         hf_token = ''.join(chars)
         
         if hf_token:
-            click.echo("\n✅ Token saved!")
+            # Validate token format
+            if len(hf_token) < 20:  # Basic validation
+                click.echo("\n❌ Invalid token format. Token should be longer than 20 characters.")
+                click.echo("Please check your token and try again.")
+                return config
+                
+            click.echo("\n✅ Token saved successfully!")
             os.environ["HUGGINGFACE_TOKEN"] = hf_token
             config["huggingface_token"] = hf_token
+            
+            # Save immediately to ensure it's persisted
+            from .config import save_config
+            save_config(config)
         else:
-            click.echo("\nSkipping HuggingFace token...")
-    
+            click.echo("\n⚠️  No token provided. Some models may not be accessible.")
+
     click.echo("\n✅ Configuration complete!\n")
     return config

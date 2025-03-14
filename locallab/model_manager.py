@@ -255,8 +255,17 @@ class ModelManager:
             start_time = time.time()
             logger.info(f"\n{Fore.CYAN}Loading model: {model_id}{Style.RESET_ALL}")
         
+            # Get and validate HuggingFace token
             from .config import get_hf_token
-            hf_token = get_hf_token(interactive=True)
+            hf_token = get_hf_token(interactive=False)  # Don't prompt during model loading
+            
+            if not hf_token and model_id in ["microsoft/phi-2"]:  # Add other gated models here
+                logger.error(f"{Fore.RED}This model requires authentication. Please configure your HuggingFace token first.{Style.RESET_ALL}")
+                logger.info(f"{Fore.YELLOW}You can set your token by running: locallab config{Style.RESET_ALL}")
+                raise HTTPException(
+                    status_code=401,
+                    detail="HuggingFace token required for this model. Run 'locallab config' to set up."
+                )
 
             if self.model is not None:
                 prev_model = self.current_model
