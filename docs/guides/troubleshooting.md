@@ -44,6 +44,27 @@ os.environ["LOCALLAB_QUANTIZATION_TYPE"] = "int8"
 os.environ["HUGGINGFACE_MODEL"] = "microsoft/phi-2"  # Smaller model
 ```
 
+### Authentication Issues
+
+**Issue:** HuggingFace Authentication Error
+```
+ERROR: Failed to load model: Invalid credentials in Authorization header
+```
+**Solution:**
+1. Get a HuggingFace token from [HuggingFace tokens page](https://huggingface.co/settings/tokens)
+2. Set the token in one of these ways:
+   ```python
+   # Option 1: Environment variable
+   os.environ["HUGGINGFACE_TOKEN"] = "your_token_here"
+   
+   # Option 2: Configuration file
+   from locallab.cli.config import set_config_value
+   set_config_value("huggingface_token", "your_token_here")
+   ```
+3. Restart the LocalLab server
+
+Note: Some models like microsoft/phi-2 require authentication to download.
+
 ## Related Documentation
 - [Getting Started](./getting-started.md)
 - [Performance Guide](./features/performance.md)

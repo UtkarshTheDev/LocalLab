@@ -42,15 +42,6 @@ def get_missing_required_env_vars() -> List[str]:
 def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token: str = None, force_reconfigure: bool = False) -> Dict[str, Any]:
     """
     Interactive prompt for configuration
-    
-    Args:
-        use_ngrok: Whether to use ngrok
-        port: Port to run the server on
-        ngrok_auth_token: Ngrok authentication token
-        force_reconfigure: Whether to force reconfiguration of all settings
-        
-    Returns:
-        Dict of configuration values
     """
     # Import here to avoid circular imports
     from .config import load_config, get_config_value
@@ -71,6 +62,28 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
     
     # Determine if we're in Colab
     in_colab = is_in_colab()
+    
+    # If in Colab, use simplified configuration
+    if in_colab:
+        # Set default values for Colab environment
+        config.setdefault("port", 8000)
+        config.setdefault("use_ngrok", True)
+        config.setdefault("model_id", os.environ.get("HUGGINGFACE_MODEL", DEFAULT_MODEL))
+        
+        # Use ngrok token from environment if available
+        if os.environ.get("NGROK_AUTH_TOKEN"):
+            config["ngrok_auth_token"] = os.environ.get("NGROK_AUTH_TOKEN")
+        elif ngrok_auth_token:
+            config["ngrok_auth_token"] = ngrok_auth_token
+            
+        # Set some reasonable defaults for Colab
+        config.setdefault("enable_quantization", True)
+        config.setdefault("quantization_type", "int8")
+        config.setdefault("enable_attention_slicing", True)
+        config.setdefault("enable_flash_attention", True)
+        config.setdefault("enable_better_transformer", True)
+        
+        return config
     
     # Check for GPU
     has_gpu = False

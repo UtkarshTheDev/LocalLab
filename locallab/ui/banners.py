@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any, List
 import os
 
 
-def print_initializing_banner(version: str):
+def print_initializing_banner(version: str = "0.4.25"):
     """
     Print the initializing banner with clear visual indication
     that the server is starting up and not ready for requests
@@ -109,7 +109,7 @@ def print_system_resources():
     else:
         system_info += f"🎮 GPU: {Fore.YELLOW}Not available{Style.RESET_ALL}\n"
         
-    system_info += f"\n{Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}\n"
+    system_info += f"\n{Fore.CYAN}═══════════════════════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}\n"
     
     print(system_info, flush=True)
     return system_info
@@ -246,7 +246,7 @@ def print_api_docs():
 
 2️⃣ /models/load - Load a specific model
   • POST with JSON body: {{ "model_id": "microsoft/phi-2" }}
-  • Example:
+  ��� Example:
     curl -X POST "{server_url}/models/load" \\
     -H "Content-Type: application/json" \\
     -d '{{"model_id": "microsoft/phi-2"}}'

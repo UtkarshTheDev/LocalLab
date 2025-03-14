@@ -81,6 +81,15 @@ async def startup_event():
     """Initialization tasks when the server starts"""
     logger.info("Starting LocalLab server...")
     
+    # Get HuggingFace token and set it in environment if available
+    from ..config import get_hf_token
+    hf_token = get_hf_token(interactive=False)
+    if hf_token:
+        os.environ["HUGGINGFACE_TOKEN"] = hf_token
+        logger.info("HuggingFace token loaded from configuration")
+    else:
+        logger.warning("No HuggingFace token found. Some models may not be accessible.")
+    
     # Initialize cache if available
     if FASTAPI_CACHE_AVAILABLE:
         FastAPICache.init(InMemoryBackend(), prefix="locallab-cache")
@@ -182,6 +191,15 @@ async def load_model_in_background(model_id: str):
     start_time = time.time()
     
     try:
+        # Ensure HF token is set before loading model
+        from ..config import get_hf_token
+        hf_token = get_hf_token(interactive=False)
+        if hf_token:
+            os.environ["HUGGINGFACE_TOKEN"] = hf_token
+            logger.debug("Using HuggingFace token from configuration")
+        else:
+            logger.warning("No HuggingFace token found. Some models may not be accessible.")
+        
         # Wait for the model to load
         await model_manager.load_model(model_id)
         
@@ -191,4 +209,7 @@ async def load_model_in_background(model_id: str):
         # We don't need to call log_model_loaded here since it's already done in the model_manager
         logger.info(f"{Fore.GREEN}Model {model_id} loaded successfully in {load_time:.2f} seconds!{Style.RESET_ALL}")
     except Exception as e:
-        logger.error(f"Failed to load model {model_id}: {str(e)}") 
+        logger.error(f"Failed to load model {model_id}: {str(e)}")
+        if "401 Client Error: Unauthorized" in str(e):
+            logger.error("This appears to be an authentication error. Please ensure your HuggingFace token is set correctly.")
+            logger.info("You can set your token using: locallab config")
