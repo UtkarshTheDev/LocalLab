@@ -1,3 +1,4 @@
+from .config import HF_TOKEN_ENV, get_env_var, set_env_var
 import os
 import logging
 import torch
@@ -256,8 +257,12 @@ class ModelManager:
             logger.info(f"\n{Fore.CYAN}Loading model: {model_id}{Style.RESET_ALL}")
         
             # Get and validate HuggingFace token
-            from .config import get_hf_token
-            hf_token = get_hf_token(interactive=False)  # Don't prompt during model loading
+            from .config import get_hf_token, HF_TOKEN_ENV, set_env_var
+            hf_token = get_hf_token(interactive=False)
+            
+            if hf_token:
+                # Ensure token is properly set in environment
+                set_env_var(HF_TOKEN_ENV, hf_token)
             
             if not hf_token and model_id in ["microsoft/phi-2"]:  # Add other gated models here
                 logger.error(f"{Fore.RED}This model requires authentication. Please configure your HuggingFace token first.{Style.RESET_ALL}")
@@ -278,7 +283,20 @@ class ModelManager:
                 gc.collect()
                 log_model_unloaded(prev_model)
 
-            # Set CUDA memory allocation configuration to avoid fragmentation
+            # Validate token if provided
+            if hf_token:
+                from huggingface_hub import HfApi
+                try:
+                    api = HfApi()
+                    api.whoami(token=hf_token)
+                    logger.info(f"{Fore.GREEN}✓ HuggingFace token validated{Style.RESET_ALL}")
+                except Exception as e:
+                    logger.error(f"{Fore.RED}Invalid HuggingFace token: {str(e)}{Style.RESET_ALL}")
+                    raise HTTPException(
+                        status_code=401,
+                        detail=f"Invalid HuggingFace token: {str(e)}"
+                    )
+            # Set CUDA memory allocation configuration
             os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"   
             try:
                 # First, try to get model config to check architecture

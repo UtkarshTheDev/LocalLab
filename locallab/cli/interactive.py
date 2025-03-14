@@ -14,7 +14,11 @@ from ..config import (
     ENABLE_ATTENTION_SLICING,
     ENABLE_FLASH_ATTENTION,
     ENABLE_BETTERTRANSFORMER,
-    ENABLE_CPU_OFFLOADING
+    ENABLE_CPU_OFFLOADING,
+    NGROK_TOKEN_ENV,
+    HF_TOKEN_ENV,
+    get_env_var,
+    set_env_var
 )
 
 def is_in_colab() -> bool:
@@ -147,167 +151,53 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
     config["use_ngrok"] = use_ngrok
     
     if use_ngrok:
+        # Show current token if exists
+        current_token = config.get("ngrok_auth_token") or get_env_var(NGROK_TOKEN_ENV)
+        if current_token:
+            click.echo(f"\nCurrent ngrok token: {current_token}")
+            
         ngrok_auth_token = click.prompt(
-            "🔑 Please enter your ngrok auth token (get one at https://dashboard.ngrok.com/get-started/your-authtoken)",
-            default=config.get("ngrok_auth_token", ""),
-            hide_input=True
+            "🔑 Enter your ngrok auth token (get one at https://dashboard.ngrok.com/get-started/your-authtoken)",
+            default=current_token,
+            type=str,
+            show_default=True
         )
+        
         if ngrok_auth_token:
-            os.environ["NGROK_AUTH_TOKEN"] = ngrok_auth_token
-            config["ngrok_auth_token"] = ngrok_auth_token
+            token_str = str(ngrok_auth_token).strip()
+            config["ngrok_auth_token"] = token_str
+            set_env_var(NGROK_TOKEN_ENV, token_str)
+            click.echo(f"✅ Ngrok token saved: {token_str}")
     
-    # Ask about optimizations
-    setup_optimizations = click.confirm(
-        "⚡ Would you like to configure optimizations for better performance?",
-        default=True
-    )
-    
-    if setup_optimizations:
-        # Quantization
-        enable_quantization = click.confirm(
-            "📊 Enable quantization for reduced memory usage?",
-            default=config.get("enable_quantization", ENABLE_QUANTIZATION)
-        )
-        os.environ["LOCALLAB_ENABLE_QUANTIZATION"] = str(enable_quantization).lower()
-        config["enable_quantization"] = enable_quantization
+    # Ask about HuggingFace token
+    current_hf_token = config.get("huggingface_token") or get_env_var(HF_TOKEN_ENV)
+    if current_hf_token:
+        click.echo(f"\nCurrent HuggingFace token: {current_hf_token}")
         
-        if enable_quantization:
-            quant_type = click.prompt(
-                "📊 Quantization type",
-                type=click.Choice(["int8", "int4"]),
-                default=config.get("quantization_type", QUANTIZATION_TYPE or "int8")
-            )
-            os.environ["LOCALLAB_QUANTIZATION_TYPE"] = quant_type
-            config["quantization_type"] = quant_type
-        
-        # Attention slicing
-        enable_attn_slicing = click.confirm(
-            "🔪 Enable attention slicing for reduced memory usage?",
-            default=config.get("enable_attention_slicing", ENABLE_ATTENTION_SLICING)
-        )
-        os.environ["LOCALLAB_ENABLE_ATTENTION_SLICING"] = str(enable_attn_slicing).lower()
-        config["enable_attention_slicing"] = enable_attn_slicing
-        
-        # Flash attention
-        enable_flash_attn = click.confirm(
-            "⚡ Enable flash attention for faster inference?",
-            default=config.get("enable_flash_attention", ENABLE_FLASH_ATTENTION)
-        )
-        os.environ["LOCALLAB_ENABLE_FLASH_ATTENTION"] = str(enable_flash_attn).lower()
-        config["enable_flash_attention"] = enable_flash_attn
-        
-        # BetterTransformer
-        enable_better_transformer = click.confirm(
-            "🔄 Enable BetterTransformer for optimized inference?",
-            default=config.get("enable_better_transformer", ENABLE_BETTERTRANSFORMER)
-        )
-        os.environ["LOCALLAB_ENABLE_BETTERTRANSFORMER"] = str(enable_better_transformer).lower()
-        config["enable_better_transformer"] = enable_better_transformer
-    
-    # Ask about advanced options
-    setup_advanced = click.confirm(
-        "🔧 Would you like to configure advanced options?",
-        default=False
-    )
-    
-    if setup_advanced:
-        # CPU offloading
-        enable_cpu_offloading = click.confirm(
-            "💻 Enable CPU offloading for large models?",
-            default=config.get("enable_cpu_offloading", ENABLE_CPU_OFFLOADING)
-        )
-        os.environ["LOCALLAB_ENABLE_CPU_OFFLOADING"] = str(enable_cpu_offloading).lower()
-        config["enable_cpu_offloading"] = enable_cpu_offloading
-        
-        # Model timeout
-        model_timeout = click.prompt(
-            "⏱️ Model unloading timeout in seconds (0 to disable)",
-            default=config.get("model_timeout", 3600),
-            type=int
-        )
-        os.environ["LOCALLAB_MODEL_TIMEOUT"] = str(model_timeout)
-        config["model_timeout"] = model_timeout
-        
-        # Cache settings
-        enable_cache = click.confirm(
-            "🔄 Enable response caching?",
-            default=config.get("enable_cache", True)
-        )
-        os.environ["LOCALLAB_ENABLE_CACHE"] = str(enable_cache).lower()
-        config["enable_cache"] = enable_cache
-        
-        if enable_cache:
-            cache_ttl = click.prompt(
-                "⏱️ Cache TTL in seconds",
-                default=config.get("cache_ttl", 3600),
-                type=int
-            )
-            os.environ["LOCALLAB_CACHE_TTL"] = str(cache_ttl)
-            config["cache_ttl"] = cache_ttl
-        
-        # Logging settings
-        log_level = click.prompt(
-            "📝 Log level",
-            type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"]),
-            default=config.get("log_level", "INFO")
-        )
-        os.environ["LOCALLAB_LOG_LEVEL"] = log_level
-        config["log_level"] = log_level
-        
-        enable_file_logging = click.confirm(
-            "📄 Enable file logging?",
-            default=config.get("enable_file_logging", False)
-        )
-        os.environ["LOCALLAB_ENABLE_FILE_LOGGING"] = str(enable_file_logging).lower()
-        config["enable_file_logging"] = enable_file_logging
-        
-        if enable_file_logging:
-            log_file = click.prompt(
-                "📄 Log file path",
-                default=config.get("log_file", "locallab.log")
-            )
-            os.environ["LOCALLAB_LOG_FILE"] = log_file
-            config["log_file"] = log_file
-    
-    # Ask about HuggingFace token with improved UX
-    hf_token = config.get("huggingface_token") or os.environ.get("HUGGINGFACE_TOKEN")
-    if not hf_token or force_reconfigure:
-        click.echo("\n�� HuggingFace Token Configuration")
+    if not current_hf_token or force_reconfigure:
+        click.echo("\n🔑 HuggingFace Token Configuration")
         click.echo("───────────────────────────────")
         click.echo("A token is required to download models like microsoft/phi-2")
         click.echo("Get your token from: https://huggingface.co/settings/tokens")
         
-        if hf_token:
-            click.echo(f"\nCurrent token: {hf_token[:4]}...{hf_token[-4:]}")
-            if not click.confirm("Would you like to update your token?", default=False):
-                click.echo("Keeping existing token...")
-                return config
-        
-        click.echo("\nEnter your HuggingFace token (press Enter to skip): ", nl=False)
-        
-        # Read token character by character for secure input
-        chars = []
-        while True:
-            char = click.getchar()
-            if char in ('\r', '\n'):
-                break
-            chars.append(char)
-            click.echo('*', nl=False)
-            
-        hf_token = ''.join(chars)
+        hf_token = click.prompt(
+            "Enter your HuggingFace token",
+            default=current_hf_token,
+            type=str,
+            show_default=True
+        )
         
         if hf_token:
-            # Validate token format
-            if len(hf_token) < 20:  # Basic validation
-                click.echo("\n❌ Invalid token format. Token should be longer than 20 characters.")
-                click.echo("Please check your token and try again.")
+            if len(hf_token) < 20:
+                click.echo("❌ Invalid token format. Token should be longer than 20 characters.")
                 return config
-                
-            click.echo("\n✅ Token saved successfully!")
-            os.environ["HUGGINGFACE_TOKEN"] = hf_token
-            config["huggingface_token"] = hf_token
             
-            # Save immediately to ensure it's persisted
+            token_str = str(hf_token).strip()
+            config["huggingface_token"] = token_str
+            set_env_var(HF_TOKEN_ENV, token_str)
+            click.echo(f"✅ HuggingFace token saved: {token_str}")
+            
+            # Save immediately
             from .config import save_config
             save_config(config)
         else:

@@ -2,6 +2,31 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.4.31] - 2024-03-14
+
+### Fixed
+- Fixed HuggingFace token handling and validation in model loading
+- Fixed ngrok token environment variable usage to use official `NGROK_AUTHTOKEN` name
+- Fixed token storage and retrieval in config and environment variables
+
+### Improved
+- Improved CLI UX for token input and management
+  - Removed token masking for better visibility
+  - Show current token values when available
+  - Added proper token validation
+- Enhanced token handling across the package
+  - Standardized environment variable names
+  - Better string handling for token values
+  - Consistent token validation
+- Better error messages for token-related issues
+- Improved networking setup with proper token handling
+
+### Changed
+- Updated environment variable names to use official standards
+  - `NGROK_AUTHTOKEN` for ngrok token
+  - `HUGGINGFACE_TOKEN` for HuggingFace token
+- Standardized token management functions in config.py
+
 ## 0.4.25 - 2025-03-13
 
 ### Fixed

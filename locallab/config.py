@@ -1,6 +1,7 @@
 import os
 import json
 from typing import Dict, Any, Optional, List, Type
+from locallab.cli.config import ensure_config_dir
 import torch
 import psutil
 from huggingface_hub import model_info, HfApi
@@ -514,17 +515,129 @@ class SystemInstructions:
 # Initialize system instructions
 system_instructions = SystemInstructions()
 
+# Standard environment variable names - use official names
+NGROK_TOKEN_ENV = "NGROK_AUTHTOKEN"  # Official ngrok env var name
+HF_TOKEN_ENV = "HUGGINGFACE_TOKEN"   # Standard HF token env var
+
+def get_env_var(key: str, *, default: Any = None, var_type: Type = str) -> Any:
+    """Get environment variable with type conversion and validation.
+
+    Args:
+        key: Environment variable key
+        default: Default value if not found
+        var_type: Type to convert to (str, int, float, bool)
+
+    Returns:
+        Converted and validated value
+    """
+    # First check environment variables
+    value = os.environ.get(key)
+    
+    # If not found in environment, try the config file
+    if value is None:
+        try:
+            # Import here to avoid circular imports
+            from .cli.config import get_config_value
+            # Convert key format: LOCALLAB_ENABLE_QUANTIZATION -> enable_quantization
+            if key.startswith("LOCALLAB_"):
+                config_key = key[9:].lower()
+            else:
+                config_key = key.lower()
+            
+            config_value = get_config_value(config_key)
+            if config_value is not None:
+                value = config_value
+        except (ImportError, ModuleNotFoundError):
+            # If the config module isn't available yet, just use the environment variable
+            pass
+    
+    # If still not found, use default
+    if value is None:
+        return default
+
+    try:
+        if var_type == bool:
+            return str(value).lower() in ('true', '1', 'yes', 'on')
+        return var_type(value)
+    except (ValueError, TypeError):
+        logging.warning(f"Invalid value for {key}, using default: {default}")
+        return default
+
+def set_env_var(name: str, value: str):
+    """Set environment variable with proper string handling"""
+    os.environ[name] = str(value).strip()
 
 def get_hf_token(interactive: bool = False) -> Optional[str]:
     """Get HuggingFace token from environment or config"""
     # First check environment
-    token = os.environ.get("HUGGINGFACE_TOKEN")
+    token = get_env_var(HF_TOKEN_ENV)
     
     # Then check config
     if not token:
         try:
             from .cli.config import get_config_value
-            token = get_config_value("huggingface_token")
+            token = str(get_config_value("huggingface_token", "")).strip()
+            if token:
+                # Update environment variable
+                set_env_var(HF_TOKEN_ENV, token)
+        except:
+            pass
+    
+    return token
+
+def get_ngrok_token() -> Optional[str]:
+    """Get ngrok token from environment or config"""
+    # First check environment
+    token = get_env_var(NGROK_TOKEN_ENV)
+    
+    # Then check config
+    if not token:
+        try:
+            from .cli.config import get_config_value
+            token = str(get_config_value("ngrok_auth_token", "")).strip()
+            if token:
+                # Update environment variable
+                set_env_var(NGROK_TOKEN_ENV, token)
+        except:
+            pass
+    
+    return token
+
+def save_config(config: Dict[str, Any]):
+    """Save configuration to file"""
+    ensure_config_dir()
+    
+    # Ensure tokens are stored as proper strings
+    if "ngrok_auth_token" in config:
+        token = str(config["ngrok_auth_token"]).strip()
+        config["ngrok_auth_token"] = token
+        set_env_var(NGROK_TOKEN_ENV, token)
+        
+    if "huggingface_token" in config:
+        token = str(config["huggingface_token"]).strip()
+        config["huggingface_token"] = token
+        set_env_var(HF_TOKEN_ENV, token)
+    
+    try:
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(config, f, indent=2)
+    except Exception as e:
+        logger.error(f"Error saving config: {e}")
+
+
+def get_hf_token(interactive: bool = False) -> Optional[str]:
+    """Get HuggingFace token from environment or config"""
+    # First check environment
+    token = os.environ.get("HUGGINGFACE_TOKEN", "").strip()
+    
+    # Then check config
+    if not token:
+        try:
+            from .cli.config import get_config_value
+            token = str(get_config_value("huggingface_token", "")).strip()
+            if token:
+                # Update environment variable
+                os.environ["HUGGINGFACE_TOKEN"] = token
         except:
             pass
     
@@ -533,24 +646,20 @@ def get_hf_token(interactive: bool = False) -> Optional[str]:
         try:
             click.echo("\n🔑 HuggingFace token is required for accessing this model.")
             click.echo("Get your token from: https://huggingface.co/settings/tokens")
-            click.echo("Enter token (press Enter to skip): ", nl=False)
             
-            # Read token character by character
-            chars = []
-            while True:
-                char = click.getchar()
-                if char in ('\r', '\n'):
-                    break
-                chars.append(char)
-                click.echo('*', nl=False)  # Show * for each character
+            token = click.prompt(
+                "Enter your HuggingFace token",
+                type=str,
+                default="",
+                show_default=False
+            ).strip()
             
-            token = ''.join(chars)
             if token:
-                if len(token) < 20:  # Basic validation
+                if len(token) < 20:
                     click.echo("\n❌ Invalid token format. Please check your token.")
                     return None
                     
-                click.echo("\n✅ Token saved!")
+                click.echo(f"\n✅ Token saved: {token}")
                 os.environ["HUGGINGFACE_TOKEN"] = token
                 
                 # Save to config
@@ -559,7 +668,6 @@ def get_hf_token(interactive: bool = False) -> Optional[str]:
             else:
                 click.echo("\nSkipping token...")
         except:
-            # If there's any error in interactive mode, just return None
             pass
             
     return token
