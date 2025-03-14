@@ -15,11 +15,13 @@ except ImportError:
 from typing import Optional, Tuple, Dict, Any, List
 
 from ..logger import get_logger
-from ..config import MIN_FREE_MEMORY
 
 # Get logger
 logger = get_logger("locallab.utils.system")
 
+# System constants
+MIN_FREE_MEMORY = 2000  # Minimum required free memory in MB
+MIN_GPU_MEMORY = 4000  # Minimum required GPU memory in MB
 
 def get_system_memory() -> Tuple[int, int]:
     """Get system memory information in MB"""
@@ -28,75 +30,33 @@ def get_system_memory() -> Tuple[int, int]:
     free_memory = vm.available // (1024 * 1024)  # Convert to MB
     return total_memory, free_memory
 
-
 def get_gpu_memory() -> Optional[Tuple[int, int]]:
-    """Get GPU memory information in MB if available"""
+    """Get GPU memory information in MB"""
     if not TORCH_AVAILABLE or not torch.cuda.is_available():
         return None
-    
-    # First try nvidia-ml-py3 (nvidia_smi)
+        
     try:
-        import nvidia_smi
-        nvidia_smi.nvmlInit()
-        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
-        info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
-        
-        total_memory = info.total // (1024 * 1024)  # Convert to MB
-        free_memory = info.free // (1024 * 1024)  # Convert to MB
-        
-        nvidia_smi.nvmlShutdown()
+        device = torch.cuda.current_device()
+        total_memory = torch.cuda.get_device_properties(device).total_memory // (1024 * 1024)  # Convert to MB
+        free_memory = total_memory - (torch.cuda.memory_allocated() + torch.cuda.memory_reserved()) // (1024 * 1024)
         return total_memory, free_memory
-    except ImportError:
-        # If nvidia_smi not available, log at debug level to avoid noise
-        logger.debug("nvidia-ml-py3 not installed, falling back to torch for GPU info")
-        # Fall back to torch for basic info
-        try:
-            # Get basic info from torch
-            device = torch.cuda.current_device()
-            total_memory = torch.cuda.get_device_properties(device).total_memory // (1024 * 1024)
-            # Note: torch doesn't provide free memory info easily, so we estimate
-            # by allocating a tensor and seeing what's available
-            torch.cuda.empty_cache()
-            free_memory = total_memory  # Optimistic starting point
-            
-            # Rough estimate - we can't get exact free memory from torch easily
-            return total_memory, free_memory
-        except Exception as torch_error:
-            logger.debug(f"Torch GPU memory check also failed: {str(torch_error)}")
-            return None
     except Exception as e:
-        logger.debug(f"Failed to get detailed GPU memory info: {str(e)}")
-        # Fall back to torch for basic info (same as ImportError case)
-        try:
-            device = torch.cuda.current_device()
-            total_memory = torch.cuda.get_device_properties(device).total_memory // (1024 * 1024)
-            torch.cuda.empty_cache()
-            free_memory = total_memory  # Optimistic estimate
-            return total_memory, free_memory
-        except Exception:
-            return None
+        logger.warning(f"Failed to get GPU memory info: {e}")
+        return None
 
-
-def check_resource_availability(required_memory: int) -> bool:
-    """Check if system has enough resources for the requested operation"""
+def check_resource_availability(required_memory: int = MIN_FREE_MEMORY) -> bool:
+    """Check if system has enough resources"""
     _, free_memory = get_system_memory()
-    
-    # Check system memory
-    if free_memory < MIN_FREE_MEMORY:
-        logger.warning(f"Low system memory: {free_memory}MB available")
+    if free_memory < required_memory:
         return False
-    
-    # If GPU is available, check GPU memory
-    if TORCH_AVAILABLE and torch.cuda.is_available():
-        gpu_memory = get_gpu_memory()
-        if gpu_memory:
-            total_gpu, free_gpu = gpu_memory
-            if free_gpu < required_memory:
-                logger.warning(f"Insufficient GPU memory: {free_gpu}MB available, {required_memory}MB required")
-                return False
-    
+        
+    gpu_mem = get_gpu_memory()
+    if gpu_mem is not None:
+        _, free_gpu = gpu_mem
+        if free_gpu < MIN_GPU_MEMORY:
+            return False
+            
     return True
-
 
 def get_device() -> str:
     """Get the device to use for computations."""
@@ -105,7 +65,6 @@ def get_device() -> str:
     else:
         return "cpu"
 
-
 def format_model_size(size_in_bytes: int) -> str:
     """Format model size in human-readable format"""
     for unit in ['B', 'KB', 'MB', 'GB']:
@@ -113,7 +72,6 @@ def format_model_size(size_in_bytes: int) -> str:
             return f"{size_in_bytes:.2f} {unit}"
         size_in_bytes /= 1024
     return f"{size_in_bytes:.2f} TB"
-
 
 def get_system_resources() -> Dict[str, Any]:
     """Get system resource information"""
@@ -146,7 +104,6 @@ def get_system_resources() -> Dict[str, Any]:
     
     return resources
 
-
 def get_cpu_info() -> Dict[str, Any]:
     """Get information about the CPU."""
     return {
@@ -154,7 +111,6 @@ def get_cpu_info() -> Dict[str, Any]:
         "threads": psutil.cpu_count(logical=True),
         "usage": psutil.cpu_percent(interval=0.1)
     }
-
 
 def get_gpu_info() -> List[Dict[str, Any]]:
     """Get detailed information about all available GPUs.
@@ -231,7 +187,6 @@ def get_gpu_info() -> List[Dict[str, Any]]:
         
     return gpu_info
 
-
 def get_memory_info() -> Dict[str, Any]:
     """Get information about the system memory."""
     mem = psutil.virtual_memory()
@@ -242,8 +197,7 @@ def get_memory_info() -> Dict[str, Any]:
         "percent": mem.percent
     }
 
-
 # Add this function for backward compatibility
 def get_system_info() -> Dict[str, Any]:
     """Get system resource information (alias for get_system_resources)"""
-    return get_system_resources() 
+    return get_system_resources()

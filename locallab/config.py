@@ -1,48 +1,34 @@
 import os
 import json
-from typing import Dict, Any, Optional, List, Type
-from locallab.cli.config import ensure_config_dir
-import torch
-import psutil
-from huggingface_hub import model_info, HfApi
 import logging
+from typing import Dict, Any, Optional, List, Type
 from pathlib import Path
 import click
+from huggingface_hub import model_info, HfApi
 
+# Standard environment variable names
+NGROK_TOKEN_ENV = "NGROK_AUTHTOKEN"  # Official ngrok env var name
+HF_TOKEN_ENV = "HUGGINGFACE_TOKEN"   # Standard HF token env var
 
 def get_env_var(key: str, *, default: Any = None, var_type: Type = str) -> Any:
-    """Get environment variable with type conversion and validation.
-
-    Args:
-        key: Environment variable key
-        default: Default value if not found
-        var_type: Type to convert to (str, int, float, bool)
-
-    Returns:
-        Converted and validated value
-    """
-    # First check environment variables
+    """Get environment variable with type conversion and validation."""
     value = os.environ.get(key)
     
-    # If not found in environment, try the config file
     if value is None:
         try:
-            # Import here to avoid circular imports
             from .cli.config import get_config_value
-            # Convert key format: LOCALLAB_ENABLE_QUANTIZATION -> enable_quantization
-            if key.startswith("LOCALLAB_"):
-                config_key = key[9:].lower()
-            else:
-                config_key = key.lower()
+            config_key = key.lower()
+            if key == NGROK_TOKEN_ENV:
+                config_key = "ngrok_auth_token"
+            elif key == HF_TOKEN_ENV:
+                config_key = "huggingface_token"
             
             config_value = get_config_value(config_key)
             if config_value is not None:
                 value = config_value
-        except (ImportError, ModuleNotFoundError):
-            # If the config module isn't available yet, just use the environment variable
+        except:
             pass
     
-    # If still not found, use default
     if value is None:
         return default
 
@@ -54,6 +40,50 @@ def get_env_var(key: str, *, default: Any = None, var_type: Type = str) -> Any:
         logging.warning(f"Invalid value for {key}, using default: {default}")
         return default
 
+def set_env_var(name: str, value: str):
+    """Set environment variable with proper string handling"""
+    os.environ[name] = str(value).strip()
+
+def get_hf_token(interactive: bool = False) -> Optional[str]:
+    """Get HuggingFace token from environment or config"""
+    token = get_env_var(HF_TOKEN_ENV)
+    if token:
+        set_env_var(HF_TOKEN_ENV, token)  # Ensure it's in env vars
+    return token
+
+def get_ngrok_token() -> Optional[str]:
+    """Get ngrok token from environment or config"""
+    token = get_env_var(NGROK_TOKEN_ENV)
+    if token:
+        set_env_var(NGROK_TOKEN_ENV, token)  # Ensure it's in env vars
+    return token
+
+def save_config(config: Dict[str, Any]):
+    """Save configuration to file"""
+    from .cli.config import ensure_config_dir, CONFIG_FILE
+    
+    ensure_config_dir()
+    
+    # Ensure tokens are stored as proper strings
+    if "ngrok_auth_token" in config:
+        token = str(config["ngrok_auth_token"]).strip()
+        config["ngrok_auth_token"] = token
+        set_env_var(NGROK_TOKEN_ENV, token)
+        
+    if "huggingface_token" in config:
+        token = str(config["huggingface_token"]).strip()
+        config["huggingface_token"] = token
+        set_env_var(HF_TOKEN_ENV, token)
+    
+    try:
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(config, f, indent=2)
+    except Exception as e:
+        logging.error(f"Error saving config: {e}")
+
+# Standard environment variable names - use official names
+NGROK_TOKEN_ENV = "NGROK_AUTHTOKEN"  # Official ngrok env var name
+HF_TOKEN_ENV = "HUGGINGFACE_TOKEN"   # Standard HF token env var
 
 # Server settings
 SERVER_HOST = get_env_var("SERVER_HOST", default="0.0.0.0")
