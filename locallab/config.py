@@ -208,7 +208,8 @@ def estimate_model_requirements(model_id: str) -> Dict[str, float]:
         "ram_gb": requirements["min_ram"] * 1.2,  # 20% buffer
         "vram_gb": requirements["min_vram"] * 1.2 if "min_vram" in requirements else 0
     }
-
+import torch
+import psutil
 
 # Model Configuration
 CUSTOM_MODEL = get_env_var("LOCALLAB_CUSTOM_MODEL", default="")
@@ -600,64 +601,6 @@ def set_env_var(name: str, value: str):
 def get_hf_token(interactive: bool = False) -> Optional[str]:
     """Get HuggingFace token from environment or config"""
     # First check environment
-    token = get_env_var(HF_TOKEN_ENV)
-    
-    # Then check config
-    if not token:
-        try:
-            from .cli.config import get_config_value
-            token = str(get_config_value("huggingface_token", "")).strip()
-            if token:
-                # Update environment variable
-                set_env_var(HF_TOKEN_ENV, token)
-        except:
-            pass
-    
-    return token
-
-def get_ngrok_token() -> Optional[str]:
-    """Get ngrok token from environment or config"""
-    # First check environment
-    token = get_env_var(NGROK_TOKEN_ENV)
-    
-    # Then check config
-    if not token:
-        try:
-            from .cli.config import get_config_value
-            token = str(get_config_value("ngrok_auth_token", "")).strip()
-            if token:
-                # Update environment variable
-                set_env_var(NGROK_TOKEN_ENV, token)
-        except:
-            pass
-    
-    return token
-
-def save_config(config: Dict[str, Any]):
-    """Save configuration to file"""
-    ensure_config_dir()
-    
-    # Ensure tokens are stored as proper strings
-    if "ngrok_auth_token" in config:
-        token = str(config["ngrok_auth_token"]).strip()
-        config["ngrok_auth_token"] = token
-        set_env_var(NGROK_TOKEN_ENV, token)
-        
-    if "huggingface_token" in config:
-        token = str(config["huggingface_token"]).strip()
-        config["huggingface_token"] = token
-        set_env_var(HF_TOKEN_ENV, token)
-    
-    try:
-        with open(CONFIG_FILE, "w") as f:
-            json.dump(config, f, indent=2)
-    except Exception as e:
-        logger.error(f"Error saving config: {e}")
-
-
-def get_hf_token(interactive: bool = False) -> Optional[str]:
-    """Get HuggingFace token from environment or config"""
-    # First check environment
     token = os.environ.get("HUGGINGFACE_TOKEN", "").strip()
     
     # Then check config
@@ -701,3 +644,44 @@ def get_hf_token(interactive: bool = False) -> Optional[str]:
             pass
             
     return token
+
+def get_ngrok_token() -> Optional[str]:
+    """Get ngrok token from environment or config"""
+    # First check environment
+    token = os.environ.get("NGROK_AUTHTOKEN", "").strip()
+    
+    # Then check config
+    if not token:
+        try:
+            from .cli.config import get_config_value
+            token = str(get_config_value("ngrok_auth_token", "")).strip()
+            if token:
+                # Update environment variable
+                os.environ["NGROK_AUTHTOKEN"] = token
+        except:
+            pass
+    
+    return token
+
+def save_config(config: Dict[str, Any]):
+    """Save configuration to file"""
+    from .cli.config import ensure_config_dir, CONFIG_FILE
+    
+    ensure_config_dir()
+    
+    # Ensure tokens are stored as proper strings
+    if "ngrok_auth_token" in config:
+        token = str(config["ngrok_auth_token"]).strip()
+        config["ngrok_auth_token"] = token
+        set_env_var(NGROK_TOKEN_ENV, token)
+        
+    if "huggingface_token" in config:
+        token = str(config["huggingface_token"]).strip()
+        config["huggingface_token"] = token
+        set_env_var(HF_TOKEN_ENV, token)
+    
+    try:
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(config, f, indent=2)
+    except Exception as e:
+        logger.error(f"Error saving config: {e}")
