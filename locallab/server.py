@@ -639,12 +639,12 @@ class ServerWithCallback(uvicorn.Server):
 
 
 def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Optional[str] = None):
-    
     try:
         set_server_status("initializing")
         
         print_initializing_banner(__version__)
         
+        # Load configuration
         from .cli.config import load_config, set_config_value
         
         try:
@@ -652,68 +652,47 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
         except Exception as e:
             logger.warning(f"Error loading configuration: {str(e)}. Using defaults.")
             saved_config = {}
+            
+        # Set up ngrok configuration
+        use_ngrok = (
+            use_ngrok if use_ngrok is not None 
+            else saved_config.get("use_ngrok", False) 
+            or os.environ.get("LOCALLAB_USE_NGROK", "").lower() == "true"
+        )
         
-        for key, value in saved_config.items():
-            if key == "model_id":
-                os.environ["HUGGINGFACE_MODEL"] = str(value)
-            elif key == "ngrok_auth_token":
-                os.environ["NGROK_AUTH_TOKEN"] = str(value)
-            elif key == "huggingface_token":
-                os.environ["HUGGINGFACE_TOKEN"] = str(value)
-            elif key in ["enable_quantization", "enable_attention_slicing", "enable_flash_attention", 
-                        "enable_better_transformer", "enable_cpu_offloading", "enable_cache", 
-                        "enable_file_logging"]:
-                env_key = f"LOCALLAB_{key.upper()}"
-                os.environ[env_key] = str(value).lower()
-            elif key in ["quantization_type", "model_timeout", "cache_ttl", "log_level", "log_file"]:
-                env_key = f"LOCALLAB_{key.upper()}"
-                os.environ[env_key] = str(value)
+        # Get port configuration
+        port = port or saved_config.get("port", None) or int(os.environ.get("LOCALLAB_PORT", "8000"))
         
-        config = prompt_for_config(use_ngrok, port, ngrok_auth_token)
-        
-        save_config(config)
-        
-        use_ngrok = config.get("use_ngrok", use_ngrok)
-        port = config.get("port", port or 8000)
-        ngrok_auth_token = config.get("ngrok_auth_token", ngrok_auth_token)
-        
-        if is_port_in_use(port):
-            logger.warning(f"Port {port} is already in use. Trying to find another port...")
-            for p in range(port+1, port+100):
-                if not is_port_in_use(p):
-                    port = p
-                    logger.info(f"Using alternative port: {port}")
-                    break
-            else:
-                raise RuntimeError(f"Could not find an available port in range {port}-{port+100}")
-        
+        # Handle ngrok auth token
+        if ngrok_auth_token:
+            os.environ["NGROK_AUTHTOKEN"] = ngrok_auth_token
+        elif saved_config.get("ngrok_auth_token"):
+            os.environ["NGROK_AUTHTOKEN"] = saved_config["ngrok_auth_token"]
+            
+        # Set up ngrok if enabled
         public_url = None
         if use_ngrok:
             os.environ["LOCALLAB_USE_NGROK"] = "true"
             
-            if not ngrok_auth_token and not os.environ.get("NGROK_AUTH_TOKEN"):
+            if not os.environ.get("NGROK_AUTHTOKEN"):
                 logger.error("Ngrok auth token is required for public access. Please set it in the configuration.")
                 logger.info("You can get a free token from: https://dashboard.ngrok.com/get-started/your-authtoken")
                 raise ValueError("Ngrok auth token is required for public access")
                 
-            logger.info(f"{Fore.CYAN}Setting up ngrok tunnel to port {port}...{Style.RESET_ALL}")
-            public_url = setup_ngrok(port=port, auth_token=ngrok_auth_token or os.environ.get("NGROK_AUTH_TOKEN"))
+            logger.info(f"Setting up ngrok tunnel to port {port}...")
+            public_url = setup_ngrok(port)
+            
             if public_url:
                 os.environ["LOCALLAB_NGROK_URL"] = public_url
                 
                 ngrok_section = f"\n{Fore.CYAN}┌────────────────────────── Ngrok Tunnel Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🚀 Ngrok Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
                 print(ngrok_section)
-            
             else:
-
- 
-
-                logger.warning(f"{Fore.YELLOW}Failed to set up ngrok tunnel. Server will run locally on port {port}.{Style.RESET_ALL}")
- 
-
+                logger.error(f"Failed to set up ngrok tunnel. Server will run locally on port {port}.")
+                raise RuntimeError("Failed to set up ngrok tunnel")
         else:
-            # Set environment variable to indicate ngrok is not enabled
             os.environ["LOCALLAB_USE_NGROK"] = "false"
+
         # Set environment variable with the port
         os.environ["LOCALLAB_PORT"] = str(port)
         # Server info section

@@ -35,8 +35,21 @@ def setup_ngrok(port: int) -> Optional[str]:
         ngrok.set_auth_token(auth_token)
         conf.get_default().auth_token = auth_token
         
-        # Start tunnel
-        public_url = ngrok.connect(port).public_url
+        # Start tunnel with improved configuration
+        tunnel = ngrok.connect(
+            port,
+            "http",
+            options={
+                "bind_tls": True,  # Enable HTTPS
+                "inspect": False,  # Disable inspection for better performance
+            }
+        )
+        
+        public_url = tunnel.public_url
+        
+        # Store the URL in environment for clients
+        os.environ["LOCALLAB_NGROK_URL"] = public_url
+        
         logger.info(f"Ngrok tunnel established at: {public_url}")
         return public_url
         
