@@ -2,36 +2,37 @@
 API routes for model management
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from typing import Dict, List, Any, Optional
-import time
-import asyncio
+from typing import Dict, Any, Optional
+import os
 
 from ..logger import get_logger
 from ..core.app import model_manager
-from ..config import MODEL_REGISTRY
+from ..logger.logger import log_model_loaded, log_model_unloaded
+from ..config import get_env_var
 
 # Get logger
 logger = get_logger("locallab.routes.models")
 
 # Create router
-router = APIRouter(tags=["Models"], prefix="/models")
+router = APIRouter(tags=["Models"])
 
+class LoadModelRequest(BaseModel):
+    """Request model for loading a model"""
+    model_id: str
 
-class ModelResponse(BaseModel):
-    """Response model for the current model info"""
-    id: str
-    name: str
-    is_loaded: bool
-    loading_progress: Optional[float] = None
-
-
-class ModelsListResponse(BaseModel):
-    """Response model for the list of available models"""
-    models: List[Dict[str, Any]]
-    current_model: Optional[str] = None
-
+@router.post("/models/load")
+async def load_model(request: LoadModelRequest) -> Dict[str, str]:
+    """Load a specific model"""
+    try:
+        # Load the model but don't persist it to config
+        # This way it won't override CLI/env settings on restart
+        await model_manager.load_model(request.model_id)
+        return {"message": f"Model {request.model_id} loaded successfully"}
+    except Exception as e:
+        logger.error(f"Failed to load model {request.model_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("", response_model=ModelsListResponse)
 async def list_models() -> ModelsListResponse:
@@ -95,11 +96,6 @@ async def load_model(model_id: str, background_tasks: BackgroundTasks) -> Dict[s
         raise HTTPException(status_code=500, detail=str(e))
 
 
-class LoadModelRequest(BaseModel):
-    """Request model for loading a model with JSON body"""
-    model_id: str
-
-
 @router.post("/load", response_model=Dict[str, str])
 async def load_model_from_body(request: LoadModelRequest, background_tasks: BackgroundTasks) -> Dict[str, str]:
     """Load a specific model using model_id from request body"""
@@ -158,4 +154,4 @@ async def get_model_status(model_id: str) -> ModelResponse:
             name=model_info.get("name", model_id),
             is_loaded=False,
             loading_progress=0.0
-        ) 
+        )

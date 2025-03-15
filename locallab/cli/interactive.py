@@ -91,6 +91,8 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
         default=config.get("model_id", DEFAULT_MODEL)
     )
     config["model_id"] = model_id
+    # Set environment variable for model
+    os.environ["HUGGINGFACE_MODEL"] = model_id
     
     # Port configuration
     port = click.prompt(

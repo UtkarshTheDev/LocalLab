@@ -38,6 +38,7 @@ from ..config import (
     ENABLE_COMPRESSION,
     QUANTIZATION_TYPE,
 )
+from ..cli.config import get_config_value
 
 # Get the logger
 logger = get_logger("locallab.app")
@@ -97,8 +98,15 @@ async def startup_event():
     else:
         logger.warning("FastAPICache not available, caching disabled")
     
-    # Check for model specified in environment variables (prioritize HUGGINGFACE_MODEL)
-    model_to_load = os.environ.get("HUGGINGFACE_MODEL", DEFAULT_MODEL)
+    # Check for model specified in environment variables or CLI config
+    # Priority: HUGGINGFACE_MODEL > CLI config > DEFAULT_MODEL
+    from ..cli.config import get_config_value
+    
+    model_to_load = (
+        os.environ.get("HUGGINGFACE_MODEL") or 
+        get_config_value("model_id") or 
+        DEFAULT_MODEL
+    )
     
     # Log model configuration
     logger.info(f"Model configuration:")

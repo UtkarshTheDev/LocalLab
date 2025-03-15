@@ -43,25 +43,11 @@ QUANTIZATION_SETTINGS = {
 
 class ModelManager:
     def __init__(self):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.current_model: Optional[str] = None
-        self.model: Optional[AutoModelForCausalLM] = None
-        self.tokenizer: Optional[AutoTokenizer] = None
-        self.model_config: Optional[Dict[str, Any]] = None
-        self.last_used: float = time.time()
-        self.compiled_model: bool = False
-        self.response_cache = {}  # Simple in-memory cache for responses
-
-        logger.info(f"Using device: {self.device}")
-
-        # Only try to use Flash Attention if it's explicitly enabled and not empty
-        if ENABLE_FLASH_ATTENTION and str(ENABLE_FLASH_ATTENTION).lower() not in ('false', '0', 'none', ''):
-            try:
-                import flash_attn
-                logger.info("Flash Attention enabled - will accelerate transformer attention operations")
-            except ImportError:
-                logger.info("Flash Attention not available - this is an optional optimization and won't affect basic functionality")
-                logger.info("To enable Flash Attention, install with: pip install flash-attn --no-build-isolation")
+        self.model = None
+        self.tokenizer = None
+        self.current_model = None
+        self._loading = False
+        self._last_use = time.time()
 
     def _get_quantization_config(self) -> Optional[Dict[str, Any]]:
         """Get quantization configuration based on settings"""
@@ -250,181 +236,37 @@ class ModelManager:
             logger.warning(f"Some optimizations could not be applied: {str(e)}")
             return model
 
-    async def load_model(self, model_id: str) -> bool:
-        """Load a model from HuggingFace Hub"""
-        try:
-            start_time = time.time()
-            logger.info(f"\n{Fore.CYAN}Loading model: {model_id}{Style.RESET_ALL}")
+    async def load_model(self, model_id: str) -> None:
+        """Load a model but don't persist it to config"""
+        if self._loading:
+            raise RuntimeError("Another model is currently loading")
+            
+        self._loading = True
         
-            # Get and validate HuggingFace token
-            from .config import get_hf_token, HF_TOKEN_ENV, set_env_var
-            hf_token = get_hf_token(interactive=False)
+        try:
+            # Unload current model if any
+            if self.model:
+                self.unload_model()
+                
+            # Load the new model
+            logger.info(f"Loading model: {model_id}")
+            start_time = time.time()
             
-            if hf_token:
-                # Ensure token is properly set in environment
-                set_env_var(HF_TOKEN_ENV, hf_token)
+            # Apply optimizations based on config
+            self.model = await self._load_model_with_optimizations(model_id)
+            self.current_model = model_id
             
-            if not hf_token and model_id in ["microsoft/phi-2"]:  # Add other gated models here
-                logger.error(f"{Fore.RED}This model requires authentication. Please configure your HuggingFace token first.{Style.RESET_ALL}")
-                logger.info(f"{Fore.YELLOW}You can set your token by running: locallab config{Style.RESET_ALL}")
-                raise HTTPException(
-                    status_code=401,
-                    detail="HuggingFace token required for this model. Run 'locallab config' to set up."
-                )
-
-            if self.model is not None:
-                prev_model = self.current_model
-                logger.info(f"Unloading previous model: {prev_model}")
-                del self.model
-                self.model = None
-                self.compiled_model = False
-                self.response_cache.clear()  # Clear cache when changing models
-                torch.cuda.empty_cache()
-                gc.collect()
-                log_model_unloaded(prev_model)
-
-            # Validate token if provided
-            if hf_token:
-                from huggingface_hub import HfApi
-                try:
-                    api = HfApi()
-                    api.whoami(token=hf_token)
-                    logger.info(f"{Fore.GREEN}✓ HuggingFace token validated{Style.RESET_ALL}")
-                except Exception as e:
-                    logger.error(f"{Fore.RED}Invalid HuggingFace token: {str(e)}{Style.RESET_ALL}")
-                    raise HTTPException(
-                        status_code=401,
-                        detail=f"Invalid HuggingFace token: {str(e)}"
-                    )
-            # Set CUDA memory allocation configuration
-            os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"   
-            try:
-                # First, try to get model config to check architecture
-                from transformers import AutoConfig, BertLMHeadModel, AutoModelForCausalLM
-                model_config = AutoConfig.from_pretrained(
-                    model_id,
-                    trust_remote_code=True,
-                    token=hf_token
-                )
-
-                # First, try to get model config to check architecture
-                from transformers import AutoConfig
-                model_config = AutoConfig.from_pretrained(
-                    model_id,
-                    trust_remote_code=True,
-                    token=hf_token
-                )
-
-                # Check if it's a BERT-based model
-                is_bert_based = any(arch.lower().startswith('bert') for arch in model_config.architectures) if hasattr(model_config, 'architectures') else False
-
-                # If it's BERT-based, set is_decoder=True
-                if is_bert_based:
-                    logger.info("Detected BERT-based model, configuring for generation...")
-                    model_config.is_decoder = True
-                    if hasattr(model_config, 'add_cross_attention'):
-                        model_config.add_cross_attention = False
-
-                # Load tokenizer first
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    model_id,
-                    trust_remote_code=True,
-                    token=hf_token
-                )
-                # Get quantization configuration
-                config = self._get_quantization_config()
-
-                # Determine if we should use CPU offloading
-                use_cpu_offload = not torch.cuda.is_available() or torch.cuda.get_device_properties(0).total_memory < 4 * 1024 * 1024 * 1024  # Less than 4GB VRAM
-
-                if use_cpu_offload:
-                    logger.info("Using CPU offloading due to limited GPU memory or CPU-only environment")
-                    config["device_map"] = {
-                        "": "cpu"
-                    }
-                    config["offload_folder"] = "offload"
-                    if "torch_dtype" in config:
-                        # Use lower precision for CPU to save memory
-                        config["torch_dtype"] = torch.float32
-
-                # Load the model with the modified config
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    model_id,
-                    config=model_config,
-                    trust_remote_code=True,
-                    token=hf_token,
-                    low_cpu_mem_usage=True,  # Enable low memory usage
-                    **config
-                )
-                
-                logger.info(f"Model loaded with device_map='auto' for automatic placement")
-
-                # Apply memory optimizations
-                if use_cpu_offload:
-                    # Enable gradient checkpointing for memory efficiency
-                    if hasattr(self.model, "gradient_checkpointing_enable"):
-                        self.model.gradient_checkpointing_enable()
-                        logger.info("Enabled gradient checkpointing for memory efficiency")
-
-                    # Enable CPU offloading if available
-                    if hasattr(self.model, "enable_cpu_offload"):
-                        self.model.enable_cpu_offload()
-                        logger.info("Enabled CPU offloading")
-
-                # Apply optimizations if needed
-                self.model = self._apply_optimizations(self.model)
-                
-                # Set model to evaluation mode
-                self.model.eval()
-                
-                # Clear any unused memory
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                gc.collect()
-
-                # Capture model parameters after loading
-                model_architecture = self.model.config.architectures[0] if hasattr(self.model.config, 'architectures') else 'Unknown'
-                memory_used = torch.cuda.memory_allocated() if torch.cuda.is_available() else 'N/A'
-                logger.info(f"Model architecture: {model_architecture}")
-                logger.info(f"Memory used: {memory_used}")
-
-                self.current_model = model_id
-                if model_id in MODEL_REGISTRY:
-                    self.model_config = MODEL_REGISTRY[model_id]
-                else:
-                    self.model_config = {"max_length": DEFAULT_MAX_LENGTH}
-
-                load_time = time.time() - start_time
-                log_model_loaded(model_id, load_time)
-                logger.info(f"{Fore.GREEN}✓ Model '{model_id}' loaded successfully in {load_time:.2f} seconds{Style.RESET_ALL}")
-                return True
-
-            except Exception as e:
-                logger.error(f"{Fore.RED}✗ Error loading model {model_id}: {str(e)}{Style.RESET_ALL}")
-                if self.model is not None:
-                    del self.model
-                    self.model = None
-                    self.compiled_model = False
-                    torch.cuda.empty_cache()
-                    gc.collect()
-
-                # Try to load a smaller fallback model
-                fallback_model = "microsoft/phi-2"  # A smaller model that works well
-                if model_id != fallback_model:
-                    logger.warning(f"{Fore.YELLOW}! Attempting to load fallback model: {fallback_model}{Style.RESET_ALL}")
-                    return await self.load_model(fallback_model)
-                else:
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Failed to load model: {str(e)}"
-                    )
-
+            load_time = time.time() - start_time
+            logger.info(f"Model loaded in {load_time:.2f} seconds")
+            
+            # Log the model load but don't persist to config
+            log_model_loaded(model_id, load_time)
+            
         except Exception as e:
-            logger.error(f"{Fore.RED}✗ Failed to load model {model_id}: {str(e)}{Style.RESET_ALL}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to load model: {str(e)}"
-            )
+            logger.error(f"Error loading model: {str(e)}")
+            raise
+        finally:
+            self._loading = False
 
     def check_model_timeout(self):
         """Check if model should be unloaded due to inactivity"""
