@@ -2,21 +2,41 @@
 API routes for model management
 """
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import os
 
 from ..logger import get_logger
 from ..core.app import model_manager
 from ..logger.logger import log_model_loaded, log_model_unloaded
-from ..config import get_env_var
+from ..config import get_env_var, MODEL_REGISTRY
 
 # Get logger
 logger = get_logger("locallab.routes.models")
 
 # Create router
 router = APIRouter(tags=["Models"])
+
+class ModelInfo(BaseModel):
+    """Model information response"""
+    id: str
+    name: str
+    can_load: bool = True
+    description: str = ""
+    is_loaded: bool = False
+
+class ModelResponse(BaseModel):
+    """Response model for model status"""
+    id: str
+    name: str
+    is_loaded: bool
+    loading_progress: float = 0.0
+
+class ModelsListResponse(BaseModel):
+    """Response model for listing models"""
+    models: List[ModelInfo]
+    current_model: Optional[str] = None
 
 class LoadModelRequest(BaseModel):
     """Request model for loading a model"""
