@@ -15,8 +15,11 @@ from ..config import get_env_var, MODEL_REGISTRY
 # Get logger
 logger = get_logger("locallab.routes.models")
 
-# Create router
-router = APIRouter(tags=["Models"])
+# Create router with prefix
+router = APIRouter(
+    prefix="/models",
+    tags=["Models"]
+)
 
 class ModelInfo(BaseModel):
     """Model information response"""
@@ -42,7 +45,7 @@ class LoadModelRequest(BaseModel):
     """Request model for loading a model"""
     model_id: str
 
-@router.post("/models/load")
+@router.post("/load")
 async def load_model(request: LoadModelRequest) -> Dict[str, str]:
     """Load a specific model"""
     try:
@@ -54,7 +57,7 @@ async def load_model(request: LoadModelRequest) -> Dict[str, str]:
         logger.error(f"Failed to load model {request.model_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("", response_model=ModelsListResponse)
+@router.get("/list", response_model=ModelsListResponse)
 async def list_models() -> ModelsListResponse:
     """List all available models"""
     models_list = []
@@ -72,13 +75,11 @@ async def list_models() -> ModelsListResponse:
         current_model=model_manager.current_model
     )
 
-
 @router.get("/available", response_model=ModelsListResponse)
 async def available_models() -> ModelsListResponse:
     """List all available models (alternative endpoint)"""
     # This endpoint exists to provide compatibility with different API patterns
     return await list_models()
-
 
 @router.get("/current", response_model=ModelResponse)
 async def get_current_model() -> ModelResponse:
@@ -95,7 +96,6 @@ async def get_current_model() -> ModelResponse:
         is_loaded=True,
         loading_progress=1.0
     )
-
 
 @router.post("/load/{model_id}", response_model=Dict[str, str])
 async def load_model(model_id: str, background_tasks: BackgroundTasks) -> Dict[str, str]:
@@ -114,7 +114,6 @@ async def load_model(model_id: str, background_tasks: BackgroundTasks) -> Dict[s
     except Exception as e:
         logger.error(f"Failed to load model {model_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.post("/load", response_model=Dict[str, str])
 async def load_model_from_body(request: LoadModelRequest, background_tasks: BackgroundTasks) -> Dict[str, str]:
@@ -135,7 +134,6 @@ async def load_model_from_body(request: LoadModelRequest, background_tasks: Back
         logger.error(f"Failed to load model {model_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.post("/unload", response_model=Dict[str, str])
 async def unload_model() -> Dict[str, str]:
     """Unload the current model to free up resources"""
@@ -149,7 +147,6 @@ async def unload_model() -> Dict[str, str]:
     except Exception as e:
         logger.error(f"Failed to unload model: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/status/{model_id}", response_model=ModelResponse)
 async def get_model_status(model_id: str) -> ModelResponse:
