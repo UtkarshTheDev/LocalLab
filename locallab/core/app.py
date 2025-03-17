@@ -37,6 +37,7 @@ from ..config import (
     DEFAULT_MODEL,
     ENABLE_COMPRESSION,
     QUANTIZATION_TYPE,
+    SERVER_PORT,
 )
 from ..cli.config import get_config_value
 
@@ -96,7 +97,8 @@ async def startup_event():
     use_ngrok = get_config_value("use_ngrok", False)
     if use_ngrok:
         from ..utils.networking import setup_ngrok
-        ngrok_url = await setup_ngrok(SERVER_PORT)
+        port = int(os.environ.get("LOCALLAB_PORT", SERVER_PORT))  # Use SERVER_PORT as fallback
+        ngrok_url = await setup_ngrok(port)
         if ngrok_url:
             logger.info(f"{Fore.GREEN}Ngrok tunnel established successfully{Style.RESET_ALL}")
     

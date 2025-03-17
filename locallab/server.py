@@ -424,6 +424,11 @@ class SimpleTCPServer:
 
 
 class ServerWithCallback(uvicorn.Server):
+    def __init__(self, config):
+        super().__init__(config)
+        self.servers = []  # Initialize servers list
+        self.should_exit = False
+        
     def install_signal_handlers(self):
         def handle_exit(signum, frame):
             self.should_exit = True
@@ -436,207 +441,50 @@ class ServerWithCallback(uvicorn.Server):
         if self.should_exit:
             return
         
-        if sockets is not None:
-            try:
-                await super().startup(sockets=sockets)
-                logger.info("Using uvicorn's built-in Server implementation")
-            except Exception as e:
-                logger.error(f"Error during server startup: {str(e)}")
-                logger.debug(f"Server startup error details: {traceback.format_exc()}")
-                self.servers = []
+        try:
+            await super().startup(sockets=sockets)
+            logger.info("Using uvicorn's built-in Server implementation")
+        except Exception as e:
+            logger.error(f"Error during server startup: {str(e)}")
+            logger.debug(f"Server startup error details: {traceback.format_exc()}")
+            self.servers = []
+            if sockets:
                 for socket in sockets:
                     server = SimpleTCPServer(config=self.config)
                     server.server = self
                     await server.start()
                     self.servers.append(server)
-        else:
-            try:
-                await super().startup(sockets=None)
-                logger.info("Using uvicorn's built-in Server implementation")
-            except Exception as e:
-                logger.error(f"Error during server startup: {str(e)}")
-                logger.debug(f"Server startup error details: {traceback.format_exc()}")
+            else:
                 server = SimpleTCPServer(config=self.config)
                 server.server = self
                 await server.start()
-                self.servers = [server]
-        
-        if self.lifespan is not None:
-            try:
-                await self.lifespan.startup()
-            except Exception as e:
-                logger.error(f"Error during lifespan startup: {str(e)}")
-                logger.debug(f"Lifespan startup error details: {traceback.format_exc()}")
-                self.lifespan = NoopLifespan(self.config.app)
-                logger.warning("Replaced failed lifespan with NoopLifespan")
-    
-    async def main_loop(self):
-        try:
-            while not self.should_exit:
-                await asyncio.sleep(0.05)
-                
-                if self.should_exit:
-                    logger.debug("Shutdown signal detected in main_loop")
-                    break
-        except Exception as e:
-            logger.error(f"Error in main loop: {str(e)}")
-            logger.debug(f"Main loop error details: {traceback.format_exc()}")
-            self.should_exit = True
-        
-        logger.debug("Exiting main_loop")
+                self.servers.append(server)
     
     async def shutdown(self, sockets=None):
         logger.debug("Starting server shutdown process")
         
-        if self.servers:
-            for server in self.servers:
-                try:
-                    server.close()
-                    await server.wait_closed()
-                    logger.debug("Server closed successfully")
-                except Exception as e:
-                    logger.error(f"Error closing server: {str(e)}")
-                    logger.debug(f"Server close error details: {traceback.format_exc()}")
+        # First shutdown any SimpleTCPServer instances
+        for server in self.servers:
+            try:
+                await server.shutdown()
+                logger.debug("SimpleTCPServer shutdown completed")
+            except Exception as e:
+                logger.error(f"Error shutting down SimpleTCPServer: {str(e)}")
         
+        # Clear servers list
+        self.servers = []
+        
+        # Shutdown lifespan
         if self.lifespan is not None:
             try:
                 await self.lifespan.shutdown()
                 logger.debug("Lifespan shutdown completed")
             except Exception as e:
                 logger.error(f"Error during lifespan shutdown: {str(e)}")
-                logger.debug(f"Lifespan shutdown error details: {traceback.format_exc()}")
         
-        self.servers = []
         self.lifespan = None
         
         logger.debug("Server shutdown process completed")
-    
-    async def serve(self, sockets=None):
-        self.config.setup_event_loop()
-        
-        self.lifespan = None
-        
-        self._initialize_lifespan()
-        
-        try:
-            await self.startup(sockets=sockets)
-            
-            if hasattr(self, 'on_startup_callback') and callable(self.on_startup_callback):
-                self.on_startup_callback()
-            
-            await self.main_loop()
-            await self.shutdown()
-        except Exception as e:
-            logger.error(f"Error during server operation: {str(e)}")
-            logger.debug(f"Server error details: {traceback.format_exc()}")
-            raise
-            
-    def _initialize_lifespan(self):
-        try:
-            from uvicorn.lifespan.on import LifespanOn
-            
-            try:
-                self.lifespan = LifespanOn(config=self.config)
-                logger.info("Using LifespanOn from uvicorn.lifespan.on with config parameter")
-                return
-            except TypeError:
-                pass
-                
-            try:
-                self.lifespan = LifespanOn(self.config.app)
-                logger.info("Using LifespanOn from uvicorn.lifespan.on with app parameter")
-                return
-            except TypeError:
-                pass
-                
-            try:
-                lifespan_on = self.config.lifespan_on if hasattr(self.config, "lifespan_on") else "auto"
-                self.lifespan = LifespanOn(self.config.app, lifespan_on)
-                logger.info("Using LifespanOn from uvicorn.lifespan.on with app and lifespan_on parameters")
-                return
-            except TypeError:
-                pass
-                
-        except (ImportError, AttributeError):
-            logger.debug("Could not import LifespanOn from uvicorn.lifespan.on")
-            
-        try:
-            from uvicorn.lifespan.lifespan import Lifespan
-            
-            try:
-                self.lifespan = Lifespan(self.config.app)
-                logger.info("Using Lifespan from uvicorn.lifespan.lifespan with app parameter")
-                return
-            except TypeError:
-                pass
-                
-            try:
-                self.lifespan = Lifespan(self.config.app, "auto")
-                logger.info("Using Lifespan from uvicorn.lifespan.lifespan with app and lifespan_on parameters")
-                return
-            except TypeError:
-                pass
-                
-            try:
-                self.lifespan = Lifespan(self.config.app, "auto", logger)
-                logger.info("Using Lifespan from uvicorn.lifespan.lifespan with app, lifespan_on, and logger parameters")
-                return
-            except TypeError:
-                pass
-                
-        except (ImportError, AttributeError):
-            logger.debug("Could not import Lifespan from uvicorn.lifespan.lifespan")
-            
-        try:
-            from uvicorn.lifespan import Lifespan
-            
-            try:
-                self.lifespan = Lifespan(self.config.app)
-                logger.info("Using Lifespan from uvicorn.lifespan with app parameter")
-                return
-            except TypeError:
-                pass
-                
-            try:
-                self.lifespan = Lifespan(self.config.app, "auto")
-                logger.info("Using Lifespan from uvicorn.lifespan with app and lifespan_on parameters")
-                return
-            except TypeError:
-                pass
-                
-            try:
-                self.lifespan = Lifespan(self.config.app, "auto", logger)
-                logger.info("Using Lifespan from uvicorn.lifespan with app, lifespan_on, and logger parameters")
-                return
-            except TypeError:
-                pass
-                
-        except (ImportError, AttributeError):
-            logger.debug("Could not import Lifespan from uvicorn.lifespan")
-            
-        try:
-            from uvicorn.lifespan.state import LifespanState
-            
-            try:
-                self.lifespan = LifespanState(self.config.app)
-                logger.info("Using LifespanState from uvicorn.lifespan.state with app parameter")
-                return
-            except TypeError:
-                pass
-                
-            try:
-                self.lifespan = LifespanState(self.config.app, logger=logger)
-                logger.info("Using LifespanState from uvicorn.lifespan.state with app and logger parameters")
-                return
-            except TypeError:
-                pass
-                
-        except (ImportError, AttributeError):
-            logger.debug("Could not import LifespanState from uvicorn.lifespan.state")
-            
-        self.lifespan = NoopLifespan(self.config.app)
-        logger.warning("Using NoopLifespan - server may not handle startup/shutdown events properly")
-
 
 def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Optional[str] = None):
     try:
@@ -1017,7 +865,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                             logger.warning("Falling back to direct SimpleTCPServer implementation")
  
 
-                            direct_server = SimpleTCPServer(config)
+                            direct_server = SimpleTCPServer(config=self.config)
  
 
                             asyncio.run(direct_server.serve())
@@ -1062,7 +910,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                                 logger.warning("Falling back to direct SimpleTCPServer implementation")
  
 
-                                direct_server = SimpleTCPServer(config)
+                                direct_server = SimpleTCPServer(config=self.config)
  
 
                                 loop.run_until_complete(direct_server.serve())
@@ -1161,7 +1009,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                             logger.warning("Falling back to direct SimpleTCPServer implementation")
  
 
-                            direct_server = SimpleTCPServer(config)
+                            direct_server = SimpleTCPServer(config=self.config)
  
 
                             asyncio.run(direct_server.serve())
@@ -1206,7 +1054,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                                 logger.warning("Falling back to direct SimpleTCPServer implementation")
  
 
-                                direct_server = SimpleTCPServer(config)
+                                direct_server = SimpleTCPServer(config=self.config)
  
 
                                 loop.run_until_complete(direct_server.serve())
