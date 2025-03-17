@@ -236,6 +236,41 @@ class ModelManager:
             logger.warning(f"Some optimizations could not be applied: {str(e)}")
             return model
 
+    async def _load_model_with_optimizations(self, model_id: str):
+        """Load and optimize a model with all configured optimizations"""
+        try:
+            # Get HF token
+            from .config import get_hf_token
+            hf_token = get_hf_token(interactive=False)
+            
+            # Apply quantization settings
+            quant_config = self._get_quantization_config()
+            
+            # Load tokenizer first
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                model_id,
+                token=hf_token if hf_token else None
+            )
+            
+            # Load model with optimizations
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_id,
+                token=hf_token if hf_token else None,
+                **quant_config
+            )
+            
+            # Apply additional optimizations
+            self.model = self._apply_optimizations(self.model)
+            
+            # Set model to evaluation mode
+            self.model.eval()
+            
+            return self.model
+            
+        except Exception as e:
+            logger.error(f"Error loading model: {str(e)}")
+            raise
+
     async def load_model(self, model_id: str) -> None:
         """Load a model but don't persist it to config"""
         if self._loading:
@@ -460,6 +495,7 @@ class ModelManager:
             logger.error(f"Generation failed: {str(e)}")
             raise HTTPException(
                 status_code=500, detail=f"Generation failed: {str(e)}")
+
 
     def _stream_generate(
         self,

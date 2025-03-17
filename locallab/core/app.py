@@ -80,16 +80,25 @@ app.include_router(system_router)
 @app.on_event("startup")
 async def startup_event():
     """Initialization tasks when the server starts"""
-    logger.info("Starting LocalLab server...")
+    logger.info(f"{Fore.CYAN}Starting LocalLab server...{Style.RESET_ALL}")
     
     # Get HuggingFace token and set it in environment if available
     from ..config import get_hf_token
     hf_token = get_hf_token(interactive=False)
     if hf_token:
         os.environ["HUGGINGFACE_TOKEN"] = hf_token
-        logger.info("HuggingFace token loaded from configuration")
+        logger.info(f"{Fore.GREEN}HuggingFace token loaded from configuration{Style.RESET_ALL}")
     else:
-        logger.warning("No HuggingFace token found. Some models may not be accessible.")
+        logger.warning(f"{Fore.YELLOW}No HuggingFace token found. Some models may not be accessible.{Style.RESET_ALL}")
+    
+    # Check if ngrok should be enabled
+    from ..cli.config import get_config_value
+    use_ngrok = get_config_value("use_ngrok", False)
+    if use_ngrok:
+        from ..utils.networking import setup_ngrok
+        ngrok_url = await setup_ngrok(SERVER_PORT)
+        if ngrok_url:
+            logger.info(f"{Fore.GREEN}Ngrok tunnel established successfully{Style.RESET_ALL}")
     
     # Initialize cache if available
     if FASTAPI_CACHE_AVAILABLE:
@@ -99,9 +108,6 @@ async def startup_event():
         logger.warning("FastAPICache not available, caching disabled")
     
     # Check for model specified in environment variables or CLI config
-    # Priority: HUGGINGFACE_MODEL > CLI config > DEFAULT_MODEL
-    from ..cli.config import get_config_value
-    
     model_to_load = (
         os.environ.get("HUGGINGFACE_MODEL") or 
         get_config_value("model_id") or 
@@ -109,7 +115,7 @@ async def startup_event():
     )
     
     # Log model configuration
-    logger.info(f"Model configuration:")
+    logger.info(f"{Fore.CYAN}Model configuration:{Style.RESET_ALL}")
     logger.info(f" - Model to load: {model_to_load}")
     logger.info(f" - Quantization: {'Enabled - ' + os.environ.get('LOCALLAB_QUANTIZATION_TYPE', QUANTIZATION_TYPE) if os.environ.get('LOCALLAB_ENABLE_QUANTIZATION', '').lower() == 'true' else 'Disabled'}")
     logger.info(f" - Attention slicing: {'Enabled' if os.environ.get('LOCALLAB_ENABLE_ATTENTION_SLICING', '').lower() == 'true' else 'Disabled'}")

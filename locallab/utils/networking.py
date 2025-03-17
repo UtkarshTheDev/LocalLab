@@ -8,6 +8,7 @@ import logging
 import requests
 from typing import Optional, Dict, List, Tuple
 from ..config import NGROK_TOKEN_ENV, get_ngrok_token, set_env_var
+from colorama import Fore, Style
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +21,13 @@ def setup_ngrok(port: int) -> Optional[str]:
     """Setup ngrok tunnel for the given port"""
     try:
         from pyngrok import ngrok, conf
+        from colorama import Fore, Style
         
         # Get ngrok token using the standardized function
         auth_token = get_ngrok_token()
         
         if not auth_token:
-            logger.error("Ngrok auth token not found. Please configure it using 'locallab config'")
+            logger.error(f"{Fore.RED}Ngrok auth token not found. Please configure it using 'locallab config'{Style.RESET_ALL}")
             return None
             
         # Ensure token is properly set in environment
@@ -50,12 +52,19 @@ def setup_ngrok(port: int) -> Optional[str]:
         # Store the URL in environment for clients
         os.environ["LOCALLAB_NGROK_URL"] = public_url
         
-        logger.info(f"Ngrok tunnel established at: {public_url}")
+        # Display banner
+        logger.info(f"""
+{Fore.GREEN}┌────────────────────────────────────────────────────────────────┐{Style.RESET_ALL}
+{Fore.GREEN}│                      NGROK TUNNEL ACTIVE                       │{Style.RESET_ALL}
+{Fore.GREEN}├────────────────────────────────────────────────────────────────┤{Style.RESET_ALL}
+{Fore.GREEN}│{Style.RESET_ALL} Public URL: {Fore.CYAN}{public_url}{Style.RESET_ALL}
+{Fore.GREEN}└────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
+""")
         return public_url
         
     except Exception as e:
-        logger.error(f"Failed to setup ngrok: {str(e)}")
-        logger.info("Please check your ngrok token using 'locallab config'")
+        logger.error(f"{Fore.RED}Failed to setup ngrok: {str(e)}{Style.RESET_ALL}")
+        logger.info(f"{Fore.YELLOW}Please check your ngrok token using 'locallab config'{Style.RESET_ALL}")
         return None
 
 def get_network_interfaces() -> List[Dict[str, str]]:
