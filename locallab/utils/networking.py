@@ -37,14 +37,11 @@ def setup_ngrok(port: int) -> Optional[str]:
         ngrok.set_auth_token(auth_token)
         conf.get_default().auth_token = auth_token
         
-        # Start tunnel with improved configuration
+        # Start tunnel with simplified configuration
         tunnel = ngrok.connect(
-            port,
-            "http",
-            options={
-                "bind_tls": True,  # Enable HTTPS
-                "inspect": False,  # Disable inspection for better performance
-            }
+            addr=port,
+            proto="http",
+            bind_tls=True  # Enable HTTPS
         )
         
         public_url = tunnel.public_url

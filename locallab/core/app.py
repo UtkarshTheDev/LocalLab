@@ -98,9 +98,13 @@ async def startup_event():
     if use_ngrok:
         from ..utils.networking import setup_ngrok
         port = int(os.environ.get("LOCALLAB_PORT", SERVER_PORT))  # Use SERVER_PORT as fallback
-        ngrok_url = await setup_ngrok(port)
+        
+        # Handle ngrok setup synchronously since it's not async
+        ngrok_url = setup_ngrok(port)
         if ngrok_url:
             logger.info(f"{Fore.GREEN}Ngrok tunnel established successfully{Style.RESET_ALL}")
+        else:
+            logger.warning("Failed to establish ngrok tunnel. Server will run locally only.")
     
     # Initialize cache if available
     if FASTAPI_CACHE_AVAILABLE:
