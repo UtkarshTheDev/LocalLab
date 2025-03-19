@@ -74,7 +74,7 @@ test_endpoint "/chat" "POST" '{
 test_endpoint "/generate/batch" "POST" '{
     "prompts": [
         "What is 2+2?",
-        "Who is Linus Torwalds?",
+        "Who is Linus Torwalds?"
     ]
 }'
 

@@ -205,10 +205,22 @@ class SimpleTCPServer:
         self._serve_task = None
         self._socket = None
         self.app = config.app
+        self.callback_triggered = False
     
     async def start(self):
         self.started = True
         logger.info("Started SimpleTCPServer as fallback")
+        
+        # Trigger callback if server has one and it hasn't been triggered yet
+        if (hasattr(self, 'server') and self.server and 
+            hasattr(self.server, 'on_startup_callback') and 
+            not self.callback_triggered and
+            not (hasattr(self.server, 'callback_triggered') and self.server.callback_triggered)):
+            logger.info("Executing startup callback from SimpleTCPServer.start")
+            self.server.on_startup_callback()
+            self.callback_triggered = True
+            if hasattr(self.server, 'callback_triggered'):
+                self.server.callback_triggered = True
         
         if not self._serve_task:
             self._serve_task = asyncio.create_task(self._run_server())
@@ -428,6 +440,7 @@ class ServerWithCallback(uvicorn.Server):
         super().__init__(config)
         self.servers = []  # Initialize servers list
         self.should_exit = False
+        self.callback_triggered = False  # Flag to track if callback has been triggered
         
     def install_signal_handlers(self):
         def handle_exit(signum, frame):
@@ -444,21 +457,43 @@ class ServerWithCallback(uvicorn.Server):
         try:
             await super().startup(sockets=sockets)
             logger.info("Using uvicorn's built-in Server implementation")
+            
+            # Execute callback after successful startup
+            # This is critical to show the running banner
+            if hasattr(self, 'on_startup_callback') and not self.callback_triggered:
+                logger.info("Executing server startup callback")
+                self.on_startup_callback()
+                self.callback_triggered = True
+                
         except Exception as e:
             logger.error(f"Error during server startup: {str(e)}")
             logger.debug(f"Server startup error details: {traceback.format_exc()}")
             self.servers = []
+            
+            # Create SimpleTCPServer as fallback
             if sockets:
                 for socket in sockets:
                     server = SimpleTCPServer(config=self.config)
                     server.server = self
                     await server.start()
                     self.servers.append(server)
+                    
+                    # Make sure callback is executed for the fallback server too
+                    if hasattr(self, 'on_startup_callback') and not self.callback_triggered:
+                        logger.info("Executing server startup callback (fallback server)")
+                        self.on_startup_callback()
+                        self.callback_triggered = True
             else:
                 server = SimpleTCPServer(config=self.config)
                 server.server = self
                 await server.start()
                 self.servers.append(server)
+                
+                # Make sure callback is executed for the fallback server too
+                if hasattr(self, 'on_startup_callback') and not self.callback_triggered:
+                    logger.info("Executing server startup callback (fallback server)")
+                    self.on_startup_callback()
+                    self.callback_triggered = True
     
     async def shutdown(self, sockets=None):
         logger.debug("Starting server shutdown process")
@@ -562,15 +597,17 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
             logger.error(f"{Fore.YELLOW}Please ensure all dependencies are installed: pip install -e .{Style.RESET_ALL}")
             raise
 
-        # Create a function to display the Running banner when the server is ready
-        startup_complete = False  # Flag to track if startup has been completed
+        # Flag to track if startup has been completed
+        startup_complete = [False]  # Using a list as a mutable reference
 
         def on_startup():
-            nonlocal startup_complete
-            if startup_complete:
+            # Use the mutable reference to track startup
+            if startup_complete[0]:
                 return
 
             try:
+                logger.info("Server startup callback triggered")
+                
                 # Set server status to running
                 set_server_status("running")
                 
@@ -614,12 +651,14 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                     logger.debug(f"Footer display error details: {traceback.format_exc()}")
                 
                 # Set flag to indicate startup is complete
-                startup_complete = True
+                startup_complete[0] = True
+                logger.info("Server startup display completed successfully")
+                
             except Exception as e:
                 logger.error(f"Error during server startup display: {str(e)}")
                 logger.debug(f"Startup display error details: {traceback.format_exc()}")
                 # Still mark startup as complete to avoid repeated attempts
-                startup_complete = True
+                startup_complete[0] = True
                 # Ensure server status is set to running even if display fails
                 set_server_status("running")
 
@@ -639,8 +678,9 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                 
                 # Define the callback for Colab
                 async def on_startup_async():
-                    # This will only run once due to the flag in on_startup
-                    on_startup()
+                    # This is an async callback that uvicorn might call
+                    if not startup_complete[0]:
+                        on_startup()
                 
                 config = uvicorn.Config(
                     app, 
@@ -648,12 +688,11 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                     port=port, 
                     reload=False, 
                     log_level="info",
-                    # Use an async callback function, not a list
-                    callback_notify=on_startup_async
+                    callback_notify=[on_startup_async]  # Use a list for the callback
                 )
                 
                 server = ServerWithCallback(config)
-                server.on_startup_callback = on_startup  # Set the callback
+                server.on_startup_callback = on_startup  # Also set the direct callback
                 
                 # Use the appropriate event loop method based on Python version
                 try:
@@ -664,7 +703,8 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                         if "'Server' object has no attribute 'start'" in str(e):
                             # If we get the 'start' attribute error, use our SimpleTCPServer directly
                             logger.warning("Falling back to direct SimpleTCPServer implementation")
-                            direct_server = SimpleTCPServer(config=self.config)
+                            direct_server = SimpleTCPServer(config=config)  # Pass the config directly
+                            direct_server.server = server  # Set reference to the server for callbacks
                             asyncio.run(direct_server.serve())
                         else:
                             raise
@@ -679,7 +719,8 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                             if "'Server' object has no attribute 'start'" in str(e):
                                 # If we get the 'start' attribute error, use our SimpleTCPServer directly
                                 logger.warning("Falling back to direct SimpleTCPServer implementation")
-                                direct_server = SimpleTCPServer(config=self.config)
+                                direct_server = SimpleTCPServer(config=config)  # Pass the config directly
+                                direct_server.server = server  # Set reference to the server for callbacks
                                 loop.run_until_complete(direct_server.serve())
                             else:
                                 raise
@@ -698,12 +739,11 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                     reload=False, 
                     workers=1, 
                     log_level="info",
-                    # This won't be used directly, as we call on_startup in the ServerWithCallback class
-                    callback_notify=None
+                    callback_notify=[lambda: on_startup()]  # Use a lambda to prevent immediate execution
                 )
                 
                 server = ServerWithCallback(config)
-                server.on_startup_callback = on_startup  # Set the callback
+                server.on_startup_callback = on_startup  # Set the callback directly
                 
                 # Use asyncio.run which is more reliable
                 try:
@@ -714,7 +754,8 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                         if "'Server' object has no attribute 'start'" in str(e):
                             # If we get the 'start' attribute error, use our SimpleTCPServer directly
                             logger.warning("Falling back to direct SimpleTCPServer implementation")
-                            direct_server = SimpleTCPServer(config=self.config)
+                            direct_server = SimpleTCPServer(config=config)  # Pass the config directly
+                            direct_server.server = server  # Set reference to the server for callbacks
                             asyncio.run(direct_server.serve())
                         else:
                             raise
@@ -729,13 +770,20 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                             if "'Server' object has no attribute 'start'" in str(e):
                                 # If we get the 'start' attribute error, use our SimpleTCPServer directly
                                 logger.warning("Falling back to direct SimpleTCPServer implementation")
-                                direct_server = SimpleTCPServer(config=self.config)
+                                direct_server = SimpleTCPServer(config=config)  # Pass the config directly
+                                direct_server.server = server  # Set reference to the server for callbacks
                                 loop.run_until_complete(direct_server.serve())
                             else:
                                 raise
                     else:
                         # Re-raise other errors
                         raise
+                        
+            # If we reach here and startup hasn't completed yet, call it manually as a fallback
+            if not startup_complete[0]:
+                logger.warning("Server started but startup callback wasn't triggered. Calling manually...")
+                on_startup()
+                
         except Exception as e:
             logger.error(f"Server startup failed: {str(e)}")
             logger.error(traceback.format_exc())
