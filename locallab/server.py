@@ -11,10 +11,11 @@ import traceback
 import socket
 import uvicorn
 import os
+import logging
 from colorama import Fore, Style, init
 init(autoreset=True)
 
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict, List, Tuple, Any
 from . import __version__
 from .utils.networking import is_port_in_use, setup_ngrok
 from .ui.banners import (
@@ -178,9 +179,20 @@ def signal_handler(signum, frame):
             pass
         
         logger.info("Forcing process termination to ensure clean shutdown")
+        # Use os._exit to guarantee termination even if other threads are running
         os._exit(0)
         
-    threading.Thread(target=delayed_exit, daemon=True).start()
+    # Start a daemonic thread to force exit after a timeout
+    force_exit_thread = threading.Thread(target=delayed_exit, daemon=True)
+    force_exit_thread.start()
+    
+    # Signal the main thread to exit immediately
+    # This is important to ensure that even if the server is stuck, the process will terminate
+    logger.info("Sending SIGINT to the current process to ensure clean exit")
+    time.sleep(1)  # Give some time for the delayed_exit thread to start
+    
+    # If we're still running after 1 second, try to force kill the process again
+    os.kill(os.getpid(), signal.SIGTERM)
 
 
 class NoopLifespan:
@@ -403,36 +415,79 @@ class SimpleTCPServer:
                 pass
     
     async def shutdown(self):
+        """Shutdown the TCP server gracefully"""
+        logger.info("Shutting down SimpleTCPServer")
+        
+        # First mark server as stopping to prevent new connections
         self.started = False
-        self._running = False
+        if hasattr(self, '_running'):
+            self._running = False
         
-        if self._serve_task:
-            self._serve_task.cancel()
+        # Cancel any running tasks
+        if self._serve_task and not self._serve_task.done():
             try:
-                await self._serve_task
-            except asyncio.CancelledError:
-                pass
-            self._serve_task = None
+                logger.debug("Cancelling serve task")
+                self._serve_task.cancel()
+                try:
+                    await asyncio.wait_for(self._serve_task, timeout=2.0)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    logger.debug("Serve task cancelled or timed out")
+            except Exception as e:
+                logger.warning(f"Error cancelling serve task: {str(e)}")
+            finally:
+                self._serve_task = None
         
+        # Close socket connections
         if self._socket:
             try:
+                logger.debug("Closing server socket")
                 self._socket.close()
-            except Exception:
-                pass
-            self._socket = None
+            except Exception as e:
+                logger.warning(f"Error closing socket: {str(e)}")
+            finally:
+                self._socket = None
         
-        logger.info("Shutdown SimpleTCPServer")
+        # Try to clean up event loop tasks
+        try:
+            # Clean up any pending tasks
+            tasks = [t for t in asyncio.all_tasks() 
+                    if t is not asyncio.current_task() and not t.done()]
+            if tasks:
+                logger.debug(f"Cancelling {len(tasks)} remaining tasks")
+                for task in tasks:
+                    task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+        except Exception as e:
+            logger.warning(f"Error cleaning up tasks: {str(e)}")
+        
+        logger.info("SimpleTCPServer shutdown completed")
     
     async def serve(self, sock=None):
+        """Main server method, keeps running until shutdown"""
         self.started = True
         try:
             while self.started:
                 await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            logger.info("SimpleTCPServer.serve task cancelled")
         except Exception as e:
             logger.error(f"Error in SimpleTCPServer.serve: {str(e)}")
             logger.debug(f"SimpleTCPServer.serve error details: {traceback.format_exc()}")
         finally:
             self.started = False
+            logger.info("SimpleTCPServer.serve exited")
+
+    def handle_app_startup_complete(self):
+        """Handle application startup complete event"""
+        if self.callback_triggered:
+            return
+            
+        if hasattr(self, 'server') and self.server and hasattr(self.server, 'on_startup_callback'):
+            logger.info("Executing startup callback from SimpleTCPServer.handle_app_startup_complete")
+            self.server.on_startup_callback()
+            self.callback_triggered = True
+            if hasattr(self.server, 'callback_triggered'):
+                self.server.callback_triggered = True
 
 
 class ServerWithCallback(uvicorn.Server):
@@ -446,6 +501,13 @@ class ServerWithCallback(uvicorn.Server):
         def handle_exit(signum, frame):
             self.should_exit = True
             logger.debug(f"Signal {signum} received in ServerWithCallback, setting should_exit=True")
+            
+            # Try to propagate the signal to parent process
+            # This helps ensure the process exits properly
+            try:
+                os.kill(os.getpid(), signal.SIGTERM)
+            except Exception:
+                pass
         
         signal.signal(signal.SIGINT, handle_exit)
         signal.signal(signal.SIGTERM, handle_exit)
@@ -494,17 +556,42 @@ class ServerWithCallback(uvicorn.Server):
                     logger.info("Executing server startup callback (fallback server)")
                     self.on_startup_callback()
                     self.callback_triggered = True
-    
+
+    # Add a method to explicitly handle the application startup complete event
+    def handle_app_startup_complete(self):
+        if hasattr(self, 'on_startup_callback') and not self.callback_triggered:
+            logger.info("Executing server startup callback from app startup complete event")
+            self.on_startup_callback()
+            self.callback_triggered = True
+
     async def shutdown(self, sockets=None):
         logger.debug("Starting server shutdown process")
         
         # First shutdown any SimpleTCPServer instances
         for server in self.servers:
             try:
-                await server.shutdown()
-                logger.debug("SimpleTCPServer shutdown completed")
+                # Check if the server has a shutdown method before calling it
+                if hasattr(server, 'shutdown') and callable(server.shutdown):
+                    await server.shutdown()
+                    logger.debug("SimpleTCPServer shutdown completed")
+                else:
+                    logger.warning(f"Server object of type {type(server)} does not have a shutdown method")
+                    # Try other shutdown methods that might be available
+                    if hasattr(server, 'stop') and callable(server.stop):
+                        if asyncio.iscoroutinefunction(server.stop):
+                            await server.stop()
+                        else:
+                            server.stop()
+                        logger.debug("Server stop method called instead of shutdown")
+                    elif hasattr(server, 'close') and callable(server.close):
+                        if asyncio.iscoroutinefunction(server.close):
+                            await server.close()
+                        else:
+                            server.close()
+                        logger.debug("Server close method called instead of shutdown")
             except Exception as e:
-                logger.error(f"Error shutting down SimpleTCPServer: {str(e)}")
+                logger.error(f"Error shutting down server: {str(e)}")
+                logger.debug(f"Server shutdown error details: {traceback.format_exc()}")
         
         # Clear servers list
         self.servers = []
@@ -520,6 +607,14 @@ class ServerWithCallback(uvicorn.Server):
         self.lifespan = None
         
         logger.debug("Server shutdown process completed")
+        
+        # Force exit after a short delay if the server is still running
+        def force_exit():
+            time.sleep(2)
+            logger.info("Forcing process termination after shutdown")
+            os._exit(0)
+        
+        threading.Thread(target=force_exit, daemon=True).start()
 
 def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Optional[str] = None):
     try:
@@ -600,6 +695,22 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
         # Flag to track if startup has been completed
         startup_complete = [False]  # Using a list as a mutable reference
 
+        # Create a custom logging handler to detect when the application is ready
+        class StartupDetectionHandler(logging.Handler):
+            def __init__(self, server_ref):
+                super().__init__()
+                self.server_ref = server_ref
+                
+            def emit(self, record):
+                if not startup_complete[0] and "Application startup complete" in record.getMessage():
+                    logger.info("Detected application startup complete message")
+                    if hasattr(self.server_ref, "handle_app_startup_complete"):
+                        self.server_ref.handle_app_startup_complete()
+                    else:
+                        logger.warning("Server reference doesn't have handle_app_startup_complete method")
+                        # Call on_startup directly as a fallback
+                        on_startup()
+
         def on_startup():
             # Use the mutable reference to track startup
             if startup_complete[0]:
@@ -666,6 +777,14 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
             # Detect if we're in Google Colab
             in_colab = is_in_colab()
             
+            # Create server reference holder
+            server_ref = [None]
+            
+            # Set up the log handler for startup detection
+            startup_handler = StartupDetectionHandler(server_ref)
+            logging.getLogger("uvicorn").addHandler(startup_handler)
+            logging.getLogger("uvicorn.error").addHandler(startup_handler)
+            
             if in_colab or use_ngrok:
                 # Colab environment setup
                 try:
@@ -693,6 +812,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                 
                 server = ServerWithCallback(config)
                 server.on_startup_callback = on_startup  # Also set the direct callback
+                server_ref[0] = server  # Store reference for log handler
                 
                 # Use the appropriate event loop method based on Python version
                 try:
@@ -705,6 +825,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                             logger.warning("Falling back to direct SimpleTCPServer implementation")
                             direct_server = SimpleTCPServer(config=config)  # Pass the config directly
                             direct_server.server = server  # Set reference to the server for callbacks
+                            server_ref[0] = direct_server  # Update reference
                             asyncio.run(direct_server.serve())
                         else:
                             raise
@@ -721,6 +842,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                                 logger.warning("Falling back to direct SimpleTCPServer implementation")
                                 direct_server = SimpleTCPServer(config=config)  # Pass the config directly
                                 direct_server.server = server  # Set reference to the server for callbacks
+                                server_ref[0] = direct_server  # Update reference
                                 loop.run_until_complete(direct_server.serve())
                             else:
                                 raise
@@ -744,6 +866,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                 
                 server = ServerWithCallback(config)
                 server.on_startup_callback = on_startup  # Set the callback directly
+                server_ref[0] = server  # Store reference for log handler
                 
                 # Use asyncio.run which is more reliable
                 try:
@@ -756,6 +879,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                             logger.warning("Falling back to direct SimpleTCPServer implementation")
                             direct_server = SimpleTCPServer(config=config)  # Pass the config directly
                             direct_server.server = server  # Set reference to the server for callbacks
+                            server_ref[0] = direct_server  # Update reference
                             asyncio.run(direct_server.serve())
                         else:
                             raise
@@ -772,6 +896,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                                 logger.warning("Falling back to direct SimpleTCPServer implementation")
                                 direct_server = SimpleTCPServer(config=config)  # Pass the config directly
                                 direct_server.server = server  # Set reference to the server for callbacks
+                                server_ref[0] = direct_server  # Update reference
                                 loop.run_until_complete(direct_server.serve())
                             else:
                                 raise

@@ -8,10 +8,11 @@ import asyncio
 import gc
 import torch
 import os
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import contextmanager
 from colorama import Fore, Style
+from typing import Optional, Dict, Any, List
 
 # Try to import FastAPICache, but don't fail if not available
 try:
@@ -29,7 +30,7 @@ except ImportError:
 
 from .. import __version__
 from ..logger import get_logger
-from ..logger.logger import log_request, log_model_loaded, log_model_unloaded, get_request_count
+from ..logger.logger import log_request, log_model_loaded, log_model_unloaded, get_request_count, set_server_status
 from ..model_manager import ModelManager
 from ..config import (
     ENABLE_CORS,
@@ -38,8 +39,11 @@ from ..config import (
     ENABLE_COMPRESSION,
     QUANTIZATION_TYPE,
     SERVER_PORT,
+    DEFAULT_MAX_LENGTH,
+    get_env_var,
 )
 from ..cli.config import get_config_value
+from ..utils.system import get_system_resources
 
 # Get the logger
 logger = get_logger("locallab.app")
@@ -77,10 +81,29 @@ app.include_router(models_router)
 app.include_router(generate_router)
 app.include_router(system_router)
 
+# Startup event triggered flag
+startup_event_triggered = False
 
+# Application startup event to ensure banners are displayed
 @app.on_event("startup")
 async def startup_event():
-    """Initialization tasks when the server starts"""
+    """Event that is triggered when the application starts up"""
+    global startup_event_triggered
+    
+    # Only log once
+    if startup_event_triggered:
+        return
+        
+    logger.info("FastAPI application startup event triggered")
+    startup_event_triggered = True
+    
+    # Wait a short time to ensure logs are processed
+    await asyncio.sleep(0.5)
+    
+    # Log a special message that our callback handler will detect
+    root_logger = logging.getLogger()
+    root_logger.info("Application startup complete - banner display trigger")
+    
     logger.info(f"{Fore.CYAN}Starting LocalLab server...{Style.RESET_ALL}")
     
     # Get HuggingFace token and set it in environment if available
@@ -158,7 +181,8 @@ async def shutdown_event():
             model_manager.current_model = None
             
         # Clean up memory
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         gc.collect()
         
         # Log model unloading
@@ -169,7 +193,37 @@ async def shutdown_event():
     except Exception as e:
         logger.error(f"Error during shutdown cleanup: {str(e)}")
     
+    # Clean up any pending tasks
+    try:
+        tasks = [t for t in asyncio.all_tasks() 
+                if t is not asyncio.current_task() and not t.done()]
+        if tasks:
+            logger.debug(f"Cancelling {len(tasks)} remaining tasks")
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+    except Exception as e:
+        logger.warning(f"Error cleaning up tasks: {str(e)}")
+    
+    # Set server status to stopped
+    set_server_status("stopped")
+    
     logger.info(f"{Fore.GREEN}Server shutdown complete{Style.RESET_ALL}")
+    
+    # Force exit if needed to clean up any hanging resources
+    import threading
+    def force_exit():
+        import time
+        import os
+        import signal
+        time.sleep(3)  # Give a little time for clean shutdown
+        logger.info("Forcing exit after shutdown to ensure clean termination")
+        try:
+            os.kill(os.getpid(), signal.SIGTERM)
+        except:
+            os._exit(0)
+    
+    threading.Thread(target=force_exit, daemon=True).start()
 
 
 @app.middleware("http")
