@@ -51,11 +51,11 @@ def setup_ngrok(port: int) -> Optional[str]:
         
         # Display banner
         logger.info(f"""
-{Fore.GREEN}┌────────────────────────────────────────────────────────────────┐{Style.RESET_ALL}
-{Fore.GREEN}│                      NGROK TUNNEL ACTIVE                       │{Style.RESET_ALL}
-{Fore.GREEN}├────────────────────────────────────────────────────────────────┤{Style.RESET_ALL}
-{Fore.GREEN}│{Style.RESET_ALL} Public URL: {Fore.CYAN}{public_url}{Style.RESET_ALL}
-{Fore.GREEN}└────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}
+{Fore.GREEN}╔═══════════════════════════════════════════════════════════════════╗{Style.RESET_ALL}
+{Fore.GREEN}                      ✨ NGROK TUNNEL ACTIVE ✨                      {Style.RESET_ALL}
+{Fore.GREEN}╠═══════════════════════════════════════════════════════════════════╣{Style.RESET_ALL}
+{Fore.CYAN}  Public URL: {Fore.YELLOW}{public_url}{Style.RESET_ALL}
+{Fore.GREEN}╚═══════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
 """)
         return public_url
         

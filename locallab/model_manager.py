@@ -47,7 +47,18 @@ class ModelManager:
         self.tokenizer = None
         self.current_model = None
         self._loading = False
-        self._last_use = time.time()
+        self._last_use = time.time()  # Initialize _last_use
+        self.response_cache = {}  # Add cache dictionary
+
+    @property
+    def last_used(self) -> float:
+        """Get the timestamp of last model use"""
+        return self._last_use
+
+    @last_used.setter
+    def last_used(self, value: float):
+        """Set the timestamp of last model use"""
+        self._last_use = value
 
     def _get_quantization_config(self) -> Optional[Dict[str, Any]]:
         """Get quantization configuration based on settings"""

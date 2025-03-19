@@ -490,6 +490,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
     try:
         set_server_status("initializing")
         
+        # Print initializing banner immediately
         print_initializing_banner(__version__)
         
         # Load configuration
@@ -543,18 +544,16 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
 
         # Set environment variable with the port
         os.environ["LOCALLAB_PORT"] = str(port)
+        
         # Server info section
         server_section = f"\n{Fore.CYAN}┌────────────────────────── Server Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🖥️ Local URL: {Fore.GREEN}http://localhost:{port}{Style.RESET_ALL}\n│  ⚙️ Status: {Fore.GREEN}Starting{Style.RESET_ALL}\n│  🔄 Model Loading: {Fore.YELLOW}In Progress{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
         print(server_section, flush=True)
- 
+
         # Set up signal handlers for graceful shutdown
-
         signal.signal(signal.SIGINT, signal_handler)
-
         signal.signal(signal.SIGTERM, signal_handler)
 
         # Import app here to avoid circular imports
-
         try:
             from .core.app import app
         except ImportError as e:
@@ -567,608 +566,210 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
         startup_complete = False  # Flag to track if startup has been completed
 
         def on_startup():
- 
-
-            # Use a flag to ensure this function only runs once
- 
-
             nonlocal startup_complete
- 
-
             if startup_complete:
- 
-
                 return
- 
-
- 
 
             try:
- 
-
                 # Set server status to running
- 
-
                 set_server_status("running")
- 
-
                 
- 
-
                 # Display the RUNNING banner
- 
-
                 print_running_banner(__version__)
- 
-
                 
- 
-
                 try:
- 
-
                     # Display system resources
- 
-
                     print_system_resources()
- 
-
                 except Exception as e:
- 
-
                     logger.error(f"Error displaying system resources: {str(e)}")
- 
-
                     logger.debug(f"System resources error details: {traceback.format_exc()}")
- 
-
                 
- 
-
                 try:
- 
-
                     # Display model information
- 
-
                     print_model_info()
- 
-
                 except Exception as e:
- 
-
                     logger.error(f"Error displaying model information: {str(e)}")
- 
-
                     logger.debug(f"Model information error details: {traceback.format_exc()}")
- 
-
                 
- 
-
                 try:
- 
-
                     # Display system instructions
- 
-
                     print_system_instructions()
- 
-
                 except Exception as e:
- 
-
                     logger.error(f"Error displaying system instructions: {str(e)}")
- 
-
                     logger.debug(f"System instructions error details: {traceback.format_exc()}")
- 
-
                 
- 
-
                 try:
- 
-
                     # Display API documentation
- 
-
                     print_api_docs()
- 
-
                 except Exception as e:
- 
-
                     logger.error(f"Error displaying API documentation: {str(e)}")
- 
-
                     logger.debug(f"API documentation error details: {traceback.format_exc()}")
- 
-
                     
- 
-
                 try:
- 
-
                     # Display footer with author information
- 
-
                     from .ui.banners import print_footer
- 
-
                     print_footer()
- 
-
                 except Exception as e:
- 
-
                     logger.error(f"Error displaying footer: {str(e)}")
- 
-
                     logger.debug(f"Footer display error details: {traceback.format_exc()}")
- 
-
                 
- 
-
                 # Set flag to indicate startup is complete
- 
-
                 startup_complete = True
- 
-
             except Exception as e:
- 
-
                 logger.error(f"Error during server startup display: {str(e)}")
- 
-
                 logger.debug(f"Startup display error details: {traceback.format_exc()}")
- 
-
                 # Still mark startup as complete to avoid repeated attempts
- 
-
                 startup_complete = True
- 
-
                 # Ensure server status is set to running even if display fails
- 
-
                 set_server_status("running")
-
-               # Start uvicorn server directly in the main process
-
- 
 
         try:
- 
-
             # Detect if we're in Google Colab
- 
-
             in_colab = is_in_colab()
- 
-
             
- 
-
             if in_colab or use_ngrok:
- 
-
                 # Colab environment setup
- 
-
                 try:
- 
-
                     import nest_asyncio
- 
-
                     nest_asyncio.apply()
- 
-
                 except ImportError:
- 
-
                     logger.warning("nest_asyncio not available. This may cause issues in Google Colab.")
- 
-
-                    
- 
-
+                
                 logger.info(f"Starting server on port {port} (Colab/ngrok mode)")
- 
-
                 
- 
-
                 # Define the callback for Colab
- 
-
                 async def on_startup_async():
- 
-
                     # This will only run once due to the flag in on_startup
- 
-
                     on_startup()
- 
-
                 
- 
-
                 config = uvicorn.Config(
- 
-
                     app, 
- 
-
                     host="0.0.0.0",  # Bind to all interfaces in Colab
- 
-
                     port=port, 
- 
-
                     reload=False, 
- 
-
                     log_level="info",
- 
-
                     # Use an async callback function, not a list
- 
-
                     callback_notify=on_startup_async
- 
-
                 )
- 
-
                 
- 
-
                 server = ServerWithCallback(config)
- 
-
                 server.on_startup_callback = on_startup  # Set the callback
- 
-
                 
- 
-
                 # Use the appropriate event loop method based on Python version
- 
-
                 try:
- 
-
                     # Wrap in try/except to handle server startup errors
- 
-
                     try:
- 
-
                         asyncio.run(server.serve())
- 
-
                     except AttributeError as e:
- 
-
                         if "'Server' object has no attribute 'start'" in str(e):
- 
-
                             # If we get the 'start' attribute error, use our SimpleTCPServer directly
- 
-
                             logger.warning("Falling back to direct SimpleTCPServer implementation")
- 
-
                             direct_server = SimpleTCPServer(config=self.config)
- 
-
                             asyncio.run(direct_server.serve())
- 
-
                         else:
- 
-
                             raise
- 
-
                 except RuntimeError as e:
- 
-
                     # Handle "Event loop is already running" error
- 
-
                     if "Event loop is already running" in str(e):
- 
-
                         logger.warning("Event loop is already running. Using get_event_loop instead.")
- 
-
                         loop = asyncio.get_event_loop()
- 
-
                         try:
- 
-
                             loop.run_until_complete(server.serve())
- 
-
                         except AttributeError as e:
- 
-
                             if "'Server' object has no attribute 'start'" in str(e):
- 
-
                                 # If we get the 'start' attribute error, use our SimpleTCPServer directly
- 
-
                                 logger.warning("Falling back to direct SimpleTCPServer implementation")
- 
-
                                 direct_server = SimpleTCPServer(config=self.config)
- 
-
                                 loop.run_until_complete(direct_server.serve())
- 
-
                             else:
- 
-
                                 raise
- 
-
                     else:
- 
-
                         # Re-raise other errors
- 
-
                         raise
- 
-
             else:
- 
-
                 # Local environment
- 
-
                 logger.info(f"Starting server on port {port} (local mode)")
- 
-
+                
                 # For local environment, we'll use a custom Server subclass
- 
-
                 config = uvicorn.Config(
- 
-
                     app, 
- 
-
                     host="127.0.0.1",  # Localhost only for local mode
- 
-
                     port=port, 
- 
-
                     reload=False, 
- 
-
                     workers=1, 
- 
-
                     log_level="info",
- 
-
                     # This won't be used directly, as we call on_startup in the ServerWithCallback class
- 
-
                     callback_notify=None
- 
-
                 )
- 
-
+                
                 server = ServerWithCallback(config)
- 
-
                 server.on_startup_callback = on_startup  # Set the callback
- 
-
                 
- 
-
                 # Use asyncio.run which is more reliable
- 
-
                 try:
- 
-
                     # Wrap in try/except to handle server startup errors
- 
-
                     try:
- 
-
                         asyncio.run(server.serve())
- 
-
                     except AttributeError as e:
- 
-
                         if "'Server' object has no attribute 'start'" in str(e):
- 
-
                             # If we get the 'start' attribute error, use our SimpleTCPServer directly
- 
-
                             logger.warning("Falling back to direct SimpleTCPServer implementation")
- 
-
                             direct_server = SimpleTCPServer(config=self.config)
- 
-
                             asyncio.run(direct_server.serve())
- 
-
                         else:
- 
-
                             raise
- 
-
                 except RuntimeError as e:
- 
-
                     # Handle "Event loop is already running" error
- 
-
                     if "Event loop is already running" in str(e):
- 
-
                         logger.warning("Event loop is already running. Using get_event_loop instead.")
- 
-
                         loop = asyncio.get_event_loop()
- 
-
                         try:
- 
-
                             loop.run_until_complete(server.serve())
- 
-
                         except AttributeError as e:
- 
-
                             if "'Server' object has no attribute 'start'" in str(e):
- 
-
                                 # If we get the 'start' attribute error, use our SimpleTCPServer directly
- 
-
                                 logger.warning("Falling back to direct SimpleTCPServer implementation")
- 
-
                                 direct_server = SimpleTCPServer(config=self.config)
- 
-
                                 loop.run_until_complete(direct_server.serve())
- 
-
                             else:
- 
-
                                 raise
- 
-
                     else:
- 
-
                         # Re-raise other errors
- 
-
                         raise
- 
-
         except Exception as e:
- 
-
             logger.error(f"Server startup failed: {str(e)}")
- 
-
             logger.error(traceback.format_exc())
- 
-
             set_server_status("error")
- 
-
             
- 
-
             # Try to start a minimal server as a last resort
- 
-
             try:
- 
-
                 logger.warning("Attempting to start minimal server as fallback")
- 
-
+                
                 # Create a minimal config
- 
-
                 minimal_config = uvicorn.Config(
- 
-
                     app="locallab.core.minimal:app",  # Use a minimal app if available, or create one
- 
-
                     host="127.0.0.1",
- 
-
                     port=port or 8000,
- 
-
                     log_level="info"
- 
-
                 )
- 
-
                 
- 
-
                 # Create a simple server
- 
-
                 direct_server = SimpleTCPServer(config=minimal_config)
- 
-
                 
- 
-
                 # Start the server
- 
-
                 logger.info("Starting minimal server")
- 
-
                 asyncio.run(direct_server.serve())
- 
-
             except Exception as e2:
- 
-
                 logger.error(f"Minimal server startup also failed: {str(e2)}")
- 
-
                 logger.error(traceback.format_exc())
- 
-
                 raise RuntimeError(f"Server startup failed: {str(e)}. Minimal server also failed: {str(e2)}")
- 
-
             
- 
-
             raise
- 
     except Exception as e:
- 
-
         logger.error(f"Fatal error during server initialization: {str(e)}")
- 
-
         logger.error(traceback.format_exc())
- 
-
         set_server_status("error")
- 
+
 def cli():
     """Command line interface entry point for the package"""
     import click

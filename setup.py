@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="locallab",
-    version="0.4.40",
+    version="0.4.41",
     packages=find_packages(include=["locallab", "locallab.*"]),
     install_requires=[
         "fastapi>=0.95.0,<1.0.0",
