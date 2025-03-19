@@ -210,21 +210,25 @@ async def shutdown_event():
     
     logger.info(f"{Fore.GREEN}Server shutdown complete{Style.RESET_ALL}")
     
-    # Force exit if needed to clean up any hanging resources
-    import threading
-    def force_exit():
-        import time
-        import os
-        import signal
-        time.sleep(3)  # Give a little time for clean shutdown
-        logger.info("Forcing exit after shutdown to ensure clean termination")
-        try:
-            os.kill(os.getpid(), signal.SIGTERM)
-        except:
-            os._exit(0)
-    
-    threading.Thread(target=force_exit, daemon=True).start()
+    # Only force exit if this is a true shutdown initiated by SIGINT/SIGTERM
+    # Check if this was triggered by an actual signal
+    if hasattr(shutdown_event, 'force_exit_required') and shutdown_event.force_exit_required:
+        import threading
+        def force_exit():
+            import time
+            import os
+            import signal
+            time.sleep(3)  # Give a little time for clean shutdown
+            logger.info("Forcing exit after shutdown to ensure clean termination")
+            try:
+                os._exit(0)  # Direct exit instead of sending another signal
+            except:
+                pass
+        
+        threading.Thread(target=force_exit, daemon=True).start()
 
+# Initialize the flag (default to not forcing exit)
+shutdown_event.force_exit_required = False
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):

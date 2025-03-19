@@ -155,10 +155,21 @@ def check_environment() -> List[Tuple[str, str, bool]]:
 def signal_handler(signum, frame):
     print(f"\n{Fore.YELLOW}Received signal {signum}, shutting down server...{Style.RESET_ALL}")
     
+    # Check if we're already shutting down to avoid duplication
+    if hasattr(signal_handler, 'shutting_down') and signal_handler.shutting_down:
+        print("Already shutting down, please wait...")
+        return
+        
+    # Set flag to avoid duplicate shutdown
+    signal_handler.shutting_down = True
+    
     set_server_status("shutting_down")
     
     try:
         from .core.app import shutdown_event
+        
+        # Mark that this is a real shutdown that needs a force exit
+        shutdown_event.force_exit_required = True
         
         loop = asyncio.get_event_loop()
         if not loop.is_closed():
@@ -185,14 +196,9 @@ def signal_handler(signum, frame):
     # Start a daemonic thread to force exit after a timeout
     force_exit_thread = threading.Thread(target=delayed_exit, daemon=True)
     force_exit_thread.start()
-    
-    # Signal the main thread to exit immediately
-    # This is important to ensure that even if the server is stuck, the process will terminate
-    logger.info("Sending SIGINT to the current process to ensure clean exit")
-    time.sleep(1)  # Give some time for the delayed_exit thread to start
-    
-    # If we're still running after 1 second, try to force kill the process again
-    os.kill(os.getpid(), signal.SIGTERM)
+
+# Initialize the shutting down flag
+signal_handler.shutting_down = False
 
 
 class NoopLifespan:
@@ -499,15 +505,18 @@ class ServerWithCallback(uvicorn.Server):
         
     def install_signal_handlers(self):
         def handle_exit(signum, frame):
+            if hasattr(handle_exit, 'called') and handle_exit.called:
+                return
+                
+            handle_exit.called = True
             self.should_exit = True
             logger.debug(f"Signal {signum} received in ServerWithCallback, setting should_exit=True")
             
-            # Try to propagate the signal to parent process
-            # This helps ensure the process exits properly
-            try:
-                os.kill(os.getpid(), signal.SIGTERM)
-            except Exception:
-                pass
+            # Don't propagate signals back to avoid loops
+            # The main signal_handler will handle process termination
+        
+        # Initialize the flag
+        handle_exit.called = False
         
         signal.signal(signal.SIGINT, handle_exit)
         signal.signal(signal.SIGTERM, handle_exit)
@@ -694,6 +703,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
 
         # Flag to track if startup has been completed
         startup_complete = [False]  # Using a list as a mutable reference
+        should_force_exit = [False]  # To prevent premature shutdown
 
         # Create a custom logging handler to detect when the application is ready
         class StartupDetectionHandler(logging.Handler):
@@ -704,11 +714,16 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
             def emit(self, record):
                 if not startup_complete[0] and "Application startup complete" in record.getMessage():
                     logger.info("Detected application startup complete message")
-                    if hasattr(self.server_ref, "handle_app_startup_complete"):
-                        self.server_ref.handle_app_startup_complete()
-                    else:
-                        logger.warning("Server reference doesn't have handle_app_startup_complete method")
-                        # Call on_startup directly as a fallback
+                    try:
+                        if hasattr(self.server_ref[0], "handle_app_startup_complete"):
+                            self.server_ref[0].handle_app_startup_complete()
+                        else:
+                            logger.warning("Server reference doesn't have handle_app_startup_complete method")
+                            # Call on_startup directly as a fallback
+                            on_startup()
+                    except Exception as e:
+                        logger.error(f"Error in startup detection handler: {e}")
+                        # Still try to display banners as a last resort
                         on_startup()
 
         def on_startup():
@@ -773,6 +788,18 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                 # Ensure server status is set to running even if display fails
                 set_server_status("running")
 
+        # Define async callback that uvicorn can call
+        async def on_startup_async():
+            # This is an async callback that uvicorn might call
+            if not startup_complete[0]:
+                on_startup()
+
+        # Define this as a function to be called by uvicorn
+        def callback_notify_function():
+            # If needed, create and return an awaitable
+            loop = asyncio.get_event_loop()
+            return loop.create_task(on_startup_async())
+
         try:
             # Detect if we're in Google Colab
             in_colab = is_in_colab()
@@ -795,19 +822,13 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                 
                 logger.info(f"Starting server on port {port} (Colab/ngrok mode)")
                 
-                # Define the callback for Colab
-                async def on_startup_async():
-                    # This is an async callback that uvicorn might call
-                    if not startup_complete[0]:
-                        on_startup()
-                
                 config = uvicorn.Config(
                     app, 
                     host="0.0.0.0",  # Bind to all interfaces in Colab
                     port=port, 
                     reload=False, 
                     log_level="info",
-                    callback_notify=[on_startup_async]  # Use a list for the callback
+                    callback_notify=callback_notify_function  # Use a function, not a list
                 )
                 
                 server = ServerWithCallback(config)
@@ -861,7 +882,7 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                     reload=False, 
                     workers=1, 
                     log_level="info",
-                    callback_notify=[lambda: on_startup()]  # Use a lambda to prevent immediate execution
+                    callback_notify=callback_notify_function  # Use a function, not a lambda or list
                 )
                 
                 server = ServerWithCallback(config)
@@ -910,6 +931,12 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                 on_startup()
                 
         except Exception as e:
+            # Don't handle TypeError about 'list' object not being callable - that's exactly what we're fixing
+            if "'list' object is not callable" in str(e):
+                logger.error("Server error: callback_notify was passed a list instead of a callable function.")
+                logger.error("This is a known issue that will be fixed in the next version.")
+                raise
+                
             logger.error(f"Server startup failed: {str(e)}")
             logger.error(traceback.format_exc())
             set_server_status("error")
@@ -923,7 +950,8 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                     app="locallab.core.minimal:app",  # Use a minimal app if available, or create one
                     host="127.0.0.1",
                     port=port or 8000,
-                    log_level="info"
+                    log_level="info",
+                    callback_notify=None  # Don't use callbacks in the minimal server
                 )
                 
                 # Create a simple server
