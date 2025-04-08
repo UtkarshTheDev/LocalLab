@@ -136,9 +136,15 @@ def print_model_info():
         # Import here to avoid circular imports
         try:
             from ..config import get_env_var
+            from ..model_manager import ModelManager
             
-            # Get model information
-            model_id = get_env_var("HUGGINGFACE_MODEL", default="microsoft/phi-2")
+            # Get model information from model manager first
+            model_manager = ModelManager()
+            model_id = model_manager.current_model if model_manager.current_model else None
+            
+            # If no model loaded, check environment/config
+            if not model_id:
+                model_id = get_env_var("HUGGINGFACE_MODEL") or get_env_var("LOCALLAB_MODEL_ID") or "microsoft/phi-2"
             
             # Get optimization settings
             enable_quantization = get_env_var("LOCALLAB_ENABLE_QUANTIZATION", default="false").lower() == "true"
