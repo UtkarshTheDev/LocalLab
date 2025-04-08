@@ -4,6 +4,9 @@ import asyncio
 import aiohttp
 import websockets
 from pydantic import BaseModel, Field
+import logging
+
+logger = logging.getLogger(__name__)
 
 class LocalLabConfig(BaseModel):
     base_url: str
@@ -29,22 +32,23 @@ class Usage(BaseModel):
     total_tokens: int
 
 class GenerateResponse(BaseModel):
-    response: str
-    model_id: str
-    usage: Usage
+    """Response model for text generation"""
+    text: str  # Changed from 'response' to 'text' to match server
+    model: str  # Changed from 'model_id' to 'model' to match server
+    usage: Optional[Usage] = None  # Made usage optional since server might not always send it
 
 class ChatChoice(BaseModel):
     message: ChatMessage
-    finish_reason: str
+    finish_reason: Optional[str] = None  # Made optional
 
 class ChatResponse(BaseModel):
     choices: List[ChatChoice]
-    usage: Usage
+    usage: Optional[Usage] = None  # Made usage optional
 
 class BatchResponse(BaseModel):
     responses: List[str]
-    model_id: str
-    usage: Usage
+    model: str  # Changed from 'model_id' to 'model'
+    usage: Optional[Usage] = None  # Made usage optional
 
 class ModelInfo(BaseModel):
     name: str
@@ -89,8 +93,12 @@ class RateLimitError(LocalLabError):
         self.retry_after = retry_after
 
 class LocalLabClient:
-    def __init__(self, config: Union[LocalLabConfig, Dict[str, Any]]):
-        if isinstance(config, dict):
+    def __init__(self, config: Union[str, LocalLabConfig, Dict[str, Any]]):
+        """Initialize the client with either a URL string or config object"""
+        if isinstance(config, str):
+            # If just a URL string is provided, create a config object
+            config = LocalLabConfig(base_url=config)
+        elif isinstance(config, dict):
             config = LocalLabConfig(**config)
         self.config = config
         self.session: Optional[aiohttp.ClientSession] = None
@@ -157,32 +165,137 @@ class LocalLabClient:
                     raise LocalLabError(str(e), "CONNECTION_ERROR")
                 await asyncio.sleep(2 ** attempt)
 
-    async def generate(self, prompt: str, options: Optional[Union[GenerateOptions, Dict]] = None) -> GenerateResponse:
-        """Generate text from prompt"""
-        if isinstance(options, dict):
-            options = GenerateOptions(**options)
-        data = {"prompt": prompt, **(options.model_dump() if options else {})}
-        response = await self._request("POST", "/generate", json=data)
-        return GenerateResponse(**response)
-
     async def stream_generate(self, prompt: str, options: Optional[Union[GenerateOptions, Dict]] = None) -> AsyncGenerator[str, None]:
         """Stream generated text"""
         if isinstance(options, dict):
             options = GenerateOptions(**options)
-        if options:
-            options.stream = True
-        else:
-            options = GenerateOptions(stream=True)
+        if options is None:
+            options = GenerateOptions()
         
-        data = {"prompt": prompt, **options.model_dump()}
-        async with self.session.post("/generate/stream", json=data) as response:
+        # Ensure stream is True and format data correctly
+        data = {
+            "prompt": prompt,
+            "stream": True,
+            "max_tokens": options.max_length,
+            "temperature": options.temperature,
+            "top_p": options.top_p,
+            "model": options.model_id
+        }
+        # Remove None values
+        data = {k: v for k, v in data.items() if v is not None}
+        
+        async with self.session.post("/generate", json=data) as response:
+            if response.status != 200:
+                try:
+                    error_data = await response.json()
+                    error_msg = error_data.get("detail", "Streaming failed")
+                    logger.error(f"Streaming error: {error_msg}")
+                    yield f"\nError: {error_msg}"
+                    return
+                except:
+                    yield "\nError: Streaming failed"
+                    return
+            
+            buffer = ""
+            current_sentence = ""
+            last_token_was_space = False
+            
             async for line in response.content:
                 if line:
                     try:
-                        data = json.loads(line)
-                        yield data["response"]
-                    except json.JSONDecodeError:
-                        yield line.decode().strip()
+                        line = line.decode('utf-8').strip()
+                        # Skip empty lines
+                        if not line:
+                            continue
+                            
+                        # Handle SSE format
+                        if line.startswith("data: "):
+                            line = line[6:]  # Remove "data: " prefix
+                            
+                        # Skip control messages
+                        if line in ["[DONE]", "[ERROR]"]:
+                            continue
+                            
+                        try:
+                            # Try to parse as JSON
+                            data = json.loads(line)
+                            text = data.get("text", data.get("response", ""))
+                        except json.JSONDecodeError:
+                            # If not JSON, use the line as is
+                            text = line
+                            
+                        if text:
+                            # Clean up any special tokens
+                            text = text.replace("<|", "").replace("|>", "")
+                            text = text.replace("<", "").replace(">", "")
+                            text = text.replace("[", "").replace("]", "")
+                            text = text.replace("{", "").replace("}", "")
+                            text = text.replace("data:", "")
+                            text = text.replace("��", "")
+                            text = text.replace("\\n", "\n")
+                            text = text.replace("|user|", "")
+                            text = text.replace("|The", "The")
+                            text = text.replace("/|assistant|", "").replace("/|user|", "")
+                            
+                            # Add space between words if needed
+                            if (not text.startswith(" ") and 
+                                not text.startswith("\n") and 
+                                not last_token_was_space and 
+                                buffer and 
+                                not buffer.endswith(" ") and
+                                not buffer.endswith("\n")):
+                                text = " " + text
+                                
+                            # Update tracking variables
+                            buffer += text
+                            current_sentence += text
+                            last_token_was_space = text.endswith(" ") or text.endswith("\n")
+                            
+                            # Check for sentence completion
+                            if any(current_sentence.endswith(p) for p in [".", "!", "?", "\n"]):
+                                current_sentence = ""
+                            
+                            yield text
+                            
+                    except Exception as e:
+                        logger.error(f"Error processing stream chunk: {str(e)}")
+                        yield f"\nError: {str(e)}"
+                        return
+
+    async def generate(self, prompt: str, options: Optional[Union[GenerateOptions, Dict]] = None) -> GenerateResponse:
+        """Generate text from prompt"""
+        if isinstance(options, dict):
+            options = GenerateOptions(**options)
+        if options is None:
+            options = GenerateOptions()
+            
+        # Format data consistently with stream_generate
+        data = {
+            "prompt": prompt,
+            "max_tokens": options.max_length,
+            "temperature": options.temperature,
+            "top_p": options.top_p,
+            "model": options.model_id,
+            "stream": False
+        }
+        # Remove None values
+        data = {k: v for k, v in data.items() if v is not None}
+        
+        response = await self._request("POST", "/generate", json=data)
+        text = response.get("text", response.get("response", ""))
+        if isinstance(text, str):
+            # Clean up any special tokens
+            text = text.replace("<|", "").replace("|>", "")
+            text = text.replace("<", "").replace(">", "")
+            text = text.replace("[", "").replace("]", "")
+            text = text.replace("{", "").replace("}", "")
+            text = text.strip()
+            
+        return GenerateResponse(
+            text=text,
+            model=response.get("model", response.get("model_id", "")),
+            usage=response.get("usage")
+        )
 
     async def chat(self, messages: List[Union[ChatMessage, Dict]], options: Optional[Union[GenerateOptions, Dict]] = None) -> ChatResponse:
         """Chat completion"""
@@ -281,4 +394,4 @@ class LocalLabClient:
                 data = json.loads(message)
                 await callback(data)
             except json.JSONDecodeError:
-                await callback(message) 
+                await callback(message)

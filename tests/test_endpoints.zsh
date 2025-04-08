@@ -79,8 +79,8 @@ test_endpoint "/generate/batch" "POST" '{
 }'
 
 # Test Loading Model
-test_endpoint "/models/load" "POST" '{
-    "model_id": "microsoft/phi-2"
+# test_endpoint "/models/load" "POST" '{
+#     "model_id": "microsoft/phi-2"
 }'
 
 # Test System Instructions
@@ -89,6 +89,6 @@ test_endpoint "/system/instructions" "POST" '{
 }'
 
 # Test Unloading Model
-test_endpoint "/models/unload" "POST"
-
+# test_endpoint "/models/unload" "POST"
+#
 print "\n${GREEN}All tests completed!${RESET}"

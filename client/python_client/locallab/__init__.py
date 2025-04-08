@@ -19,7 +19,7 @@ from .client import (
     RateLimitError,
 )
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 __author__ = "Utkarsh"
 __email__ = "utkarshweb2023@gmail.com"
 
@@ -36,4 +36,4 @@ __all__ = [
     "LocalLabError",
     "ValidationError",
     "RateLimitError",
-] 
+]

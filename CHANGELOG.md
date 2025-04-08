@@ -2,6 +2,14 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.4.45] - 2024-03-14
+
+### Fixed
+- Fixed Python client initialization error "'str' object has no attribute 'headers'"
+- Updated client package to handle string URLs in constructor
+- Bumped client package version to 1.0.2
+- Updated documentation with correct client initialization examples
+
 ## [0.4.31] - 2024-03-14
 
 ### Fixed

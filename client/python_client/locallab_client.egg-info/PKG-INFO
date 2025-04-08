@@ -1,15 +1,15 @@
-Metadata-Version: 2.2
+Metadata-Version: 2.4
 Name: locallab-client
 Version: 1.0.1
 Summary: Python client for connecting to LocalLab servers - Interact with AI models running on LocalLab
-Home-page: https://github.com/yourusername/locallab-client
-Author: Your Name
+Home-page: https://github.com/UtkarshTheDev/LocalLab
+Author: Utkarsh Tiwari
 Author-email: Utkarsh <utkarshweb2023@gmail.com>
 License: MIT
-Project-URL: Homepage, https://github.com/Developer-Utkarsh/LocalLab
-Project-URL: Documentation, https://github.com/Developer-Utkarsh/LocalLab#readme
-Project-URL: Repository, https://github.com/Developer-Utkarsh/LocalLab.git
-Project-URL: Issues, https://github.com/Developer-Utkarsh/LocalLab/issues
+Project-URL: Homepage, https://github.com/UtkarshTheDev/LocalLab
+Project-URL: Documentation, https://github.com/UtkarshTheDev/LocalLab#readme
+Project-URL: Repository, https://github.com/UtkarshTheDev/LocalLab.git
+Project-URL: Issues, https://github.com/UtkarshTheDev/LocalLab/issues
 Keywords: llm,ai,client,api,inference
 Classifier: Development Status :: 4 - Beta
 Classifier: Intended Audience :: Developers
