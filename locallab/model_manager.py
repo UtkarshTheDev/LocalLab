@@ -747,14 +747,26 @@ class ModelManager:
 
         # Create a custom stream generator with improved quality
         async def improved_stream_generator():
-            # Use the same stopping conditions as non-streaming
             stop_sequences = ["</s>", "<|endoftext|>", "<|im_end|>", "<|assistant|>"]
             accumulated_text = ""
+            last_token_was_space = False  # Track if last token was a space
             
-            # Use a generator that produces high-quality chunks
             try:
                 for token_chunk in self._stream_generate(inputs, gen_params=gen_params):
+                    # Skip empty chunks
+                    if not token_chunk or token_chunk.isspace():
+                        continue
+                        
+                    # Add space between words if needed
+                    if not token_chunk.startswith(" ") and not last_token_was_space and accumulated_text:
+                        token_chunk = " " + token_chunk
+                        
                     accumulated_text += token_chunk
+                    last_token_was_space = token_chunk.endswith(" ")
+                    
+                    # Clean up the token
+                    token_chunk = token_chunk.replace("|user|", "").replace("|The", "The")
+                    token_chunk = token_chunk.replace("��", "").replace("\\n", "\n")
                     
                     # Check for stop sequences
                     should_stop = False
@@ -765,23 +777,24 @@ class ModelManager:
                             should_stop = True
                             break
                     
-                    # Yield the token chunk
+                    # Yield the cleaned token chunk
                     yield token_chunk
                     
                     # Stop if we've reached a stop sequence
                     if should_stop:
                         break
                     
-                    # Also stop if we've generated too much text (safety measure)
-                    if len(accumulated_text) > gen_params.get("max_length", 512) * 4:  # Character estimate
+                    # Also stop if we've generated too much text
+                    if len(accumulated_text) > gen_params.get("max_length", 512) * 4:
                         logger.warning("Stream generation exceeded maximum length - stopping")
                         break
                         
                     await asyncio.sleep(0)
+                    
             except Exception as e:
                 logger.error(f"Error in stream generation: {str(e)}")
-                # Don't propagate the error to avoid breaking the stream
-                # Just stop generating
+                # Send error message to client
+                yield f"\nError: {str(e)}"
         
         # Use the improved generator
         async for token in improved_stream_generator():
