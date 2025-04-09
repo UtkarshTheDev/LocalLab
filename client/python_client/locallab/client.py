@@ -103,6 +103,7 @@ class LocalLabClient:
         self.config = config
         self.session: Optional[aiohttp.ClientSession] = None
         self.ws: Optional[websockets.WebSocketClientProtocol] = None
+        self._stream_context = []  # Add context tracking
 
     async def __aenter__(self):
         await self.connect()
@@ -166,20 +167,21 @@ class LocalLabClient:
                 await asyncio.sleep(2 ** attempt)
 
     async def stream_generate(self, prompt: str, options: Optional[Union[GenerateOptions, Dict]] = None) -> AsyncGenerator[str, None]:
-        """Stream generated text"""
+        """Stream generated text with context awareness"""
         if isinstance(options, dict):
             options = GenerateOptions(**options)
         if options is None:
             options = GenerateOptions()
         
-        # Format data consistently
+        # Format data with context
         data = {
             "prompt": prompt,
             "stream": True,
             "max_tokens": options.max_length,
             "temperature": options.temperature,
             "top_p": options.top_p,
-            "model": options.model_id
+            "model": options.model_id,
+            "context": self._stream_context[-5:] if self._stream_context else []  # Send last 5 exchanges
         }
         # Remove None values
         data = {k: v for k, v in data.items() if v is not None}
@@ -195,7 +197,7 @@ class LocalLabClient:
                     yield f"Error: {error_msg}"
                     return
                 
-                buffer = ""
+                current_response = ""
                 async for line in response.content:
                     if line:
                         try:
@@ -217,7 +219,6 @@ class LocalLabClient:
                                 # Handle different response formats
                                 text = data.get("text", data.get("response", data.get("content", "")))
                             except json.JSONDecodeError:
-                                # If not JSON, use raw line
                                 text = line
                             
                             if text:
@@ -235,20 +236,24 @@ class LocalLabClient:
                                           .replace("user:", ""))
                                 
                                 # Add space between words if needed
-                                if (buffer and 
+                                if (current_response and 
                                     not text.startswith(" ") and 
                                     not text.startswith("\n") and 
-                                    not buffer.endswith(" ") and 
-                                    not buffer.endswith("\n")):
+                                    not current_response.endswith(" ") and 
+                                    not current_response.endswith("\n")):
                                     text = " " + text
                                 
-                                buffer += text
+                                current_response += text
                                 yield text
                                 
                         except Exception as e:
                             logger.error(f"Error processing stream chunk: {str(e)}")
                             yield f"\nError: Failed to process response - {str(e)}"
                             return
+                
+                # Update context with the full exchange
+                self._stream_context.append({"role": "user", "content": prompt})
+                self._stream_context.append({"role": "assistant", "content": current_response})
                             
         except Exception as e:
             logger.error(f"Stream connection error: {str(e)}")

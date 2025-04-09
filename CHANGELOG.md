@@ -2,6 +2,19 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.4.46] - 2024-03-14
+
+### Added
+- Added context awareness to streaming generation
+- Enhanced streaming response quality with context tracking
+- Improved streaming response coherence by maintaining conversation history
+- Updated documentation with streaming context examples
+
+### Fixed
+- Fixed streaming response formatting issues
+- Improved error handling in streaming generation
+- Enhanced token cleanup for better readability
+
 ## [0.4.45] - 2024-03-14
 
 ### Fixed

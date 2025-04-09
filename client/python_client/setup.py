@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="locallab-client",
-    version="1.0.2",
+    version="1.0.3",
     author="Utkarsh Tiwari",
     author_email="utkarshweb2023@gmail.com",
     description="Official Python client for LocalLab - A local LLM server",

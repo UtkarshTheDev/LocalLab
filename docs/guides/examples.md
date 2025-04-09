@@ -133,6 +133,31 @@ async def stream_chat():
         print(token, end="", flush=True)
 ```
 
+### Stream Text Generation with Context
+
+The streaming generation now maintains context of the conversation for more coherent responses:
+
+```python
+async def stream_with_context():
+    client = LocalLabClient("http://localhost:8000")
+    try:
+        # First response
+        print("Q: Tell me a story about a robot")
+        async for token in client.stream_generate("Tell me a story about a robot"):
+            print(token, end="", flush=True)
+        print("\n")
+        
+        # Follow-up question (will have context from previous response)
+        print("Q: What happens next in the story?")
+        async for token in client.stream_generate("What happens next in the story?"):
+            print(token, end="", flush=True)
+        print("\n")
+    finally:
+        await client.close()
+```
+
+The client maintains a context of recent exchanges, allowing for more coherent follow-up responses. The context is automatically managed and includes up to 5 previous exchanges.
+
 ## Batch Processing
 
 ### Process Multiple Prompts
