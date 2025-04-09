@@ -172,7 +172,7 @@ class LocalLabClient:
         if options is None:
             options = GenerateOptions()
         
-        # Ensure stream is True and format data correctly
+        # Format data consistently
         data = {
             "prompt": prompt,
             "stream": True,
@@ -184,81 +184,76 @@ class LocalLabClient:
         # Remove None values
         data = {k: v for k, v in data.items() if v is not None}
         
-        async with self.session.post("/generate", json=data) as response:
-            if response.status != 200:
-                error_msg = await response.text()
-                logger.error(f"Streaming error: {error_msg}")
-                yield f"Error: {error_msg}"
-                return
+        if not self.session:
+            await self.connect()
             
-            buffer = ""
-            current_sentence = ""
-            last_token_was_space = False
-            
-            try:
+        try:
+            async with self.session.post("/generate", json=data) as response:
+                if response.status != 200:
+                    error_msg = await response.text()
+                    logger.error(f"Streaming error: {error_msg}")
+                    yield f"Error: {error_msg}"
+                    return
+                
+                buffer = ""
                 async for line in response.content:
                     if line:
                         try:
                             line = line.decode('utf-8').strip()
-                            # Skip empty lines
                             if not line:
                                 continue
-                                
+                            
                             # Handle SSE format
                             if line.startswith("data: "):
-                                line = line[6:]  # Remove "data: " prefix
-                                
+                                line = line[6:]
+                            
                             # Skip control messages
                             if line in ["[DONE]", "[ERROR]"]:
                                 continue
-                                
+                            
+                            # Parse response
                             try:
-                                # Try to parse as JSON
                                 data = json.loads(line)
-                                text = data.get("text", data.get("response", ""))
+                                # Handle different response formats
+                                text = data.get("text", data.get("response", data.get("content", "")))
                             except json.JSONDecodeError:
-                                # If not JSON, use the line as is
+                                # If not JSON, use raw line
                                 text = line
-                                
+                            
                             if text:
-                                # Clean up any special tokens
-                                text = text.replace("<|", "").replace("|>", "")
-                                text = text.replace("<", "").replace(">", "")
-                                text = text.replace("[", "").replace("]", "")
-                                text = text.replace("{", "").replace("}", "")
-                                text = text.replace("data:", "")
-                                text = text.replace("��", "")
-                                text = text.replace("\\n", "\n")
-                                text = text.replace("|user|", "")
-                                text = text.replace("|The", "The")
-                                text = text.replace("/|assistant|", "").replace("/|user|", "")
-                                text = text.replace("assistant", "").replace("Error:", "")
+                                # Clean up special tokens and formatting
+                                text = (text.replace("<|", "").replace("|>", "")
+                                          .replace("<", "").replace(">", "")
+                                          .replace("[", "").replace("]", "")
+                                          .replace("{", "").replace("}", "")
+                                          .replace("data:", "")
+                                          .replace("��", "")
+                                          .replace("\\n", "\n")
+                                          .replace("|user|", "")
+                                          .replace("|assistant|", "")
+                                          .replace("assistant:", "")
+                                          .replace("user:", ""))
                                 
                                 # Add space between words if needed
-                                if (not text.startswith(" ") and 
+                                if (buffer and 
+                                    not text.startswith(" ") and 
                                     not text.startswith("\n") and 
-                                    not last_token_was_space and 
-                                    buffer and 
-                                    not buffer.endswith(" ") and
+                                    not buffer.endswith(" ") and 
                                     not buffer.endswith("\n")):
                                     text = " " + text
-                                    
-                                # Update tracking variables
-                                buffer += text
-                                current_sentence += text
-                                last_token_was_space = text.endswith(" ") or text.endswith("\n")
                                 
+                                buffer += text
                                 yield text
                                 
                         except Exception as e:
                             logger.error(f"Error processing stream chunk: {str(e)}")
-                            yield f"\nError: {str(e)}"
+                            yield f"\nError: Failed to process response - {str(e)}"
                             return
                             
-            except Exception as e:
-                logger.error(f"Stream connection error: {str(e)}")
-                yield f"\nError: Connection error - {str(e)}"
-                return
+        except Exception as e:
+            logger.error(f"Stream connection error: {str(e)}")
+            yield f"\nError: Connection failed - {str(e)}"
+            return
 
     async def generate(self, prompt: str, options: Optional[Union[GenerateOptions, Dict]] = None) -> GenerateResponse:
         """Generate text from prompt"""
