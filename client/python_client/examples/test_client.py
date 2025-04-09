@@ -16,11 +16,17 @@ async def main():
         print(response.text)
         print()
         
-        # Test streaming with proper spacing
+        # Test streaming with proper spacing and error handling
         print("Streaming response:")
-        async for token in client.stream_generate("What are you working on? Tell me about your current project."):
-            print(token, end="", flush=True)
-        print("\n")
+        try:
+            async for token in client.stream_generate("What are you working on? Tell me about your current project."):
+                if token.startswith("Error:"):
+                    print(f"\n{token}")
+                    break
+                print(token, end="", flush=True)
+            print("\n")
+        except Exception as e:
+            print(f"\nStreaming error: {str(e)}")
         
         # Test chat with context
         messages = [

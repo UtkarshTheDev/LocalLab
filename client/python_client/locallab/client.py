@@ -186,81 +186,79 @@ class LocalLabClient:
         
         async with self.session.post("/generate", json=data) as response:
             if response.status != 200:
-                try:
-                    error_data = await response.json()
-                    error_msg = error_data.get("detail", "Streaming failed")
-                    logger.error(f"Streaming error: {error_msg}")
-                    yield f"\nError: {error_msg}"
-                    return
-                except:
-                    yield "\nError: Streaming failed"
-                    return
+                error_msg = await response.text()
+                logger.error(f"Streaming error: {error_msg}")
+                yield f"Error: {error_msg}"
+                return
             
             buffer = ""
             current_sentence = ""
             last_token_was_space = False
             
-            async for line in response.content:
-                if line:
-                    try:
-                        line = line.decode('utf-8').strip()
-                        # Skip empty lines
-                        if not line:
-                            continue
-                            
-                        # Handle SSE format
-                        if line.startswith("data: "):
-                            line = line[6:]  # Remove "data: " prefix
-                            
-                        # Skip control messages
-                        if line in ["[DONE]", "[ERROR]"]:
-                            continue
-                            
+            try:
+                async for line in response.content:
+                    if line:
                         try:
-                            # Try to parse as JSON
-                            data = json.loads(line)
-                            text = data.get("text", data.get("response", ""))
-                        except json.JSONDecodeError:
-                            # If not JSON, use the line as is
-                            text = line
-                            
-                        if text:
-                            # Clean up any special tokens
-                            text = text.replace("<|", "").replace("|>", "")
-                            text = text.replace("<", "").replace(">", "")
-                            text = text.replace("[", "").replace("]", "")
-                            text = text.replace("{", "").replace("}", "")
-                            text = text.replace("data:", "")
-                            text = text.replace("��", "")
-                            text = text.replace("\\n", "\n")
-                            text = text.replace("|user|", "")
-                            text = text.replace("|The", "The")
-                            text = text.replace("/|assistant|", "").replace("/|user|", "")
-                            
-                            # Add space between words if needed
-                            if (not text.startswith(" ") and 
-                                not text.startswith("\n") and 
-                                not last_token_was_space and 
-                                buffer and 
-                                not buffer.endswith(" ") and
-                                not buffer.endswith("\n")):
-                                text = " " + text
+                            line = line.decode('utf-8').strip()
+                            # Skip empty lines
+                            if not line:
+                                continue
                                 
-                            # Update tracking variables
-                            buffer += text
-                            current_sentence += text
-                            last_token_was_space = text.endswith(" ") or text.endswith("\n")
+                            # Handle SSE format
+                            if line.startswith("data: "):
+                                line = line[6:]  # Remove "data: " prefix
+                                
+                            # Skip control messages
+                            if line in ["[DONE]", "[ERROR]"]:
+                                continue
+                                
+                            try:
+                                # Try to parse as JSON
+                                data = json.loads(line)
+                                text = data.get("text", data.get("response", ""))
+                            except json.JSONDecodeError:
+                                # If not JSON, use the line as is
+                                text = line
+                                
+                            if text:
+                                # Clean up any special tokens
+                                text = text.replace("<|", "").replace("|>", "")
+                                text = text.replace("<", "").replace(">", "")
+                                text = text.replace("[", "").replace("]", "")
+                                text = text.replace("{", "").replace("}", "")
+                                text = text.replace("data:", "")
+                                text = text.replace("��", "")
+                                text = text.replace("\\n", "\n")
+                                text = text.replace("|user|", "")
+                                text = text.replace("|The", "The")
+                                text = text.replace("/|assistant|", "").replace("/|user|", "")
+                                text = text.replace("assistant", "").replace("Error:", "")
+                                
+                                # Add space between words if needed
+                                if (not text.startswith(" ") and 
+                                    not text.startswith("\n") and 
+                                    not last_token_was_space and 
+                                    buffer and 
+                                    not buffer.endswith(" ") and
+                                    not buffer.endswith("\n")):
+                                    text = " " + text
+                                    
+                                # Update tracking variables
+                                buffer += text
+                                current_sentence += text
+                                last_token_was_space = text.endswith(" ") or text.endswith("\n")
+                                
+                                yield text
+                                
+                        except Exception as e:
+                            logger.error(f"Error processing stream chunk: {str(e)}")
+                            yield f"\nError: {str(e)}"
+                            return
                             
-                            # Check for sentence completion
-                            if any(current_sentence.endswith(p) for p in [".", "!", "?", "\n"]):
-                                current_sentence = ""
-                            
-                            yield text
-                            
-                    except Exception as e:
-                        logger.error(f"Error processing stream chunk: {str(e)}")
-                        yield f"\nError: {str(e)}"
-                        return
+            except Exception as e:
+                logger.error(f"Stream connection error: {str(e)}")
+                yield f"\nError: Connection error - {str(e)}"
+                return
 
     async def generate(self, prompt: str, options: Optional[Union[GenerateOptions, Dict]] = None) -> GenerateResponse:
         """Generate text from prompt"""
