@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "locallab-client"
-version = "1.0.1"
+version = "1.0.3"
 description = "Python client for connecting to LocalLab servers - Interact with AI models running on LocalLab"
 readme = "README.md"
 authors = [{ name = "Utkarsh", email = "utkarshweb2023@gmail.com" }]
