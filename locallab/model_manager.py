@@ -65,7 +65,7 @@ class ModelManager:
         # Check if quantization is explicitly disabled (not just False but also '0', 'none', '')
         # Use the config system to get the value, which checks environment variables and config file
         from .cli.config import get_config_value
-        
+
         # First check if CUDA is available - if not, we can't use bitsandbytes quantization
         if not torch.cuda.is_available():
             logger.warning("CUDA not available - quantization with bitsandbytes requires CUDA")
@@ -74,14 +74,14 @@ class ModelManager:
                 "torch_dtype": torch.float32,
                 "device_map": "auto"
             }
-        
+
         enable_quantization = get_config_value('enable_quantization', ENABLE_QUANTIZATION)
         # Convert string values to boolean if needed
         if isinstance(enable_quantization, str):
             enable_quantization = enable_quantization.lower() not in ('false', '0', 'none', '')
-        
+
         quantization_type = get_config_value('quantization_type', QUANTIZATION_TYPE)
-        
+
         if not enable_quantization:
             logger.info("Quantization is disabled, using default precision")
             return {
@@ -156,12 +156,12 @@ class ModelManager:
         try:
             # Import the config system
             from .cli.config import get_config_value
-            
+
             # Only apply attention slicing if explicitly enabled and not empty
             enable_attention_slicing = get_config_value('enable_attention_slicing', ENABLE_ATTENTION_SLICING)
             if isinstance(enable_attention_slicing, str):
                 enable_attention_slicing = enable_attention_slicing.lower() not in ('false', '0', 'none', '')
-            
+
             if enable_attention_slicing:
                 if hasattr(model, 'enable_attention_slicing'):
                     # Use more aggressive slicing for faster inference
@@ -175,7 +175,7 @@ class ModelManager:
             enable_cpu_offloading = get_config_value('enable_cpu_offloading', ENABLE_CPU_OFFLOADING)
             if isinstance(enable_cpu_offloading, str):
                 enable_cpu_offloading = enable_cpu_offloading.lower() not in ('false', '0', 'none', '')
-            
+
             if enable_cpu_offloading:
                 if hasattr(model, "enable_cpu_offload"):
                     model.enable_cpu_offload()
@@ -187,7 +187,7 @@ class ModelManager:
             enable_bettertransformer = get_config_value('enable_better_transformer', ENABLE_BETTERTRANSFORMER)
             if isinstance(enable_bettertransformer, str):
                 enable_bettertransformer = enable_bettertransformer.lower() not in ('false', '0', 'none', '')
-            
+
             if enable_bettertransformer:
                 try:
                     from optimum.bettertransformer import BetterTransformer
@@ -204,7 +204,7 @@ class ModelManager:
             enable_flash_attention = get_config_value('enable_flash_attention', ENABLE_FLASH_ATTENTION)
             if isinstance(enable_flash_attention, str):
                 enable_flash_attention = enable_flash_attention.lower() not in ('false', '0', 'none', '')
-            
+
             if enable_flash_attention:
                 try:
                     # Try to enable flash attention directly on the model config
@@ -221,7 +221,7 @@ class ModelManager:
                 except Exception as e:
                     logger.warning(
                         f"Flash Attention optimization failed: {str(e)}")
-            
+
             # Enable memory efficient attention if available
             try:
                 if hasattr(model, "enable_xformers_memory_efficient_attention"):
@@ -229,7 +229,7 @@ class ModelManager:
                     logger.info("XFormers memory efficient attention enabled")
             except Exception as e:
                 logger.info(f"XFormers memory efficient attention not available: {str(e)}")
-            
+
             # Enable gradient checkpointing for memory efficiency if available
             try:
                 if hasattr(model, "gradient_checkpointing_enable"):
@@ -237,7 +237,7 @@ class ModelManager:
                     logger.info("Gradient checkpointing enabled for memory efficiency")
             except Exception as e:
                 logger.info(f"Gradient checkpointing not available: {str(e)}")
-            
+
             # Set model to evaluation mode for faster inference
             model.eval()
             logger.info("Model set to evaluation mode for faster inference")
@@ -253,31 +253,31 @@ class ModelManager:
             # Get HF token
             from .config import get_hf_token
             hf_token = get_hf_token(interactive=False)
-            
+
             # Apply quantization settings
             quant_config = self._get_quantization_config()
-            
+
             # Load tokenizer first
             self.tokenizer = AutoTokenizer.from_pretrained(
                 model_id,
                 token=hf_token if hf_token else None
             )
-            
+
             # Load model with optimizations
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_id,
                 token=hf_token if hf_token else None,
                 **quant_config
             )
-            
+
             # Apply additional optimizations
             self.model = self._apply_optimizations(self.model)
-            
+
             # Set model to evaluation mode
             self.model.eval()
-            
+
             return self.model
-            
+
         except Exception as e:
             logger.error(f"Error loading model: {str(e)}")
             raise
@@ -286,28 +286,28 @@ class ModelManager:
         """Load a model but don't persist it to config"""
         if self._loading:
             raise RuntimeError("Another model is currently loading")
-            
+
         self._loading = True
-        
+
         try:
             # Unload current model if any
             if self.model:
                 self.unload_model()
-                
+
             # Load the new model
             logger.info(f"Loading model: {model_id}")
             start_time = time.time()
-            
+
             # Apply optimizations based on config
             self.model = await self._load_model_with_optimizations(model_id)
             self.current_model = model_id
-            
+
             load_time = time.time() - start_time
             logger.info(f"Model loaded in {load_time:.2f} seconds")
-            
+
             # Log the model load but don't persist to config
             log_model_loaded(model_id, load_time)
-            
+
         except Exception as e:
             logger.error(f"Error loading model: {str(e)}")
             raise
@@ -358,7 +358,7 @@ class ModelManager:
 
             # Format prompt with system instructions
             formatted_prompt = f"""<|system|>{instructions}</|system|>\n<|user|>{prompt}</|user|>\n<|assistant|>"""
-            
+
             # Check cache for non-streaming requests with default parameters
             cache_key = None
             if not stream and not any([max_length, max_new_tokens, temperature, top_p, top_k, repetition_penalty]):
@@ -370,16 +370,16 @@ class ModelManager:
             # Get model-specific generation parameters
             from .config import get_model_generation_params
             gen_params = get_model_generation_params(self.current_model)
-            
+
             # Set optimized defaults for faster generation
             if not max_length and not max_new_tokens:
                 # Use a smaller default max_length for faster generation
                 gen_params["max_length"] = min(gen_params.get("max_length", DEFAULT_MAX_LENGTH), 512)
-            
+
             if not temperature:
                 # Slightly lower temperature for faster and more focused generation
                 gen_params["temperature"] = min(gen_params.get("temperature", DEFAULT_TEMPERATURE), 0.7)
-            
+
             if not top_k:
                 # Add top_k for faster sampling
                 gen_params["top_k"] = 40
@@ -417,10 +417,10 @@ class ModelManager:
                     logger.warning(f"Invalid repetition_penalty value: {repetition_penalty}. Using model default.")
 
             inputs = self.tokenizer(formatted_prompt, return_tensors="pt")
-            
+
             # Get the actual device of the model
             model_device = next(self.model.parameters()).device
-            
+
             # Move inputs to the same device as the model
             for key in inputs:
                 inputs[key] = inputs[key].to(model_device)
@@ -455,11 +455,11 @@ class ModelManager:
                         generate_params["top_k"] = gen_params["top_k"]
                     if "repetition_penalty" in gen_params:
                         generate_params["repetition_penalty"] = gen_params["repetition_penalty"]
-                    
+
                     # Set a reasonable max time for generation to prevent hanging
                     if "max_time" not in generate_params and not stream:
                         generate_params["max_time"] = 30.0  # 30 seconds max for generation
-                    
+
                     # Use efficient attention implementation if available
                     if hasattr(self.model.config, "attn_implementation"):
                         generate_params["attn_implementation"] = "flash_attention_2"
@@ -469,16 +469,16 @@ class ModelManager:
                     outputs = self.model.generate(**generate_params)
                     generation_time = time.time() - start_time
                     logger.info(f"Generation completed in {generation_time:.2f} seconds")
-                
+
                 except RuntimeError as e:
                     if "CUDA out of memory" in str(e):
                         # If we run out of memory, clear cache and try again with smaller parameters
                         torch.cuda.empty_cache()
                         logger.warning("CUDA out of memory during generation. Cleared cache and reducing parameters.")
-                        
+
                         # Reduce parameters for memory efficiency
                         generate_params["max_new_tokens"] = min(generate_params.get("max_new_tokens", 512), 256)
-                        
+
                         # Try again with reduced parameters
                         outputs = self.model.generate(**generate_params)
                     else:
@@ -490,7 +490,7 @@ class ModelManager:
             # Clean up response by removing system and user prompts if they got repeated
             response = response.replace(
                 str(instructions), "").replace(prompt, "").strip()
-            
+
             # Cache the response if we have a cache key
             if cache_key:
                 self.response_cache[cache_key] = response
@@ -499,7 +499,7 @@ class ModelManager:
                     # Remove oldest entries
                     for _ in range(10):
                         self.response_cache.pop(next(iter(self.response_cache)), None)
-            
+
             return response
 
         except Exception as e:
@@ -516,7 +516,7 @@ class ModelManager:
         top_p: float = None,
         gen_params: Optional[Dict[str, Any]] = None
     ) -> Generator[str, None, None]:
-        """Stream generate text from the model"""
+        """Stream generate text from the model with optimizations for low-resource computers"""
         try:
             # If gen_params is provided, use it instead of individual parameters
             if gen_params is not None:
@@ -528,45 +528,61 @@ class ModelManager:
                 repetition_penalty = gen_params.get("repetition_penalty", 1.1)
             else:
                 # Use provided individual parameters or defaults
-                max_length = max_length or min(DEFAULT_MAX_LENGTH, 512)  # Limit default max_length
+                max_length = max_length or min(DEFAULT_MAX_LENGTH, 256)  # More conservative limit for low-resource computers
                 temperature = temperature or 0.7  # Use same temperature as non-streaming
                 top_p = top_p or DEFAULT_TOP_P
                 top_k = 40  # Default to 40 for better quality
                 repetition_penalty = 1.1
 
+            # For low-resource computers, limit max_length to prevent OOM
+            if max_length > 256:
+                logger.info(f"Limiting max_length from {max_length} to 256 for better performance on low-resource computers")
+                max_length = 256
+
             # Get the actual device of the model
             model_device = next(self.model.parameters()).device
-            
+
             # Ensure inputs are on the same device as the model
             for key in inputs:
                 if inputs[key].device != model_device:
                     inputs[key] = inputs[key].to(model_device)
 
-            # Use KV caching for faster generation
-            past_key_values = None
-            input_ids = inputs["input_ids"]
-            attention_mask = inputs["attention_mask"]
-            
-            # Generate fewer tokens at once for more responsive streaming
-            # Using smaller chunks makes it appear more interactive while maintaining quality
-            tokens_to_generate_per_step = 2  # Reduced from 3 to 2 for better quality control
-            
+            # For low-resource computers, generate one token at a time
+            # This is more memory-efficient and prevents OOM errors
+            tokens_to_generate_per_step = 1
+
             # Track generated text for quality control
             generated_text = ""
-            
+
             # Define stop sequences for proper termination
-            stop_sequences = ["</s>", "<|endoftext|>", "<|im_end|>", "<|assistant|>"]
-            
+            stop_sequences = ["</s>", "<|endoftext|>", "<|im_end|>", "<|assistant|>", "<|user|>"]
+
+            # Memory monitoring variables
+            last_memory_check = time.time()
+            memory_check_interval = 2.0  # Check memory every 2 seconds
+
+            # Get input IDs and attention mask
+            input_ids = inputs["input_ids"]
+            attention_mask = inputs["attention_mask"]
+
             with torch.no_grad():
                 for step in range(0, max_length, tokens_to_generate_per_step):
-                    # Calculate how many tokens to generate in this step
-                    current_tokens_to_generate = min(tokens_to_generate_per_step, max_length - step)
-                    
-                    # Generate parameters - use the same high-quality parameters as non-streaming
+                    # Periodically check memory usage and clear cache if needed
+                    current_time = time.time()
+                    if current_time - last_memory_check > memory_check_interval:
+                        last_memory_check = current_time
+                        if torch.cuda.is_available():
+                            current_mem = torch.cuda.memory_allocated() / (1024 * 1024 * 1024)  # GB
+                            total_mem = torch.cuda.get_device_properties(0).total_memory / (1024 * 1024 * 1024)  # GB
+                            if current_mem > 0.7 * total_mem:  # If using >70% of GPU memory
+                                torch.cuda.empty_cache()
+                                logger.info("Cleared CUDA cache during streaming to prevent OOM")
+
+                    # Generate parameters - optimized for low-resource computers
                     generate_params = {
                         "input_ids": input_ids,
                         "attention_mask": attention_mask,
-                        "max_new_tokens": current_tokens_to_generate,
+                        "max_new_tokens": tokens_to_generate_per_step,
                         "temperature": temperature,
                         "top_p": top_p,
                         "top_k": top_k,
@@ -575,28 +591,28 @@ class ModelManager:
                         "repetition_penalty": repetition_penalty,
                         "num_beams": 1  # Explicitly set to 1 to avoid warnings
                     }
-                    
-                    # Use efficient attention if available
-                    if hasattr(self.model.config, "attn_implementation"):
+
+                    # Use efficient attention if available, but only on CUDA devices
+                    if torch.cuda.is_available() and hasattr(self.model.config, "attn_implementation"):
                         generate_params["attn_implementation"] = "flash_attention_2"
-                    
+
                     try:
                         # Generate tokens
                         outputs = self.model.generate(**generate_params)
-                        
+
                         # Get the new tokens (skip the input tokens)
                         new_tokens = outputs[0][len(input_ids[0]):]
-                        
-                        # Decode and yield each new token
+
+                        # Decode the new token
                         new_text = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
-                        
-                        # If no new text was generated or it's just whitespace, stop generation
+
+                        # If no new text was generated or it's just whitespace, skip this token but continue generation
                         if not new_text or new_text.isspace():
-                            break
-                        
+                            continue
+
                         # Add to generated text for quality control
                         generated_text += new_text
-                        
+
                         # Check for stop sequences
                         should_stop = False
                         for stop_seq in stop_sequences:
@@ -604,12 +620,12 @@ class ModelManager:
                                 # We've reached a stop sequence, stop generation
                                 should_stop = True
                                 break
-                                
+
                         # Check for repetition (a sign of poor quality)
                         if len(generated_text) > 50:
-                            # Check for repeating patterns of 10+ characters
+                            # Check for repeating patterns of 5+ characters
                             last_50_chars = generated_text[-50:]
-                            for pattern_len in range(10, 20):
+                            for pattern_len in range(5, 15):
                                 if pattern_len < len(last_50_chars) // 2:
                                     pattern = last_50_chars[-pattern_len:]
                                     if pattern in last_50_chars[:-pattern_len]:
@@ -617,70 +633,81 @@ class ModelManager:
                                         logger.warning("Detected repetition in streaming generation, stopping")
                                         should_stop = True
                                         break
-                        
+
                         # Yield the new text
                         yield new_text
-                        
+
                         # Stop if needed
                         if should_stop:
                             break
-                        
-                        # Update input_ids and attention_mask for next iteration
+
+                        # Update input_ids for next iteration
                         input_ids = outputs
                         attention_mask = torch.ones_like(input_ids)
-                        
+
                         # Ensure the updated inputs are on the correct device
                         if input_ids.device != model_device:
                             input_ids = input_ids.to(model_device)
                         if attention_mask.device != model_device:
                             attention_mask = attention_mask.to(model_device)
-                            
-                        # Check if we're running out of memory and need to clear cache
-                        if torch.cuda.is_available():
-                            current_mem = torch.cuda.memory_allocated() / (1024 * 1024 * 1024)  # GB
-                            total_mem = torch.cuda.get_device_properties(0).total_memory / (1024 * 1024 * 1024)  # GB
-                            if current_mem > 0.9 * total_mem:  # If using >90% of GPU memory
-                                # Clear cache to avoid OOM
-                                torch.cuda.empty_cache()
-                                logger.info("Cleared CUDA cache to avoid out of memory error")
-                    
+
                     except RuntimeError as e:
-                        if "CUDA out of memory" in str(e):
-                            # If we run out of memory, clear cache and try again with smaller batch
-                            torch.cuda.empty_cache()
-                            logger.warning("CUDA out of memory during streaming. Cleared cache and reducing batch size.")
-                            
-                            # Reduce tokens per step for the rest of generation
-                            tokens_to_generate_per_step = 1
-                            current_tokens_to_generate = 1
-                            
-                            # Try again with smaller batch
-                            generate_params["max_new_tokens"] = 1
-                            outputs = self.model.generate(**generate_params)
-                            
-                            # Continue as before
-                            new_tokens = outputs[0][len(input_ids[0]):]
-                            new_text = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
-                            
-                            if not new_text or new_text.isspace():
+                        error_msg = str(e)
+                        if "CUDA out of memory" in error_msg or "DefaultCPUAllocator: can't allocate memory" in error_msg:
+                            # If we run out of memory, clear cache and try to recover
+                            if torch.cuda.is_available():
+                                torch.cuda.empty_cache()
+
+                            logger.warning(f"Memory error during streaming: {error_msg}. Attempting to recover...")
+
+                            # Wait a moment to let memory clear
+                            time.sleep(0.5)
+
+                            try:
+                                # Try again with minimal parameters
+                                minimal_params = {
+                                    "input_ids": input_ids,
+                                    "attention_mask": attention_mask,
+                                    "max_new_tokens": 1,
+                                    "do_sample": False,  # Turn off sampling to save memory
+                                    "pad_token_id": self.tokenizer.eos_token_id,
+                                    "num_beams": 1
+                                }
+                                outputs = self.model.generate(**minimal_params)
+
+                                # Continue as before
+                                new_tokens = outputs[0][len(input_ids[0]):]
+                                new_text = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
+
+                                if new_text and not new_text.isspace():
+                                    generated_text += new_text
+                                    yield new_text
+
+                                    input_ids = outputs
+                                    attention_mask = torch.ones_like(input_ids)
+                                else:
+                                    # If recovery didn't produce valid text, stop generation
+                                    logger.warning("Recovery attempt didn't produce valid text, stopping generation")
+                                    break
+                            except Exception as recovery_error:
+                                # If recovery fails, yield an error message and stop
+                                logger.error(f"Recovery failed: {str(recovery_error)}")
+                                yield "\nError: Out of memory. Try a shorter response or reduce model parameters."
                                 break
-                                
-                            generated_text += new_text
-                            yield new_text
-                            
-                            input_ids = outputs
-                            attention_mask = torch.ones_like(input_ids)
                         else:
-                            # For other errors, re-raise
-                            raise
+                            # For other errors, log and yield error message
+                            logger.error(f"Error during streaming: {error_msg}")
+                            yield f"\nError: {error_msg}"
+                            break
 
         except Exception as e:
             logger.error(f"Streaming generation failed: {str(e)}")
-            raise HTTPException(
-                status_code=500, detail=f"Streaming generation failed: {str(e)}")
+            # Instead of raising an exception, yield the error as text
+            # This allows the client to display the error message
+            yield f"\nError: {str(e)}"
 
     async def async_stream_generate(self, inputs: Dict[str, torch.Tensor] = None, gen_params: Dict[str, Any] = None, prompt: str = None, system_prompt: Optional[str] = None, **kwargs):
-        """Convert the synchronous stream generator to an async generator.
+        """Convert the synchronous stream generator to an async generator with optimizations for low-resource computers.
 
         This can be called either with:
         1. inputs and gen_params directly (internal use)
@@ -699,21 +726,20 @@ class ModelManager:
             # Get model-specific generation parameters
             from .config import get_model_generation_params
             gen_params = get_model_generation_params(self.current_model)
-            
-            # Set optimized defaults for streaming that match non-streaming quality
-            # Use the same parameters as non-streaming for consistency
+
+            # Set optimized defaults for streaming on low-resource computers
             if not kwargs.get("max_length") and not kwargs.get("max_new_tokens"):
-                # Use a reasonable default max_length
-                gen_params["max_length"] = min(gen_params.get("max_length", DEFAULT_MAX_LENGTH), 512)
-            
+                # Use a conservative default max_length for low-resource computers
+                gen_params["max_length"] = min(gen_params.get("max_length", DEFAULT_MAX_LENGTH), 256)
+
             if not kwargs.get("temperature"):
-                # Use the same temperature as non-streaming
+                # Use a slightly lower temperature for more predictable generation
                 gen_params["temperature"] = min(gen_params.get("temperature", DEFAULT_TEMPERATURE), 0.7)
-            
+
             if not kwargs.get("top_k"):
                 # Add top_k for better quality
                 gen_params["top_k"] = 40
-                
+
             if not kwargs.get("repetition_penalty"):
                 # Add repetition penalty to avoid loops
                 gen_params["repetition_penalty"] = 1.1
@@ -728,76 +754,110 @@ class ModelManager:
 
             # Tokenize the prompt
             inputs = self.tokenizer(formatted_prompt, return_tensors="pt")
-            
+
             # Get the actual device of the model
             model_device = next(self.model.parameters()).device
-            
+
             # Move inputs to the same device as the model
             for key in inputs:
                 inputs[key] = inputs[key].to(model_device)
 
-        # Check if we need to clear CUDA cache before generation
+        # Check if we need to clear memory before generation
         if torch.cuda.is_available():
-            current_mem = torch.cuda.memory_allocated() / (1024 * 1024 * 1024)  # GB
-            total_mem = torch.cuda.get_device_properties(0).total_memory / (1024 * 1024 * 1024)  # GB
-            if current_mem > 0.8 * total_mem:  # If using >80% of GPU memory
-                # Clear cache to avoid OOM
-                torch.cuda.empty_cache()
-                logger.info("Cleared CUDA cache before streaming generation to avoid out of memory error")
+            # Clear CUDA cache before streaming to ensure maximum available memory
+            torch.cuda.empty_cache()
+            logger.info("Cleared CUDA cache before streaming generation to ensure optimal performance")
 
-        # Create a custom stream generator with improved quality
-        async def improved_stream_generator():
-            stop_sequences = ["</s>", "<|endoftext|>", "<|im_end|>", "<|assistant|>"]
+        # Create a token-level streaming generator optimized for low-resource computers
+        async def token_level_stream_generator():
+            # Define stop sequences for proper termination
+            stop_sequences = ["</s>", "<|endoftext|>", "<|im_end|>", "<|assistant|>", "<|user|>"]
             accumulated_text = ""
-            last_token_was_space = False  # Track if last token was a space
-            
+            token_buffer = ""
+            last_yield_time = time.time()
+            error_reported = False
+
             try:
-                for token_chunk in self._stream_generate(inputs, gen_params=gen_params):
-                    # Skip empty chunks
-                    if not token_chunk or token_chunk.isspace():
+                # Use the optimized _stream_generate method
+                for token in self._stream_generate(inputs, gen_params=gen_params):
+                    # Check if this is an error message
+                    if token.startswith("\nError:"):
+                        if not error_reported:
+                            yield token
+                            error_reported = True
+                        break
+
+                    # Skip empty tokens
+                    if not token or token.isspace():
                         continue
-                        
-                    # Add space between words if needed
-                    if not token_chunk.startswith(" ") and not last_token_was_space and accumulated_text:
-                        token_chunk = " " + token_chunk
-                        
-                    accumulated_text += token_chunk
-                    last_token_was_space = token_chunk.endswith(" ")
-                    
-                    # Clean up the token
-                    token_chunk = token_chunk.replace("|user|", "").replace("|The", "The")
-                    token_chunk = token_chunk.replace("��", "").replace("\\n", "\n")
-                    
+
+                    # Add token to buffer
+                    token_buffer += token
+                    accumulated_text += token
+
                     # Check for stop sequences
                     should_stop = False
                     for stop_seq in stop_sequences:
                         if stop_seq in accumulated_text:
                             # Truncate at stop sequence
                             accumulated_text = accumulated_text.split(stop_seq)[0]
+                            token_buffer = ""
                             should_stop = True
                             break
-                    
-                    # Yield the cleaned token chunk
-                    yield token_chunk
-                    
+
+                    # Determine if we should yield the buffer now
+                    current_time = time.time()
+                    time_since_last_yield = current_time - last_yield_time
+
+                    # Yield in these cases:
+                    # 1. Buffer contains complete word (ends with space)
+                    # 2. Buffer contains punctuation
+                    # 3. It's been more than 100ms since last yield
+                    # 4. Buffer is getting large (>10 chars)
+                    should_yield = (
+                        token.endswith(" ") or
+                        any(p in token for p in ".,!?;:") or
+                        time_since_last_yield > 0.1 or
+                        len(token_buffer) > 10
+                    )
+
+                    if should_yield and token_buffer:
+                        # Clean up the token buffer before yielding
+                        clean_buffer = token_buffer
+                        clean_buffer = clean_buffer.replace("|user|", "").replace("|The", "The")
+                        clean_buffer = clean_buffer.replace("��", "").replace("\\n", "\n")
+
+                        # Yield the cleaned buffer
+                        yield clean_buffer
+                        last_yield_time = current_time
+                        token_buffer = ""
+
                     # Stop if we've reached a stop sequence
                     if should_stop:
                         break
-                    
+
                     # Also stop if we've generated too much text
-                    if len(accumulated_text) > gen_params.get("max_length", 512) * 4:
+                    if len(accumulated_text) > gen_params.get("max_length", 256) * 4:
                         logger.warning("Stream generation exceeded maximum length - stopping")
                         break
-                        
+
+                    # Yield control to allow other async tasks to run
                     await asyncio.sleep(0)
-                    
+
+                # Yield any remaining text in the buffer
+                if token_buffer and not error_reported:
+                    clean_buffer = token_buffer.replace("|user|", "").replace("|The", "The")
+                    clean_buffer = clean_buffer.replace("��", "").replace("\\n", "\n")
+                    yield clean_buffer
+
             except Exception as e:
-                logger.error(f"Error in stream generation: {str(e)}")
-                # Send error message to client
-                yield f"\nError: {str(e)}"
-        
-        # Use the improved generator
-        async for token in improved_stream_generator():
+                logger.error(f"Error in token-level stream generation: {str(e)}")
+                # Send error message to client if not already reported
+                if not error_reported:
+                    yield f"\nError: {str(e)}"
+
+        # Use the token-level streaming generator
+        async for token in token_level_stream_generator():
             yield token
 
     def get_model_info(self) -> Dict[str, Any]:
@@ -823,7 +883,7 @@ class ModelManager:
         # Check environment variables for optimization settings
         enable_quantization = os.environ.get('LOCALLAB_ENABLE_QUANTIZATION', '').lower() not in ('false', '0', 'none', '')
         quantization_type = os.environ.get('LOCALLAB_QUANTIZATION_TYPE', '') if enable_quantization else "None"
-        
+
         # If quantization is disabled or type is empty, set to "None"
         if not enable_quantization or not quantization_type or quantization_type.lower() in ('none', ''):
             quantization_type = "None"
