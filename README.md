@@ -56,28 +56,46 @@ When you use LocalLab:
    ```
 
 3. **AI Interaction**
+
    ```python
    # Your code sends requests through the client
+   # Async usage
    response = await client.generate("Write a story")
    print(response)  # Server processes and returns AI response
+
+   # Or sync usage (New!)
+   response = client.generate("Write a story")
+   print(response)  # Same result, no async/await needed!
    ```
 
 ## 💡 Quick Examples
 
 ```python
-# Generate text
-response = await client.generate("Hello!")
+# Generate text (async or sync)
+response = await client.generate("Hello!")  # Async
+response = client.generate("Hello!")        # Sync (New!)
 
-# Chat with AI
-response = await client.chat([
+# Chat with AI (async or sync)
+response = await client.chat([              # Async
+    {"role": "user", "content": "Hi!"}
+])
+response = client.chat([                    # Sync (New!)
     {"role": "user", "content": "Hi!"}
 ])
 
-# Process multiple prompts
-responses = await client.batch_generate([
+# Process multiple prompts (async or sync)
+responses = await client.batch_generate([   # Async
     "Write a joke",
     "Tell a story"
 ])
+responses = client.batch_generate([         # Sync (New!)
+    "Write a joke",
+    "Tell a story"
+])
+
+# Context manager support (New!)
+with LocalLabClient("http://localhost:8000") as client:
+    response = client.generate("Hello!")    # Auto-closes when done
 ```
 
 [➡️ See More Examples](./docs/guides/examples.md)
@@ -127,6 +145,8 @@ Our [Documentation Guide](./docs/README.md) will help you:
 - **Resource Efficient**: Automatic optimization
 - **Privacy First**: All local, no data sent to cloud
 - **Free GPU**: Google Colab integration
+- **Unified Client API**: Works with or without async/await (New!)
+- **Automatic Resource Management**: Sessions close automatically (New!)
 
 [➡️ See All Features](./docs/features/README.md)
 
@@ -144,5 +164,5 @@ Our [Documentation Guide](./docs/README.md) will help you:
 
 ---
 
-Made with ❤️ by Utkarsh Tiwari  
+Made with ❤️ by Utkarsh Tiwari
 [GitHub](https://github.com/UtkarshTheDev) • [Twitter](https://twitter.com/UtkarshTheDev) • [LinkedIn](https://linkedin.com/in/utkarshthedev)

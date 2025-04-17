@@ -4,6 +4,28 @@ All notable changes to LocalLab will be documented in this file.
 
 ## [0.4.48] - 2024-03-15
 
+### Client Library Changes
+
+#### Added
+
+- Added unified client API that works both with and without async/await
+- Implemented automatic session closing to the Python client
+- Added proper resource management with atexit handlers and finalizers
+- Improved error handling in the Python client
+- Added synchronous context manager support (`with` statement)
+
+#### Changed
+
+- Simplified client API - same methods work in both sync and async contexts
+- Updated Python client to track activity and close inactive sessions
+- Enhanced client session management to prevent resource leaks
+- Improved client package version to 0.2.0
+
+#### Fixed
+
+- Fixed issue with unclosed client sessions causing warnings
+- Improved error propagation in streaming responses
+
 ### Changed
 
 - Removed all response formatting from streaming generation
