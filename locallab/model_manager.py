@@ -485,11 +485,9 @@ class ModelManager:
                         # For other errors, re-raise
                         raise
 
+            # Decode the raw response without any formatting
             response = self.tokenizer.decode(
                 outputs[0][len(inputs["input_ids"][0]):], skip_special_tokens=True)
-            # Clean up response by removing system and user prompts if they got repeated
-            response = response.replace(
-                str(instructions), "").replace(prompt, "").strip()
 
             # Cache the response if we have a cache key
             if cache_key:
@@ -822,13 +820,8 @@ class ModelManager:
                     )
 
                     if should_yield and token_buffer:
-                        # Clean up the token buffer before yielding
-                        clean_buffer = token_buffer
-                        clean_buffer = clean_buffer.replace("|user|", "").replace("|The", "The")
-                        clean_buffer = clean_buffer.replace("��", "").replace("\\n", "\n")
-
-                        # Yield the cleaned buffer
-                        yield clean_buffer
+                        # Yield the raw token buffer without any formatting
+                        yield token_buffer
                         last_yield_time = current_time
                         token_buffer = ""
 
@@ -846,9 +839,8 @@ class ModelManager:
 
                 # Yield any remaining text in the buffer
                 if token_buffer and not error_reported:
-                    clean_buffer = token_buffer.replace("|user|", "").replace("|The", "The")
-                    clean_buffer = clean_buffer.replace("��", "").replace("\\n", "\n")
-                    yield clean_buffer
+                    # Yield the raw token buffer without any formatting
+                    yield token_buffer
 
             except Exception as e:
                 logger.error(f"Error in token-level stream generation: {str(e)}")

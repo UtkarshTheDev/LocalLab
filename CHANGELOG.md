@@ -2,6 +2,15 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.4.48] - 2024-03-15
+
+### Changed
+
+- Removed all response formatting from streaming generation
+- Simplified token streaming to provide raw, unformatted tokens
+- Removed text cleaning and formatting from all generation endpoints
+- Improved error handling in streaming responses
+
 ## [0.4.47] - 2024-03-15
 
 ### Added
