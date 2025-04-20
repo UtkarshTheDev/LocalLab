@@ -3,6 +3,7 @@
 ## Local Deployment
 
 ### Prerequisites
+
 - Python 3.8+
 - pip
 - Virtual environment (recommended)
@@ -31,7 +32,7 @@ start_server()
 ### Connect Client
 
 ```python
-from locallab.client import LocalLabClient
+from locallab_client import LocalLabClient
 
 # Connect to local server
 client = LocalLabClient("http://localhost:8000")
@@ -59,11 +60,13 @@ os.environ["LOCALLAB_ENABLE_ATTENTION_SLICING"] = "true"
 ## Resource Requirements
 
 ### Minimum Requirements
+
 - 4GB RAM
 - Python 3.8+
 - pip
 
 ### Recommended
+
 - 8GB+ RAM
 - CUDA-compatible GPU
 - SSD storage
@@ -71,21 +74,25 @@ os.environ["LOCALLAB_ENABLE_ATTENTION_SLICING"] = "true"
 ## Best Practices
 
 ### Memory Management
+
 - Use appropriate model size
 - Enable quantization
 - Monitor resource usage
 
 ### Error Handling
+
 - Implement proper error handling
 - Use fallback models
 - Monitor system health
 
 ### Security
+
 - Set rate limits
 - Enable request validation
 - Use appropriate CORS settings
 
 ## Related Documentation
+
 - [API Documentation](./API.md)
 - [Features Guide](./features/README.md)
 - [Troubleshooting](./TROUBLESHOOTING.md)

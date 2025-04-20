@@ -63,7 +63,7 @@ def test_system_info(locallab_client):
 
 def test_error_handling(locallab_client):
     """Test client error handling"""
-    with patch('locallab.client.requests') as mock_requests:
+    with patch('locallab_client.requests') as mock_requests:
         # Test connection error
         mock_requests.post.side_effect = requests.ConnectionError
         with pytest.raises(ConnectionError):
@@ -85,7 +85,7 @@ def test_error_handling(locallab_client):
 
 def test_streaming(locallab_client):
     """Test streaming functionality"""
-    with patch('locallab.client.requests') as mock_requests:
+    with patch('locallab_client.requests') as mock_requests:
         mock_response = Mock()
         mock_response.iter_lines.return_value = [b'data: token1', b'data: token2']
         mock_requests.post.return_value = mock_response

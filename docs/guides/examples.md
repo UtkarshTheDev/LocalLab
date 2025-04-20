@@ -18,7 +18,7 @@ First, set up your LocalLab environment:
 
 ```python
 import asyncio
-from locallab.client import LocalLabClient
+from locallab_client import LocalLabClient
 
 async def main():
     # Initialize client
@@ -146,7 +146,7 @@ async def stream_with_context():
         async for token in client.stream_generate("Tell me a story about a robot"):
             print(token, end="", flush=True)
         print("\n")
-        
+
         # Follow-up question (will have context from previous response)
         print("Q: What happens next in the story?")
         async for token in client.stream_generate("What happens next in the story?"):

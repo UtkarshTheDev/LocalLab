@@ -1,6 +1,6 @@
 import asyncio
 import os
-from locallab.client import LocalLabClient
+from locallab_client import LocalLabClient
 
 # Get the server URL from environment or user input
 SERVER_URL = os.getenv("LOCALLAB_SERVER_URL") or input("Enter the ngrok URL from your Colab notebook: ").strip()

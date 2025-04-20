@@ -5,13 +5,8 @@ import weakref
 import warnings
 import threading
 import time
-from typing import Optional, AsyncGenerator, Dict, Any, List, Set, ClassVar, Generator, Union
+from typing import Optional, AsyncGenerator, Dict, Any, List, Set, ClassVar
 import json
-
-try:
-    from .dual_mode import dual_mode
-except ImportError:
-    from dual_mode import dual_mode
 
 # Global registry to track all active client sessions
 _active_clients: Set[weakref.ReferenceType] = set()
@@ -76,11 +71,10 @@ def _start_cleanup_task():
 # Initialize the cleanup task
 _start_cleanup_task()
 
-@dual_mode
 class LocalLabClient:
-    """Python client for the LocalLab API with automatic session management
+    """Asynchronous Python client for the LocalLab API with automatic session management
 
-    This client can be used both synchronously and asynchronously:
+    This client requires async/await syntax. For synchronous usage, use SyncLocalLabClient.
 
     Async usage:
     ```python
@@ -89,12 +83,7 @@ class LocalLabClient:
     await client.close()
     ```
 
-    Sync usage:
-    ```python
-    client = LocalLabClient("http://localhost:8000")
-    response = client.generate("Hello, world!")
-    client.close()
-    ```
+    # Context manager usage has been removed to simplify the client implementation
     """
 
     # Class variable to track the last activity time
@@ -138,37 +127,43 @@ class LocalLabClient:
         if client_id in cls._last_activity_times:
             del cls._last_activity_times[client_id]
 
-    async def __aenter__(self):
-        """Async context manager entry"""
-        await self.connect()
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit"""
-        await self.close()
-
-    # The synchronous context manager methods are automatically created by the dual_mode decorator
+    # Context manager methods have been removed to simplify the client implementation
 
     def __del__(self):
         """Attempt to close the session when the client is garbage collected"""
         if not self._closed and self._session is not None:
-            # We can't await in __del__, but the dual_mode decorator will handle it
-            try:
-                self.close()
-            except Exception:
-                # If that fails, just issue a warning
-                warnings.warn(
-                    "LocalLabClient was garbage collected with an open session. "
-                    "Please use 'client.close()' or 'with LocalLabClient(...) as client:' "
-                    "to properly close the session."
-                )
+            # We can't await in __del__, so just issue a warning
+            warnings.warn(
+                "LocalLabClient was garbage collected with an open session. "
+                "Please use 'await client.close()' to properly close the session."
+            )
 
     async def connect(self):
-        """Create aiohttp session if it doesn't exist"""
+        """Ensure the client has an active session with retry logic"""
+        # Update activity timestamp
         self._update_activity()
-        if not self._session:
-            self._session = aiohttp.ClientSession(timeout=self.timeout)
-            self._closed = False
+
+        # Maximum number of connection attempts
+        max_attempts = 3
+        attempt = 0
+        last_error = None
+
+        while attempt < max_attempts:
+            try:
+                if self._session is None or self._session.closed:
+                    self._session = aiohttp.ClientSession(timeout=self.timeout)
+                    self._closed = False
+                return
+            except Exception as e:
+                last_error = e
+                attempt += 1
+                if attempt < max_attempts:
+                    # Wait before retrying (exponential backoff)
+                    await asyncio.sleep(0.5 * (2 ** attempt))
+
+        # If we've exhausted all attempts, raise the last error
+        if last_error:
+            raise Exception(f"Failed to create session after {max_attempts} attempts: {str(last_error)}")
 
     async def close(self):
         """Close aiohttp session"""
@@ -191,9 +186,10 @@ class LocalLabClient:
         stream: bool = False,
         max_length: Optional[int] = None,
         temperature: float = 0.7,
-        top_p: float = 0.9
+        top_p: float = 0.9,
+        timeout: float = 60.0  # Add timeout parameter with a default of 60 seconds
     ) -> str:
-        """Generate text using the model"""
+        """Generate text using the model with improved error handling"""
         # Update activity timestamp
         self._update_activity()
 
@@ -207,15 +203,40 @@ class LocalLabClient:
         }
 
         if stream:
-            return self.stream_generate(prompt, model_id, max_length, temperature, top_p)
+            return self.stream_generate(prompt, model_id, max_length, temperature, top_p, timeout)
 
-        await self.connect()
-        async with self._session.post(f"{self.base_url}/generate", json=payload) as response:
-            if response.status != 200:
-                raise Exception(f"Generation failed: {await response.text()}")
+        # Create a timeout for this specific request
+        request_timeout = aiohttp.ClientTimeout(total=timeout)
 
-            data = await response.json()
-            return data["response"]
+        try:
+            await self.connect()
+            async with self._session.post(
+                f"{self.base_url}/generate",
+                json=payload,
+                timeout=request_timeout
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"Generation failed: {error_text}")
+
+                try:
+                    data = await response.json()
+                    # Handle both response formats for backward compatibility
+                    if "response" in data:
+                        return data["response"]
+                    elif "text" in data:
+                        return data["text"]
+                    else:
+                        raise Exception(f"Unexpected response format: {data}")
+                except Exception as e:
+                    # Handle JSON parsing errors
+                    raise Exception(f"Failed to parse response: {str(e)}")
+        except asyncio.TimeoutError:
+            raise Exception("Request timed out. The server took too long to respond.")
+        except aiohttp.ClientError as e:
+            raise Exception(f"Connection error: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Generation failed: {str(e)}")
 
     async def stream_generate(
         self,
@@ -224,9 +245,10 @@ class LocalLabClient:
         max_length: Optional[int] = None,
         temperature: float = 0.7,
         top_p: float = 0.9,
-        timeout: float = 60.0  # Add timeout parameter with a default of 60 seconds
+        timeout: float = 120.0,  # Increased timeout for low-resource CPUs
+        retry_count: int = 2     # Add retry count for reliability
     ) -> AsyncGenerator[str, None]:
-        """Stream text generation with token-level streaming and improved error handling"""
+        """Stream text generation with token-level streaming and robust error handling"""
         # Update activity timestamp
         self._update_activity()
 
@@ -242,49 +264,100 @@ class LocalLabClient:
         # Create a timeout for this specific request
         request_timeout = aiohttp.ClientTimeout(total=timeout)
 
-        try:
-            await self.connect()
-            async with self._session.post(
-                f"{self.base_url}/generate",
-                json=payload,
-                timeout=request_timeout
-            ) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    raise Exception(f"Streaming failed: {error_text}")
+        # Track retries
+        retries = 0
+        last_error = None
 
-                # Track if we've seen any data to detect early disconnections
-                received_data = False
+        while retries <= retry_count:
+            try:
+                await self.connect()
+                async with self._session.post(
+                    f"{self.base_url}/generate",
+                    json=payload,
+                    timeout=request_timeout
+                ) as response:
+                    if response.status != 200:
+                        error_text = await response.text()
+                        raise Exception(f"Streaming failed: {error_text}")
 
-                try:
-                    # Process the streaming response
-                    async for line in response.content:
-                        if line:
-                            received_data = True
-                            text = line.decode("utf-8").strip()
+                    # Track if we've seen any data to detect early disconnections
+                    received_data = False
+                    # Buffer for accumulating partial responses if needed
 
-                            # Check for error messages
-                            if text.startswith("\nError:"):
-                                raise Exception(text.replace("\nError: ", ""))
+                    try:
+                        # Process the streaming response
+                        async for line in response.content:
+                            if line:
+                                received_data = True
+                                text = line.decode("utf-8").strip()
 
-                            yield text
+                                # Skip empty lines
+                                if not text:
+                                    continue
 
-                    # If we didn't receive any data, the stream might have ended unexpectedly
-                    if not received_data:
-                        yield "\nError: Stream ended unexpectedly without returning any data"
+                                # Handle SSE format (data: prefix)
+                                if text.startswith("data: "):
+                                    text = text[6:]  # Remove "data: " prefix
 
-                except Exception as stream_error:
-                    # Handle errors during streaming
-                    if "timeout" in str(stream_error).lower():
-                        yield "\nError: Stream timed out. The server took too long to respond."
-                    else:
-                        yield f"\nError: {str(stream_error)}"
-        except Exception as e:
-            # Handle connection errors
-            if "timeout" in str(e).lower():
-                yield "\nError: Connection timed out. The server took too long to respond."
-            else:
+                                # Check for end of stream marker
+                                if text == "[DONE]":
+                                    break
+
+                                # Check for error messages
+                                if text.startswith("\nError:") or text.startswith("Error:"):
+                                    error_msg = text.replace("\nError: ", "").replace("Error: ", "")
+                                    raise Exception(error_msg)
+
+                                yield text
+
+                        # If we didn't receive any data, the stream might have ended unexpectedly
+                        if not received_data:
+                            yield "\nError: Stream ended unexpectedly without returning any data"
+
+                        # Successful completion, break the retry loop
+                        break
+
+                    except asyncio.TimeoutError:
+                        # For timeout during streaming, we'll retry
+                        last_error = "Stream timed out. The server took too long to respond."
+                        retries += 1
+                        if retries > retry_count:
+                            yield f"\nError: {last_error}"
+                        continue
+
+                    except Exception as stream_error:
+                        # For other streaming errors, yield the error and break
+                        error_msg = str(stream_error)
+                        if "timeout" in error_msg.lower():
+                            last_error = "Stream timed out. The server took too long to respond."
+                            retries += 1
+                            if retries > retry_count:
+                                yield f"\nError: {last_error}"
+                            continue
+                        else:
+                            yield f"\nError: {error_msg}"
+                            break
+
+            except asyncio.TimeoutError:
+                # For connection timeout, we'll retry
+                last_error = "Connection timed out. The server took too long to respond."
+                retries += 1
+                if retries > retry_count:
+                    yield f"\nError: {last_error}"
+                continue
+
+            except aiohttp.ClientError as e:
+                # For connection errors, we'll retry
+                last_error = f"Connection error: {str(e)}"
+                retries += 1
+                if retries > retry_count:
+                    yield f"\nError: {last_error}"
+                continue
+
+            except Exception as e:
+                # For other errors, yield the error and break
                 yield f"\nError: {str(e)}"
+                break
 
     async def chat(
         self,
@@ -293,9 +366,10 @@ class LocalLabClient:
         stream: bool = False,
         max_length: Optional[int] = None,
         temperature: float = 0.7,
-        top_p: float = 0.9
+        top_p: float = 0.9,
+        timeout: float = 60.0  # Add timeout parameter with a default of 60 seconds
     ) -> Dict[str, Any]:
-        """Chat completion endpoint"""
+        """Chat completion endpoint with improved error handling"""
         # Update activity timestamp
         self._update_activity()
 
@@ -309,14 +383,33 @@ class LocalLabClient:
         }
 
         if stream:
-            return self.stream_chat(messages, model_id, max_length, temperature, top_p)
+            return self.stream_chat(messages, model_id, max_length, temperature, top_p, timeout)
 
-        await self.connect()
-        async with self._session.post(f"{self.base_url}/chat", json=payload) as response:
-            if response.status != 200:
-                raise Exception(f"Chat completion failed: {await response.text()}")
+        # Create a timeout for this specific request
+        request_timeout = aiohttp.ClientTimeout(total=timeout)
 
-            return await response.json()
+        try:
+            await self.connect()
+            async with self._session.post(
+                f"{self.base_url}/chat",
+                json=payload,
+                timeout=request_timeout
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"Chat completion failed: {error_text}")
+
+                try:
+                    return await response.json()
+                except Exception as e:
+                    # Handle JSON parsing errors
+                    raise Exception(f"Failed to parse response: {str(e)}")
+        except asyncio.TimeoutError:
+            raise Exception("Request timed out. The server took too long to respond.")
+        except aiohttp.ClientError as e:
+            raise Exception(f"Connection error: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Chat completion failed: {str(e)}")
 
     async def stream_chat(
         self,
@@ -324,9 +417,11 @@ class LocalLabClient:
         model_id: Optional[str] = None,
         max_length: Optional[int] = None,
         temperature: float = 0.7,
-        top_p: float = 0.9
+        top_p: float = 0.9,
+        timeout: float = 120.0,  # Increased timeout for low-resource CPUs
+        retry_count: int = 2     # Add retry count for reliability
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        """Stream chat completion"""
+        """Stream chat completion with robust error handling"""
         # Update activity timestamp
         self._update_activity()
 
@@ -339,17 +434,102 @@ class LocalLabClient:
             "top_p": top_p
         }
 
-        await self.connect()
-        async with self._session.post(f"{self.base_url}/chat", json=payload) as response:
-            if response.status != 200:
-                raise Exception(f"Chat streaming failed: {await response.text()}")
+        # Create a timeout for this specific request
+        request_timeout = aiohttp.ClientTimeout(total=timeout)
 
-            async for line in response.content:
-                if line:
-                    data = json.loads(line.decode("utf-8"))
-                    if data == "[DONE]":
+        # Track retries
+        retries = 0
+        last_error = None
+
+        while retries <= retry_count:
+            try:
+                await self.connect()
+                async with self._session.post(
+                    f"{self.base_url}/chat",
+                    json=payload,
+                    timeout=request_timeout
+                ) as response:
+                    if response.status != 200:
+                        error_text = await response.text()
+                        raise Exception(f"Chat streaming failed: {error_text}")
+
+                    # Track if we've seen any data to detect early disconnections
+                    received_data = False
+
+                    try:
+                        # Process the streaming response
+                        async for line in response.content:
+                            if line:
+                                received_data = True
+                                text = line.decode("utf-8").strip()
+
+                                # Skip empty lines
+                                if not text:
+                                    continue
+
+                                try:
+                                    data = json.loads(text)
+
+                                    # Check for end of stream marker
+                                    if data == "[DONE]":
+                                        break
+
+                                    yield data
+                                except json.JSONDecodeError:
+                                    # Handle non-JSON responses
+                                    if text.startswith("\nError:") or text.startswith("Error:"):
+                                        error_msg = text.replace("\nError: ", "").replace("Error: ", "")
+                                        raise Exception(error_msg)
+                                    continue
+
+                        # If we didn't receive any data, the stream might have ended unexpectedly
+                        if not received_data:
+                            yield {"error": "Stream ended unexpectedly without returning any data"}
+
+                        # Successful completion, break the retry loop
                         break
-                    yield data
+
+                    except asyncio.TimeoutError:
+                        # For timeout during streaming, we'll retry
+                        last_error = "Stream timed out. The server took too long to respond."
+                        retries += 1
+                        if retries > retry_count:
+                            yield {"error": last_error}
+                        continue
+
+                    except Exception as stream_error:
+                        # For other streaming errors, yield the error and break
+                        error_msg = str(stream_error)
+                        if "timeout" in error_msg.lower():
+                            last_error = "Stream timed out. The server took too long to respond."
+                            retries += 1
+                            if retries > retry_count:
+                                yield {"error": last_error}
+                            continue
+                        else:
+                            yield {"error": error_msg}
+                            break
+
+            except asyncio.TimeoutError:
+                # For connection timeout, we'll retry
+                last_error = "Connection timed out. The server took too long to respond."
+                retries += 1
+                if retries > retry_count:
+                    yield {"error": last_error}
+                continue
+
+            except aiohttp.ClientError as e:
+                # For connection errors, we'll retry
+                last_error = f"Connection error: {str(e)}"
+                retries += 1
+                if retries > retry_count:
+                    yield {"error": last_error}
+                continue
+
+            except Exception as e:
+                # For other errors, yield the error and break
+                yield {"error": str(e)}
+                break
 
     async def batch_generate(
         self,
@@ -357,9 +537,10 @@ class LocalLabClient:
         model_id: Optional[str] = None,
         max_length: Optional[int] = None,
         temperature: float = 0.7,
-        top_p: float = 0.9
+        top_p: float = 0.9,
+        timeout: float = 120.0  # Add timeout parameter with a default of 120 seconds for batch operations
     ) -> Dict[str, List[str]]:
-        """Generate text for multiple prompts in parallel"""
+        """Generate text for multiple prompts in parallel with improved error handling"""
         # Update activity timestamp
         self._update_activity()
 
@@ -371,87 +552,201 @@ class LocalLabClient:
             "top_p": top_p
         }
 
-        await self.connect()
-        async with self._session.post(f"{self.base_url}/generate/batch", json=payload) as response:
-            if response.status != 200:
-                raise Exception(f"Batch generation failed: {await response.text()}")
-
-            return await response.json()
-
-    async def load_model(self, model_id: str) -> bool:
-        """Load a specific model"""
-        # Update activity timestamp
-        self._update_activity()
-
-        await self.connect()
-        async with self._session.post(
-            f"{self.base_url}/models/load",
-            json={"model_id": model_id}
-        ) as response:
-            if response.status != 200:
-                raise Exception(f"Model loading failed: {await response.text()}")
-
-            data = await response.json()
-            return data["status"] == "success"
-
-    async def get_current_model(self) -> Dict[str, Any]:
-        """Get information about the currently loaded model"""
-        # Update activity timestamp
-        self._update_activity()
-
-        await self.connect()
-        async with self._session.get(f"{self.base_url}/models/current") as response:
-            if response.status != 200:
-                raise Exception(f"Failed to get current model: {await response.text()}")
-
-            return await response.json()
-
-    async def list_models(self) -> Dict[str, Any]:
-        """List all available models"""
-        # Update activity timestamp
-        self._update_activity()
-
-        await self.connect()
-        async with self._session.get(f"{self.base_url}/models/available") as response:
-            if response.status != 200:
-                raise Exception(f"Failed to list models: {await response.text()}")
-
-            data = await response.json()
-            return data["models"]
-
-    async def health_check(self) -> bool:
-        """Check if the server is healthy"""
-        # Update activity timestamp
-        self._update_activity()
+        # Create a timeout for this specific request
+        request_timeout = aiohttp.ClientTimeout(total=timeout)
 
         try:
             await self.connect()
-            async with self._session.get(f"{self.base_url}/health") as response:
+            async with self._session.post(
+                f"{self.base_url}/generate/batch",
+                json=payload,
+                timeout=request_timeout
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"Batch generation failed: {error_text}")
+
+                try:
+                    return await response.json()
+                except Exception as e:
+                    # Handle JSON parsing errors
+                    raise Exception(f"Failed to parse response: {str(e)}")
+        except asyncio.TimeoutError:
+            raise Exception("Request timed out. The server took too long to respond.")
+        except aiohttp.ClientError as e:
+            raise Exception(f"Connection error: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Batch generation failed: {str(e)}")
+
+    async def load_model(self, model_id: str, timeout: float = 60.0) -> bool:
+        """Load a specific model with improved error handling"""
+        # Update activity timestamp
+        self._update_activity()
+
+        # Create a timeout for this specific request
+        request_timeout = aiohttp.ClientTimeout(total=timeout)
+
+        try:
+            await self.connect()
+            async with self._session.post(
+                f"{self.base_url}/models/load",
+                json={"model_id": model_id},
+                timeout=request_timeout
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"Model loading failed: {error_text}")
+
+                try:
+                    data = await response.json()
+                    return data["status"] == "success"
+                except Exception as e:
+                    # Handle JSON parsing errors
+                    raise Exception(f"Failed to parse response: {str(e)}")
+        except asyncio.TimeoutError:
+            raise Exception("Request timed out. The server took too long to respond.")
+        except aiohttp.ClientError as e:
+            raise Exception(f"Connection error: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Model loading failed: {str(e)}")
+
+    async def get_current_model(self, timeout: float = 30.0) -> Dict[str, Any]:
+        """Get information about the currently loaded model with improved error handling"""
+        # Update activity timestamp
+        self._update_activity()
+
+        # Create a timeout for this specific request
+        request_timeout = aiohttp.ClientTimeout(total=timeout)
+
+        try:
+            await self.connect()
+            async with self._session.get(
+                f"{self.base_url}/models/current",
+                timeout=request_timeout
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"Failed to get current model: {error_text}")
+
+                try:
+                    return await response.json()
+                except Exception as e:
+                    # Handle JSON parsing errors
+                    raise Exception(f"Failed to parse response: {str(e)}")
+        except asyncio.TimeoutError:
+            raise Exception("Request timed out. The server took too long to respond.")
+        except aiohttp.ClientError as e:
+            raise Exception(f"Connection error: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Failed to get current model: {str(e)}")
+
+    async def list_models(self, timeout: float = 30.0) -> Dict[str, Any]:
+        """List all available models with improved error handling"""
+        # Update activity timestamp
+        self._update_activity()
+
+        # Create a timeout for this specific request
+        request_timeout = aiohttp.ClientTimeout(total=timeout)
+
+        try:
+            await self.connect()
+            async with self._session.get(
+                f"{self.base_url}/models/available",
+                timeout=request_timeout
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"Failed to list models: {error_text}")
+
+                try:
+                    data = await response.json()
+                    return data["models"]
+                except Exception as e:
+                    # Handle JSON parsing errors
+                    raise Exception(f"Failed to parse response: {str(e)}")
+        except asyncio.TimeoutError:
+            raise Exception("Request timed out. The server took too long to respond.")
+        except aiohttp.ClientError as e:
+            raise Exception(f"Connection error: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Failed to list models: {str(e)}")
+
+    async def health_check(self, timeout: float = 10.0) -> bool:
+        """Check if the server is healthy with a short timeout"""
+        # Update activity timestamp
+        self._update_activity()
+
+        # Create a timeout for this specific request
+        request_timeout = aiohttp.ClientTimeout(total=timeout)
+
+        try:
+            await self.connect()
+            async with self._session.get(
+                f"{self.base_url}/health",
+                timeout=request_timeout
+            ) as response:
                 return response.status == 200
-        except Exception:
+        except (asyncio.TimeoutError, aiohttp.ClientError, Exception):
+            # Any error means the server is not healthy
             return False
 
-    async def get_system_info(self) -> Dict[str, Any]:
-        """Get detailed system information"""
+    async def get_system_info(self, timeout: float = 30.0) -> Dict[str, Any]:
+        """Get detailed system information with improved error handling"""
         # Update activity timestamp
         self._update_activity()
 
-        await self.connect()
-        async with self._session.get(f"{self.base_url}/system/info") as response:
-            if response.status != 200:
-                raise Exception(f"Failed to get system info: {await response.text()}")
+        # Create a timeout for this specific request
+        request_timeout = aiohttp.ClientTimeout(total=timeout)
 
-            return await response.json()
+        try:
+            await self.connect()
+            async with self._session.get(
+                f"{self.base_url}/system/info",
+                timeout=request_timeout
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"Failed to get system info: {error_text}")
 
-    async def unload_model(self) -> bool:
-        """Unload the current model to free up resources"""
+                try:
+                    return await response.json()
+                except Exception as e:
+                    # Handle JSON parsing errors
+                    raise Exception(f"Failed to parse response: {str(e)}")
+        except asyncio.TimeoutError:
+            raise Exception("Request timed out. The server took too long to respond.")
+        except aiohttp.ClientError as e:
+            raise Exception(f"Connection error: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Failed to get system info: {str(e)}")
+
+    async def unload_model(self, timeout: float = 30.0) -> bool:
+        """Unload the current model to free up resources with improved error handling"""
         # Update activity timestamp
         self._update_activity()
 
-        await self.connect()
-        async with self._session.post(f"{self.base_url}/models/unload") as response:
-            if response.status != 200:
-                raise Exception(f"Failed to unload model: {await response.text()}")
+        # Create a timeout for this specific request
+        request_timeout = aiohttp.ClientTimeout(total=timeout)
 
-            data = await response.json()
-            return data["status"] == "Model unloaded successfully"
+        try:
+            await self.connect()
+            async with self._session.post(
+                f"{self.base_url}/models/unload",
+                timeout=request_timeout
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(f"Failed to unload model: {error_text}")
+
+                try:
+                    data = await response.json()
+                    return data["status"] == "Model unloaded successfully"
+                except Exception as e:
+                    # Handle JSON parsing errors
+                    raise Exception(f"Failed to parse response: {str(e)}")
+        except asyncio.TimeoutError:
+            raise Exception("Request timed out. The server took too long to respond.")
+        except aiohttp.ClientError as e:
+            raise Exception(f"Connection error: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Failed to unload model: {str(e)}")

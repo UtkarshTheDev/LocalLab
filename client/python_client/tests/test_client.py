@@ -2,7 +2,7 @@ import pytest
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 from aiohttp import ClientSession, ClientResponse, WSMessage
-from locallab.client import (
+from locallab_client import (
     LocalLabClient,
     LocalLabConfig,
     GenerateOptions,

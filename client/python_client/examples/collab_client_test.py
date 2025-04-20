@@ -1,5 +1,5 @@
 import asyncio
-from locallab.client import LocalLabClient
+from locallab_client import LocalLabClient
 
 
 async def main():

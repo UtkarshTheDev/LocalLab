@@ -51,11 +51,11 @@ When you use LocalLab:
 
    ```python
     # Async Usage
-        from locallab.client import LocalLabClient # Async client
+        from locallab_client import LocalLabClient # Async client
         server_url = "http://localhost:8000" # or "https://your-ngrok-url.ngrok.app"
         client = LocalLabClient(server_url)
     # Sync Usage
-        from locallab.client import SyncLocalLabClient # Sync client
+        from locallab_client import SyncLocalLabClient # Sync client
         server_url = "http://localhost:8000" # or "https://your-ngrok-url.ngrok.app"
         client = SyncLocalLabClient(server_url)
    ```

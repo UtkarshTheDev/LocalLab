@@ -11,15 +11,24 @@ import os
 # Add the parent directory to the path so we can import the client
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# Try different import approaches
 try:
+    # First try the installed package
     from locallab_client import SyncLocalLabClient
 except ImportError:
     try:
+        # Then try direct import
         from sync_wrapper import SyncLocalLabClient
     except ImportError:
-        print("LocalLab client not found. Please install it with:")
-        print("pip install locallab-client")
-        sys.exit(1)
+        try:
+            # Then try relative import
+            import sys, os
+            sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+            from sync_wrapper import SyncLocalLabClient
+        except ImportError:
+            print("LocalLab client not found. Please install it with:")
+            print("pip install locallab-client")
+            sys.exit(1)
 
 
 def main():
@@ -89,13 +98,15 @@ def main():
         client.close()
 
 
-# Using context manager example
-def context_manager_example():
-    """Example using sync context manager."""
-    print("\n=== Context Manager Example ===")
+# Example without context manager
+def simple_example():
+    """Example without using context manager."""
+    print("\n=== Simple Example ===")
 
-    # Use the client as a sync context manager
-    with SyncLocalLabClient("http://localhost:8000") as client:
+    # Create the client directly
+    client = SyncLocalLabClient("http://localhost:8000")
+
+    try:
         # Check if the server is healthy
         if not client.health_check():
             print("Server is not healthy. Please check if it's running.")
@@ -104,11 +115,13 @@ def context_manager_example():
         # Generate text
         response = client.generate("Write a short poem")
         print(f"Response: {response}")
-
-    # Client is automatically closed when exiting the context
+    finally:
+        # Always close the client when done
+        client.close()
+        print("Client closed.")
 
 
 if __name__ == "__main__":
     # Run the examples
     main()
-    context_manager_example()
+    simple_example()

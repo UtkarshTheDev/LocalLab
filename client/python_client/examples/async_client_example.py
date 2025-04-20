@@ -12,15 +12,24 @@ import os
 # Add the parent directory to the path so we can import the client
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# Try different import approaches
 try:
+    # First try the installed package
     from locallab_client import LocalLabClient
 except ImportError:
     try:
+        # Then try direct import
         from client import LocalLabClient
     except ImportError:
-        print("LocalLab client not found. Please install it with:")
-        print("pip install locallab-client")
-        sys.exit(1)
+        try:
+            # Then try relative import
+            import sys, os
+            sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+            from client import LocalLabClient
+        except ImportError:
+            print("LocalLab client not found. Please install it with:")
+            print("pip install locallab-client")
+            sys.exit(1)
 
 
 async def main():
@@ -40,8 +49,14 @@ async def main():
 
         # Basic text generation
         print("\nGenerating text...")
-        response = await client.generate("Write a short story about a robot")
-        print(f"Response: {response}")
+        try:
+            print("Sending generate request...")
+            response = await client.generate("Write a short story about a robot")
+            print(f"Response: {response}")
+        except Exception as e:
+            print(f"Error during generation: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
 
         # Streaming text generation
         print("\nStreaming text generation...")
@@ -91,13 +106,15 @@ async def main():
         await client.close()
 
 
-# Using context manager example
-async def context_manager_example():
-    """Example using async context manager."""
-    print("\n=== Context Manager Example ===")
+# Example without context manager
+async def simple_example():
+    """Example without using context manager."""
+    print("\n=== Simple Example ===")
 
-    # Use the client as an async context manager
-    async with LocalLabClient("http://localhost:8000") as client:
+    # Create the client directly
+    client = LocalLabClient("http://localhost:8000")
+
+    try:
         # Check if the server is healthy
         if not await client.health_check():
             print("Server is not healthy. Please check if it's running.")
@@ -106,11 +123,14 @@ async def context_manager_example():
         # Generate text
         response = await client.generate("Write a short poem")
         print(f"Response: {response}")
-
-    # Client is automatically closed when exiting the context
+    finally:
+        # Always close the client when done
+        await client.close()
+        print("Client closed.")
 
 
 if __name__ == "__main__":
     # Run the examples
     asyncio.run(main())
-    asyncio.run(context_manager_example())
+    # Run the simple example
+    asyncio.run(simple_example())

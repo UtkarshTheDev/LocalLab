@@ -40,7 +40,7 @@ start_server()
 ### Batch Processing
 
 ```python
-from locallab.client import LocalLabClient
+from locallab_client import LocalLabClient
 
 client = LocalLabClient("http://localhost:8000")
 

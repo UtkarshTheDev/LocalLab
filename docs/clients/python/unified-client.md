@@ -26,7 +26,7 @@ Under the hood, the client uses a sophisticated dual-mode system that:
 
 ```python
 # Initialize the client (same for both modes)
-from locallab.client import LocalLabClient
+from locallab_client import LocalLabClient
 client = LocalLabClient("http://localhost:8000")
 
 # Synchronous usage
@@ -97,7 +97,7 @@ response = client.generate("Hello")
 
 ```python
 # Simple synchronous example
-from locallab.client import LocalLabClient
+from locallab_client import LocalLabClient
 
 client = LocalLabClient("http://localhost:8000")
 response = client.generate("Write a story about a robot")
