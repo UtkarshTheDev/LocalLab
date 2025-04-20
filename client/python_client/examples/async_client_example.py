@@ -1,10 +1,11 @@
 """
-Example usage of the synchronous LocalLab client.
+Example usage of the asynchronous LocalLab client.
 
-This example demonstrates how to use the SyncLocalLabClient to interact with
-the LocalLab server without using async/await syntax.
+This example demonstrates how to use the LocalLabClient to interact with
+the LocalLab server using async/await syntax.
 """
 
+import asyncio
 import sys
 import os
 
@@ -12,39 +13,40 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 try:
-    from locallab_client import SyncLocalLabClient
+    from locallab_client import LocalLabClient
 except ImportError:
     try:
-        from sync_wrapper import SyncLocalLabClient
+        from client import LocalLabClient
     except ImportError:
         print("LocalLab client not found. Please install it with:")
         print("pip install locallab-client")
         sys.exit(1)
 
 
-def main():
-    # Initialize client - no async/await needed!
-    client = SyncLocalLabClient("http://localhost:8000")
+async def main():
+    """Run the example."""
+    # Initialize client
+    client = LocalLabClient("http://localhost:8000")
 
     try:
         # Check if the server is healthy
-        if not client.health_check():
+        if not await client.health_check():
             print("Server is not healthy. Please check if it's running.")
             return
 
         # Get information about the current model
-        model_info = client.get_current_model()
+        model_info = await client.get_current_model()
         print(f"Current model: {model_info['name']}")
 
         # Basic text generation
         print("\nGenerating text...")
-        response = client.generate("Write a short story about a robot")
+        response = await client.generate("Write a short story about a robot")
         print(f"Response: {response}")
 
         # Streaming text generation
         print("\nStreaming text generation...")
         print("Response: ", end="", flush=True)
-        for chunk in client.stream_generate("Write a haiku about nature"):
+        async for chunk in client.stream_generate("Write a haiku about nature"):
             print(chunk, end="", flush=True)
         print()  # Add a newline at the end
 
@@ -54,7 +56,7 @@ def main():
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Tell me a joke about programming."}
         ]
-        response = client.chat(messages)
+        response = await client.chat(messages)
         print(f"Response: {response['choices'][0]['message']['content']}")
 
         # Batch generation
@@ -64,20 +66,20 @@ def main():
             "Tell a joke",
             "Give a fun fact"
         ]
-        responses = client.batch_generate(prompts)
+        responses = await client.batch_generate(prompts)
         for prompt, response in zip(prompts, responses["responses"]):
             print(f"\nPrompt: {prompt}")
             print(f"Response: {response}")
 
         # List available models
         print("\nAvailable models:")
-        models = client.list_models()
+        models = await client.list_models()
         for model in models:
             print(f"- {model}")
 
         # Get system information
         print("\nSystem information:")
-        system_info = client.get_system_info()
+        system_info = await client.get_system_info()
         print(f"CPU: {system_info['cpu']}")
         print(f"RAM: {system_info['memory']}")
         print(f"GPU: {system_info.get('gpu', 'None')}")
@@ -86,23 +88,23 @@ def main():
         print(f"Error: {str(e)}")
     finally:
         # Always close the client when done
-        client.close()
+        await client.close()
 
 
 # Using context manager example
-def context_manager_example():
-    """Example using sync context manager."""
+async def context_manager_example():
+    """Example using async context manager."""
     print("\n=== Context Manager Example ===")
 
-    # Use the client as a sync context manager
-    with SyncLocalLabClient("http://localhost:8000") as client:
+    # Use the client as an async context manager
+    async with LocalLabClient("http://localhost:8000") as client:
         # Check if the server is healthy
-        if not client.health_check():
+        if not await client.health_check():
             print("Server is not healthy. Please check if it's running.")
             return
 
         # Generate text
-        response = client.generate("Write a short poem")
+        response = await client.generate("Write a short poem")
         print(f"Response: {response}")
 
     # Client is automatically closed when exiting the context
@@ -110,5 +112,5 @@ def context_manager_example():
 
 if __name__ == "__main__":
     # Run the examples
-    main()
-    context_manager_example()
+    asyncio.run(main())
+    asyncio.run(context_manager_example())

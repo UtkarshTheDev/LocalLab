@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="locallab-client",
-    version="1.0.3",
+    version="0.2.1",
     author="Utkarsh Tiwari",
     author_email="utkarshweb2023@gmail.com",
     description="Official Python client for LocalLab - A local LLM server",
@@ -28,7 +28,7 @@ setup(
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
     ],
     python_requires=">=3.7",
-    install_requires=[
+    install_requires=[  
         "aiohttp>=3.8.0",
         "typing-extensions>=4.0.0",
         "pydantic>=2.0.0",

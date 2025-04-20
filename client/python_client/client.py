@@ -8,7 +8,10 @@ import time
 from typing import Optional, AsyncGenerator, Dict, Any, List, Set, ClassVar, Generator, Union
 import json
 
-from .dual_mode import dual_mode
+try:
+    from .dual_mode import dual_mode
+except ImportError:
+    from dual_mode import dual_mode
 
 # Global registry to track all active client sessions
 _active_clients: Set[weakref.ReferenceType] = set()
@@ -144,16 +147,7 @@ class LocalLabClient:
         """Async context manager exit"""
         await self.close()
 
-    def __enter__(self):
-        """Synchronous context manager entry"""
-        # The dual_mode decorator will handle running connect() synchronously
-        self.connect()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Synchronous context manager exit"""
-        # The dual_mode decorator will handle running close() synchronously
-        self.close()
+    # The synchronous context manager methods are automatically created by the dual_mode decorator
 
     def __del__(self):
         """Attempt to close the session when the client is garbage collected"""
