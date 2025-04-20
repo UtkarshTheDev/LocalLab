@@ -4,6 +4,24 @@ All notable changes to LocalLab will be documented in this file.
 
 ## [0.4.48] - 2024-03-15
 
+### Client Library Changes (v0.2.1)
+
+#### Added
+
+- Added a dedicated synchronous client (`SyncLocalLabClient`) that doesn't require async/await
+- Added automatic session closing to prevent resource leaks
+- Added proper resource management with context managers
+
+#### Changed
+
+- Simplified client API with separate async and sync clients
+- Updated documentation to clearly explain both client options
+
+#### Fixed
+
+- Fixed issue with unclosed client sessions causing warnings
+- Improved error handling in streaming responses
+
 ### Client Library Changes
 
 #### Added

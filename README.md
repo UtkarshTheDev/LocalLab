@@ -50,9 +50,14 @@ When you use LocalLab:
 2. **Client Connection**
 
    ```python
-   from locallab.client import LocalLabClient
-   server_url = "http://localhost:8000" # or "https://your-ngrok-url.ngrok.app"
-   client = LocalLabClient(server_url)
+    # Async Usage
+        from locallab.client import LocalLabClient # Async client
+        server_url = "http://localhost:8000" # or "https://your-ngrok-url.ngrok.app"
+        client = LocalLabClient(server_url)
+    # Sync Usage
+        from locallab.client import SyncLocalLabClient # Sync client
+        server_url = "http://localhost:8000" # or "https://your-ngrok-url.ngrok.app"
+        client = SyncLocalLabClient(server_url)
    ```
 
 3. **AI Interaction**
@@ -71,31 +76,35 @@ When you use LocalLab:
 ## 💡 Quick Examples
 
 ```python
+# Install the client
+# pip install locallab-client
+
+# Import the appropriate client
+from locallab_client import LocalLabClient       # Async client
+from locallab_client import SyncLocalLabClient  # Sync client
+
 # Generate text (async or sync)
-response = await client.generate("Hello!")  # Async
-response = client.generate("Hello!")        # Sync (New!)
+response = await client.generate("Hello!")  # Async with LocalLabClient
+response = client.generate("Hello!")        # Sync with SyncLocalLabClient
 
 # Chat with AI (async or sync)
-response = await client.chat([              # Async
+response = await client.chat([              # Async with LocalLabClient
     {"role": "user", "content": "Hi!"}
 ])
-response = client.chat([                    # Sync (New!)
+response = client.chat([                    # Sync with SyncLocalLabClient
     {"role": "user", "content": "Hi!"}
 ])
 
 # Process multiple prompts (async or sync)
-responses = await client.batch_generate([   # Async
+responses = await client.batch_generate([   # Async with LocalLabClient
     "Write a joke",
     "Tell a story"
 ])
-responses = client.batch_generate([         # Sync (New!)
+responses = client.batch_generate([         # Sync with SyncLocalLabClient
     "Write a joke",
     "Tell a story"
 ])
 
-# Context manager support (New!)
-with LocalLabClient("http://localhost:8000") as client:
-    response = client.generate("Hello!")    # Auto-closes when done
 ```
 
 [➡️ See More Examples](./docs/guides/examples.md)
@@ -145,7 +154,7 @@ Our [Documentation Guide](./docs/README.md) will help you:
 - **Resource Efficient**: Automatic optimization
 - **Privacy First**: All local, no data sent to cloud
 - **Free GPU**: Google Colab integration
-- **Unified Client API**: Works with or without async/await (New!)
+- **Flexible Client API**: Both async and sync clients available (New!)
 - **Automatic Resource Management**: Sessions close automatically (New!)
 
 [➡️ See All Features](./docs/features/README.md)
