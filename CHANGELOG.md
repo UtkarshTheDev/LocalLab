@@ -2,6 +2,19 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.4.49] - 2024-04-21
+
+### Fixed
+
+- Fixed server shutdown issues when pressing Ctrl+C
+- Improved error handling during server shutdown process
+- Enhanced handling of asyncio.CancelledError during shutdown
+- Added proper handling for asyncio.Server objects during shutdown
+- Reduced duplicate log messages during shutdown
+- Added clean shutdown banner for better user experience
+- Improved task cancellation with proper timeout handling
+- Enhanced force exit mechanism to ensure clean termination
+
 ## [0.4.48] - 2024-03-15
 
 ### Client Library Changes (v0.2.1)
