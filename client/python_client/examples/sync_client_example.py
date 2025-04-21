@@ -9,26 +9,23 @@ import sys
 import os
 
 # Add the parent directory to the path so we can import the client
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
 # Try different import approaches
 try:
-    # First try the installed package
-    from locallab_client import SyncLocalLabClient
-except ImportError:
+    # First try importing from the parent directory
+    sys.path.append(parent_dir)  # Make sure parent_dir is in sys.path
+    from sync_client import SyncLocalLabClient  # Import the sync client directly
+except ImportError as e:
     try:
-        # Then try direct import
-        from sync_wrapper import SyncLocalLabClient
+        # Then try the installed package
+        from locallab_client import SyncLocalLabClient
     except ImportError:
-        try:
-            # Then try relative import
-            import sys, os
-            sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-            from sync_wrapper import SyncLocalLabClient
-        except ImportError:
-            print("LocalLab client not found. Please install it with:")
-            print("pip install locallab-client")
-            sys.exit(1)
+        print(f"LocalLab client not found: {e}")
+        print("Please install it with: pip install locallab-client")
+        sys.exit(1)
 
 
 def main():
