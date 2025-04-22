@@ -1,1 +1,1 @@
-locallab
+locallab_client

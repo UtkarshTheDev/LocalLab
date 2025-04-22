@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 import logging
 
 # Import from the package root
-from . import LocalLabClient
+from .client import LocalLabClient, LocalLabConfig
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class SyncLocalLabClient:
 
     def __init__(self, base_url: str, timeout: float = 30.0):
         """Initialize the synchronous client."""
-        self._async_client = LocalLabClient(base_url, timeout)
+        self._async_client = LocalLabClient(LocalLabConfig(base_url=base_url, timeout=timeout))
         self._loop = None
         self._thread = None
         self._executor = ThreadPoolExecutor(max_workers=1)

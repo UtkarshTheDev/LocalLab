@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="locallab-client",
-    version="1.0.5",
+    version="1.0.6",
     author="Utkarsh",
     author_email="utkarshweb2023@gmail.com",
     description="Python client for LocalLab - A local LLM server",

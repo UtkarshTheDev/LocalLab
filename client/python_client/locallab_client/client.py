@@ -143,6 +143,9 @@ class LocalLabConfig:
 
 class LocalLabClient:
     """Asynchronous client for the LocalLab API with improved error handling."""
+    
+    # Class-level attribute for activity tracking
+    _last_activity_times = {}
 
     def __init__(self, config: Union[str, LocalLabConfig, Dict[str, Any]]):
         if isinstance(config, str):
@@ -151,7 +154,7 @@ class LocalLabClient:
             config = LocalLabConfig(**config)
         
         self.config = config
-        self.session: Optional[aiohttp.ClientSession] = None
+        self._session: Optional[aiohttp.ClientSession] = None
         self.ws: Optional[websockets.WebSocketClientProtocol] = None
         self._stream_context = []
         self._closed = False
@@ -160,25 +163,12 @@ class LocalLabClient:
         self._retry_count = 0
         self._max_retries = 3
 
-    async def _ensure_connection(self):
-        """Ensure the client is connected with retry logic."""
-        if self._closed:
-            raise RuntimeError("Client is closed")
-            
-        if not self.session or self.session.closed:
-            async with self._connection_lock:
-                try:
-                    await self.connect()
-                except Exception as e:
-                    logger.error(f"Connection error: {str(e)}")
-                    raise ConnectionError(f"Failed to connect: {str(e)}")
-
     async def connect(self):
         """Initialize HTTP session with improved error handling."""
         if self._closed:
             raise RuntimeError("Client is closed")
             
-        if not self.session:
+        if not self._session:
             try:
                 headers = {
                     "Content-Type": "application/json",
@@ -187,8 +177,7 @@ class LocalLabClient:
                 if self.config.api_key:
                     headers["Authorization"] = f"Bearer {self.config.api_key}"
                 
-                self.session = aiohttp.ClientSession(
-                    base_url=self.config.base_url,
+                self._session = aiohttp.ClientSession(
                     headers=headers,
                     timeout=aiohttp.ClientTimeout(total=self.config.timeout),
                 )
@@ -200,9 +189,9 @@ class LocalLabClient:
         """Close all connections with proper cleanup."""
         if not self._closed:
             try:
-                if self.session:
-                    await self.session.close()
-                    self.session = None
+                if self._session:
+                    await self._session.close()
+                    self._session = None
                 if self.ws:
                     await self.ws.close()
                     self.ws = None

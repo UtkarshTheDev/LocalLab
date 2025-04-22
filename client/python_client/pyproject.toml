@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "locallab-client"
-version = "1.0.5"
+version = "1.0.6"
 description = "Python client for LocalLab - A local LLM server"
 readme = "README.md"
 authors = [
@@ -28,9 +28,11 @@ dependencies = [
     "aiohttp>=3.8.0",
     "websockets>=10.0",
     "pydantic>=2.0.0",
+    "asyncio>=3.4.3",
+    "nest-asyncio>=1.5.1",
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/locallab"
-Documentation = "https://github.com/yourusername/locallab/tree/main/docs"
-Repository = "https://github.com/yourusername/locallab.git"
+Homepage = "https://github.com/UtkarshTheDev/LocalLab"
+Documentation = "https://github.com/UtkarshTheDev/LocalLab/tree/main/docs"
+Repository = "https://github.com/UtkarshTheDev/LocalLab.git"

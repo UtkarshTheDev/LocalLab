@@ -49,10 +49,20 @@ class LoadModelRequest(BaseModel):
 async def load_model(request: LoadModelRequest) -> Dict[str, str]:
     """Load a specific model"""
     try:
-        # Load the model but don't persist it to config
-        # This way it won't override CLI/env settings on restart
+        # Check if model exists in registry
+        if request.model_id not in MODEL_REGISTRY:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Model {request.model_id} not found. Available models: {list(MODEL_REGISTRY.keys())}"
+            )
+        
+        # Check if model is already loaded
+        if model_manager.current_model == request.model_id and model_manager.is_model_loaded(request.model_id):
+            return {"status": "success", "message": f"Model {request.model_id} is already loaded"}
+        
+        # Load the model
         await model_manager.load_model(request.model_id)
-        return {"message": f"Model {request.model_id} loaded successfully"}
+        return {"status": "success", "message": f"Model {request.model_id} loaded successfully"}
     except Exception as e:
         logger.error(f"Failed to load model {request.model_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

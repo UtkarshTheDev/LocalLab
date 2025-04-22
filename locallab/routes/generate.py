@@ -111,8 +111,12 @@ async def generate_text(request: GenerationRequest) -> GenerationResponse:
     """
     Generate text based on a prompt
     """
-    if not model_manager.current_model:
-        raise HTTPException(status_code=400, detail="No model is currently loaded")
+    # Check if model is loaded
+    if not model_manager.current_model or not model_manager.model:
+        raise HTTPException(
+            status_code=400, 
+            detail="No model is currently loaded. Please load a model first using POST /models/load."
+        )
 
     if request.stream:
         # Return a streaming response

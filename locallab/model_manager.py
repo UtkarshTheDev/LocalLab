@@ -346,7 +346,10 @@ class ModelManager:
         self.check_model_timeout()
 
         if not self.model or not self.tokenizer:
-            await self.load_model(DEFAULT_MODEL)
+            raise HTTPException(
+                status_code=400, 
+                detail="No model is currently loaded. Please load a model first using the /models/load endpoint."
+            )
 
         self.last_used = time.time()
 

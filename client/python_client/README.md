@@ -2,6 +2,20 @@
 
 Official Python client for LocalLab - A local LLM server.
 
+## Package Name Note
+
+While the package is installed as `locallab-client` (with a hyphen) via pip:
+```bash
+pip install locallab-client
+```
+
+You import it using an underscore:
+```python
+from locallab_client import LocalLabClient
+```
+
+This follows Python's package naming convention where hyphens in package names are converted to underscores for imports.
+
 ## Features
 
 - 🚀 Async/await API
@@ -9,7 +23,7 @@ Official Python client for LocalLab - A local LLM server.
 - 🌊 Streaming support
 - 💬 Chat completion
 - 🔍 Model management
-- 📈 System monitoring
+- ���� System monitoring
 - 🔒 Type-safe with Pydantic
 - 🌐 WebSocket support
 

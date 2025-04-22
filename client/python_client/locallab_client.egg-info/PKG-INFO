@@ -1,40 +1,29 @@
 Metadata-Version: 2.4
 Name: locallab-client
-Version: 1.0.1
-Summary: Python client for connecting to LocalLab servers - Interact with AI models running on LocalLab
+Version: 1.0.5
+Summary: Python client for LocalLab - A local LLM server
 Home-page: https://github.com/UtkarshTheDev/LocalLab
-Author: Utkarsh Tiwari
+Author: Utkarsh
 Author-email: Utkarsh <utkarshweb2023@gmail.com>
 License: MIT
-Project-URL: Homepage, https://github.com/UtkarshTheDev/LocalLab
-Project-URL: Documentation, https://github.com/UtkarshTheDev/LocalLab#readme
-Project-URL: Repository, https://github.com/UtkarshTheDev/LocalLab.git
-Project-URL: Issues, https://github.com/UtkarshTheDev/LocalLab/issues
-Keywords: llm,ai,client,api,inference
-Classifier: Development Status :: 4 - Beta
+Project-URL: Homepage, https://github.com/yourusername/locallab
+Project-URL: Documentation, https://github.com/yourusername/locallab/tree/main/docs
+Project-URL: Repository, https://github.com/yourusername/locallab.git
+Classifier: Development Status :: 5 - Production/Stable
 Classifier: Intended Audience :: Developers
 Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
 Classifier: Programming Language :: Python :: 3
 Classifier: Programming Language :: Python :: 3.7
 Classifier: Programming Language :: Python :: 3.8
 Classifier: Programming Language :: Python :: 3.9
 Classifier: Programming Language :: Python :: 3.10
 Classifier: Programming Language :: Python :: 3.11
-Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
 Requires-Python: >=3.7
 Description-Content-Type: text/markdown
-Requires-Dist: aiohttp<4.0.0,>=3.8.0
-Requires-Dist: websockets<11.0,>=10.0
-Requires-Dist: pydantic<3.0.0,>=2.0.0
-Requires-Dist: typing-extensions>=4.0.0
-Provides-Extra: dev
-Requires-Dist: pytest>=6.0; extra == "dev"
-Requires-Dist: pytest-asyncio>=0.15.0; extra == "dev"
-Requires-Dist: pytest-cov>=2.0; extra == "dev"
-Requires-Dist: black>=22.0; extra == "dev"
-Requires-Dist: isort>=5.0; extra == "dev"
-Requires-Dist: mypy>=0.900; extra == "dev"
-Requires-Dist: flake8>=3.9; extra == "dev"
+Requires-Dist: aiohttp>=3.8.0
+Requires-Dist: websockets>=10.0
+Requires-Dist: pydantic>=2.0.0
 Dynamic: author
 Dynamic: home-page
 Dynamic: requires-python
@@ -66,7 +55,7 @@ poetry add locallab-client
 
 ```python
 import asyncio
-from locallab.client import LocalLabClient
+from locallab_client import LocalLabClient
 
 async def main():
     # Initialize client
