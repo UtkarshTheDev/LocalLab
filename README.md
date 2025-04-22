@@ -86,10 +86,17 @@ from locallab_client import SyncLocalLabClient
 client = SyncLocalLabClient("http://localhost:8000")
 
 try:
+    print("Generating text...")
     # Generate text
     response = client.generate("Write a story")
     print(response)
 
+    print("Streaming responses...")
+    # Stream responses
+    for token in client.stream_generate("Tell me a story"):
+       print(token, end="", flush=True)
+
+    print("Chat responses...")
     # Chat with AI
     response = client.chat([
         {"role": "system", "content": "You are helpful."},
@@ -113,21 +120,25 @@ async def main():
     client = LocalLabClient("http://localhost:8000")
     
     try:
+        print("Generating text...")
         # Generate text
         response = await client.generate("Write a story")
         print(response)
 
+        print("Streaming responses...")
         # Stream responses
         async for token in client.stream_generate("Tell me a story"):
             print(token, end="", flush=True)
 
+        print("\nChatting with AI...")
         # Chat with AI
         response = await client.chat([
             {"role": "system", "content": "You are helpful."},
             {"role": "user", "content": "Hello!"}
         ])
-        print(response.choices[0]["message"]["content"])
-
+        # Extracting Content
+        content = response['choices'][0]['message']['content']
+        print(content)
     finally:
         # Always close the client
         await client.close()
