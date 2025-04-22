@@ -1,3 +1,7 @@
+"""
+Asynchronous client for LocalLab API.
+"""
+
 import aiohttp
 import asyncio
 import atexit
@@ -5,8 +9,67 @@ import weakref
 import warnings
 import threading
 import time
-from typing import Optional, AsyncGenerator, Dict, Any, List, Set, ClassVar
+import logging
+from typing import Optional, AsyncGenerator, Dict, Any, List, Set, ClassVar, Union
 import json
+import websockets
+from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
+
+# Define response models
+class GenerateOptions(BaseModel):
+    """Options for text generation"""
+    max_length: Optional[int] = None
+    temperature: float = 0.7
+    top_p: float = 0.9
+    stream: bool = False
+
+class ChatMessage(BaseModel):
+    """Chat message format"""
+    role: str
+    content: str
+
+class GenerateResponse(BaseModel):
+    """Response from text generation"""
+    text: str
+    model: str
+
+class ChatResponse(BaseModel):
+    """Response from chat completion"""
+    choices: List[Dict[str, Any]]
+
+class BatchResponse(BaseModel):
+    """Response from batch generation"""
+    responses: List[str]
+
+class ModelInfo(BaseModel):
+    """Model information"""
+    name: str
+    type: str
+    parameters: Optional[Dict[str, Any]] = None
+
+class SystemInfo(BaseModel):
+    """System information"""
+    cpu_usage: float
+    memory_usage: float
+    gpu_info: Optional[Dict[str, Any]] = None
+    active_model: Optional[str] = None
+    uptime: float
+    request_count: int
+
+# Define custom exceptions
+class LocalLabError(Exception):
+    """Base exception for LocalLab errors"""
+    pass
+
+class ValidationError(LocalLabError):
+    """Validation error"""
+    pass
+
+class RateLimitError(LocalLabError):
+    """Rate limit error"""
+    pass
 
 # Global registry to track all active client sessions
 _active_clients: Set[weakref.ReferenceType] = set()
@@ -71,45 +134,82 @@ def _start_cleanup_task():
 # Initialize the cleanup task
 _start_cleanup_task()
 
-class LocalLabClient:
-    """Asynchronous Python client for the LocalLab API with automatic session management
-
-    This client requires async/await syntax. For synchronous usage, use SyncLocalLabClient.
-
-    Async usage:
-    ```python
-    client = LocalLabClient("http://localhost:8000")
-    response = await client.generate("Hello, world!")
-    await client.close()
-    ```
-
-    # Context manager usage has been removed to simplify the client implementation
-    """
-
-    # Class variable to track the last activity time
-    _last_activity_times: ClassVar[Dict[int, float]] = {}
-
-    def __init__(self, base_url: str, timeout: float = 30.0, auto_close: bool = True):
-        """Initialize the client with the server's base URL
-
-        Args:
-            base_url: The base URL of the LocalLab server
-            timeout: Request timeout in seconds
-            auto_close: Whether to automatically close the session when unused
-        """
+class LocalLabConfig:
+    def __init__(self, base_url: str, timeout: float = 30.0, headers: Dict[str, str] = {}, api_key: Optional[str] = None):
         self.base_url = base_url.rstrip("/")
-        self.timeout = aiohttp.ClientTimeout(total=timeout)
-        self._session = None
-        self._auto_close = auto_close
+        self.timeout = timeout
+        self.headers = headers
+        self.api_key = api_key
+
+class LocalLabClient:
+    """Asynchronous client for the LocalLab API with improved error handling."""
+
+    def __init__(self, config: Union[str, LocalLabConfig, Dict[str, Any]]):
+        if isinstance(config, str):
+            config = LocalLabConfig(base_url=config)
+        elif isinstance(config, dict):
+            config = LocalLabConfig(**config)
+        
+        self.config = config
+        self.session: Optional[aiohttp.ClientSession] = None
+        self.ws: Optional[websockets.WebSocketClientProtocol] = None
+        self._stream_context = []
         self._closed = False
+        self._connection_lock = asyncio.Lock()
+        self._last_activity = time.time()
+        self._retry_count = 0
+        self._max_retries = 3
 
-        # Register this client in the global registry
-        if self._auto_close:
-            with _registry_lock:
-                _active_clients.add(weakref.ref(self, self._cleanup_callback))
+    async def _ensure_connection(self):
+        """Ensure the client is connected with retry logic."""
+        if self._closed:
+            raise RuntimeError("Client is closed")
+            
+        if not self.session or self.session.closed:
+            async with self._connection_lock:
+                try:
+                    await self.connect()
+                except Exception as e:
+                    logger.error(f"Connection error: {str(e)}")
+                    raise ConnectionError(f"Failed to connect: {str(e)}")
 
-        # Update last activity time
-        self._update_activity()
+    async def connect(self):
+        """Initialize HTTP session with improved error handling."""
+        if self._closed:
+            raise RuntimeError("Client is closed")
+            
+        if not self.session:
+            try:
+                headers = {
+                    "Content-Type": "application/json",
+                    **self.config.headers,
+                }
+                if self.config.api_key:
+                    headers["Authorization"] = f"Bearer {self.config.api_key}"
+                
+                self.session = aiohttp.ClientSession(
+                    base_url=self.config.base_url,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=self.config.timeout),
+                )
+            except Exception as e:
+                logger.error(f"Failed to create session: {str(e)}")
+                raise ConnectionError(f"Failed to create session: {str(e)}")
+
+    async def close(self):
+        """Close all connections with proper cleanup."""
+        if not self._closed:
+            try:
+                if self.session:
+                    await self.session.close()
+                    self.session = None
+                if self.ws:
+                    await self.ws.close()
+                    self.ws = None
+            except Exception as e:
+                logger.error(f"Error during close: {str(e)}")
+            finally:
+                self._closed = True
 
     def _update_activity(self):
         """Update the last activity time for this client"""
@@ -127,8 +227,6 @@ class LocalLabClient:
         if client_id in cls._last_activity_times:
             del cls._last_activity_times[client_id]
 
-    # Context manager methods have been removed to simplify the client implementation
-
     def __del__(self):
         """Attempt to close the session when the client is garbage collected"""
         if not self._closed and self._session is not None:
@@ -137,47 +235,6 @@ class LocalLabClient:
                 "LocalLabClient was garbage collected with an open session. "
                 "Please use 'await client.close()' to properly close the session."
             )
-
-    async def connect(self):
-        """Ensure the client has an active session with retry logic"""
-        # Update activity timestamp
-        self._update_activity()
-
-        # Maximum number of connection attempts
-        max_attempts = 3
-        attempt = 0
-        last_error = None
-
-        while attempt < max_attempts:
-            try:
-                if self._session is None or self._session.closed:
-                    self._session = aiohttp.ClientSession(timeout=self.timeout)
-                    self._closed = False
-                return
-            except Exception as e:
-                last_error = e
-                attempt += 1
-                if attempt < max_attempts:
-                    # Wait before retrying (exponential backoff)
-                    await asyncio.sleep(0.5 * (2 ** attempt))
-
-        # If we've exhausted all attempts, raise the last error
-        if last_error:
-            raise Exception(f"Failed to create session after {max_attempts} attempts: {str(last_error)}")
-
-    async def close(self):
-        """Close aiohttp session"""
-        if self._session and not self._closed:
-            await self._session.close()
-            self._session = None
-            self._closed = True
-
-            # Remove from registry
-            with _registry_lock:
-                for ref in list(_active_clients):
-                    if ref() is self:
-                        _active_clients.remove(ref)
-                        break
 
     async def generate(
         self,
@@ -211,7 +268,7 @@ class LocalLabClient:
         try:
             await self.connect()
             async with self._session.post(
-                f"{self.base_url}/generate",
+                f"{self.config.base_url}/generate",
                 json=payload,
                 timeout=request_timeout
             ) as response:
@@ -272,7 +329,7 @@ class LocalLabClient:
             try:
                 await self.connect()
                 async with self._session.post(
-                    f"{self.base_url}/generate",
+                    f"{self.config.base_url}/generate",
                     json=payload,
                     timeout=request_timeout
                 ) as response:
@@ -391,7 +448,7 @@ class LocalLabClient:
         try:
             await self.connect()
             async with self._session.post(
-                f"{self.base_url}/chat",
+                f"{self.config.base_url}/chat",
                 json=payload,
                 timeout=request_timeout
             ) as response:
@@ -445,7 +502,7 @@ class LocalLabClient:
             try:
                 await self.connect()
                 async with self._session.post(
-                    f"{self.base_url}/chat",
+                    f"{self.config.base_url}/chat",
                     json=payload,
                     timeout=request_timeout
                 ) as response:
@@ -558,7 +615,7 @@ class LocalLabClient:
         try:
             await self.connect()
             async with self._session.post(
-                f"{self.base_url}/generate/batch",
+                f"{self.config.base_url}/generate/batch",
                 json=payload,
                 timeout=request_timeout
             ) as response:
@@ -589,7 +646,7 @@ class LocalLabClient:
         try:
             await self.connect()
             async with self._session.post(
-                f"{self.base_url}/models/load",
+                f"{self.config.base_url}/models/load",
                 json={"model_id": model_id},
                 timeout=request_timeout
             ) as response:
@@ -621,7 +678,7 @@ class LocalLabClient:
         try:
             await self.connect()
             async with self._session.get(
-                f"{self.base_url}/models/current",
+                f"{self.config.base_url}/models/current",
                 timeout=request_timeout
             ) as response:
                 if response.status != 200:
@@ -651,7 +708,7 @@ class LocalLabClient:
         try:
             await self.connect()
             async with self._session.get(
-                f"{self.base_url}/models/available",
+                f"{self.config.base_url}/models/available",
                 timeout=request_timeout
             ) as response:
                 if response.status != 200:
@@ -682,7 +739,7 @@ class LocalLabClient:
         try:
             await self.connect()
             async with self._session.get(
-                f"{self.base_url}/health",
+                f"{self.config.base_url}/health",
                 timeout=request_timeout
             ) as response:
                 return response.status == 200
@@ -701,7 +758,7 @@ class LocalLabClient:
         try:
             await self.connect()
             async with self._session.get(
-                f"{self.base_url}/system/info",
+                f"{self.config.base_url}/system/info",
                 timeout=request_timeout
             ) as response:
                 if response.status != 200:
@@ -731,7 +788,7 @@ class LocalLabClient:
         try:
             await self.connect()
             async with self._session.post(
-                f"{self.base_url}/models/unload",
+                f"{self.config.base_url}/models/unload",
                 timeout=request_timeout
             ) as response:
                 if response.status != 200:

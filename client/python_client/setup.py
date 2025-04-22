@@ -1,18 +1,21 @@
 from setuptools import setup, find_packages
 
-with open("README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
-
 setup(
     name="locallab-client",
-    version="0.2.1",
-    author="Utkarsh Tiwari",
+    version="1.0.2",
+    author="Utkarsh",
     author_email="utkarshweb2023@gmail.com",
-    description="Official Python client for LocalLab - A local LLM server",
-    long_description=long_description,
+    description="Python client for LocalLab - A local LLM server",
+    long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/UtkarshTheDev/LocalLab",
-    packages=find_packages(include=["locallab", "locallab.*"]),
+    url="https://github.com/yourusername/locallab",
+    packages=find_packages(),
+    install_requires=[
+        "aiohttp>=3.8.0",
+        "websockets>=10.0",
+        "pydantic>=2.0.0",
+    ],
+    python_requires=">=3.7",
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Developers",
@@ -24,30 +27,5 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
-        "Topic :: Software Development :: Libraries :: Python Modules",
-        "Topic :: Scientific/Engineering :: Artificial Intelligence",
     ],
-    python_requires=">=3.7",
-    install_requires=[  
-        "aiohttp>=3.8.0",
-        "typing-extensions>=4.0.0",
-        "pydantic>=2.0.0",
-        "websockets>=10.0",
-    ],
-    extras_require={
-        "dev": [
-            "pytest>=6.0",
-            "pytest-asyncio>=0.15.0",
-            "pytest-cov>=2.0",
-            "black>=22.0",
-            "isort>=5.0",
-            "mypy>=0.900",
-            "flake8>=3.9",
-        ],
-    },
-    project_urls={
-        "Bug Tracker": "https://github.com/UtkarshTheDev/LocalLab/issues",
-        "Documentation": "https://github.com/UtkarshTheDev/LocalLab#readme",
-        "Source Code": "https://github.com/UtkarshTheDev/LocalLab",
-    },
 )

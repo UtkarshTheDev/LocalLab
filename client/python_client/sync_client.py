@@ -7,115 +7,130 @@ import asyncio
 import threading
 import sys
 import os
+import time
 from typing import List, Dict, Any, Optional, Generator, Union
 from concurrent.futures import ThreadPoolExecutor
+import logging
 
-# Make sure we can import the client
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
+# Import from the package root
+from . import LocalLabClient
 
-# Import the client directly
-import client
-LocalLabClient = client.LocalLabClient
-
+logger = logging.getLogger(__name__)
 
 class SyncLocalLabClient:
     """
     Synchronous client for the LocalLab API.
-
-    This class provides a synchronous interface to the LocalLab API by wrapping
-    the asynchronous LocalLabClient. It handles all the async/await details
-    internally, allowing developers to use the client without async/await syntax.
-
-    Example:
-        ```python
-        from sync_client import SyncLocalLabClient
-
-        # Create a client
-        client = SyncLocalLabClient("http://localhost:8000")
-
-        # Generate text
-        response = client.generate("Write a story about a robot")
-        print(response)
-
-        # No need to explicitly close the client, it will be closed automatically
-        ```
     """
 
     def __init__(self, base_url: str, timeout: float = 30.0):
-        """
-        Initialize the synchronous client.
-
-        Args:
-            base_url: The base URL of the LocalLab server
-            timeout: Request timeout in seconds
-        """
+        """Initialize the synchronous client."""
         self._async_client = LocalLabClient(base_url, timeout)
         self._loop = None
         self._thread = None
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._lock = threading.RLock()
+        self._is_closed = False
         self._initialize_event_loop()
 
     def _initialize_event_loop(self):
-        """Initialize a dedicated event loop in a separate thread."""
+        """Initialize a dedicated event loop in a separate thread with error handling."""
         with self._lock:
             if self._loop is None or self._thread is None:
-                self._loop = asyncio.new_event_loop()
+                try:
+                    self._loop = asyncio.new_event_loop()
 
-                def run_event_loop():
-                    asyncio.set_event_loop(self._loop)
-                    self._loop.run_forever()
+                    def run_event_loop():
+                        try:
+                            asyncio.set_event_loop(self._loop)
+                            self._loop.run_forever()
+                        except Exception as e:
+                            logger.error(f"Event loop error: {str(e)}")
+                        finally:
+                            try:
+                                # Cancel all running tasks
+                                pending = asyncio.all_tasks(self._loop)
+                                for task in pending:
+                                    task.cancel()
+                                # Run loop until tasks are cancelled
+                                self._loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                                self._loop.close()
+                            except Exception as e:
+                                logger.error(f"Error during event loop cleanup: {str(e)}")
 
-                self._thread = threading.Thread(target=run_event_loop, daemon=True)
-                self._thread.start()
+                    self._thread = threading.Thread(target=run_event_loop, daemon=True)
+                    self._thread.start()
+                except Exception as e:
+                    logger.error(f"Failed to initialize event loop: {str(e)}")
+                    raise RuntimeError(f"Failed to initialize client: {str(e)}")
 
-    def _run_coroutine(self, coro):
-        """Run a coroutine in the event loop thread and return the result."""
+    def _ensure_connection(self):
+        """Ensure the client is connected and ready."""
+        if self._is_closed:
+            raise RuntimeError("Client is closed")
         if not self._loop or not self._thread or not self._thread.is_alive():
             self._initialize_event_loop()
 
-        future = asyncio.run_coroutine_threadsafe(coro, self._loop)
-        return future.result()
+    def _run_coroutine(self, coro, timeout: Optional[float] = None):
+        """Run a coroutine in the event loop thread with timeout and error handling."""
+        self._ensure_connection()
+        
+        try:
+            future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+            return future.result(timeout=timeout)
+        except asyncio.TimeoutError:
+            raise TimeoutError("Operation timed out")
+        except Exception as e:
+            logger.error(f"Error running coroutine: {str(e)}")
+            raise
 
     def __enter__(self):
-        """Context manager entry."""
+        """Context manager entry with connection validation."""
+        self._ensure_connection()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
+        """Context manager exit with proper cleanup."""
         self.close()
 
     def __del__(self):
-        """Clean up resources when the object is garbage collected."""
-        self.close()
+        """Cleanup on garbage collection."""
+        if not self._is_closed:
+            self.close()
 
     def close(self):
-        """Close the client and clean up resources."""
+        """Close the client with proper cleanup of all resources."""
         with self._lock:
-            if self._loop and self._thread and self._thread.is_alive():
-                # Run the close coroutine in the event loop
+            if not self._is_closed:
                 try:
-                    future = asyncio.run_coroutine_threadsafe(
-                        self._async_client.close(), self._loop
-                    )
-                    future.result(timeout=5)  # Wait up to 5 seconds for close to complete
-                except Exception:
-                    pass  # Ignore errors during cleanup
+                    # Close async client first
+                    if self._loop and self._thread and self._thread.is_alive():
+                        try:
+                            future = asyncio.run_coroutine_threadsafe(
+                                self._async_client.close(), self._loop
+                            )
+                            future.result(timeout=5)
+                        except Exception as e:
+                            logger.error(f"Error closing async client: {str(e)}")
 
-                # Stop the event loop
-                self._loop.call_soon_threadsafe(self._loop.stop)
+                    # Stop event loop
+                    if self._loop and not self._loop.is_closed():
+                        self._loop.call_soon_threadsafe(self._loop.stop)
 
-                # Wait for the thread to finish
-                self._thread.join(timeout=1)
+                    # Wait for thread to finish
+                    if self._thread and self._thread.is_alive():
+                        self._thread.join(timeout=1)
 
-                # Clean up
-                self._loop = None
-                self._thread = None
-
-            # Shutdown the executor
-            self._executor.shutdown(wait=False)
+                    # Clean up
+                    self._loop = None
+                    self._thread = None
+                    
+                    # Shutdown executor
+                    self._executor.shutdown(wait=False)
+                    
+                except Exception as e:
+                    logger.error(f"Error during client cleanup: {str(e)}")
+                finally:
+                    self._is_closed = True
 
     def generate(
         self,

@@ -2,6 +2,49 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.4.53] - 2024-04-21
+
+### Added
+- Enhanced error handling and reliability in both clients
+- Added timeout handling to sync client streaming methods
+- Improved event loop cleanup and resource management
+- Added connection state validation
+- Added retry mechanism for streaming operations
+- Added comprehensive logging throughout both clients
+- Added proper cleanup of resources on client closure
+
+### Fixed
+- Fixed potential memory leaks in event loop handling
+- Fixed thread cleanup in synchronous client
+- Improved error propagation between async and sync clients
+- Added proper timeout handling in streaming operations
+- Enhanced connection state management
+
+## [0.4.52] - 2024-04-21
+
+### Fixed
+- Fixed package structure to avoid duplicate exports
+- Updated version numbers to be consistent across all files
+- Fixed imports in sync_client.py to use correct package name
+- Improved package import reliability
+- Ensured both LocalLabClient and SyncLocalLabClient are properly exported
+
+## [0.4.51] - 2024-04-21
+
+### Fixed
+- Fixed SyncLocalLabClient not being exported from locallab_client package
+- Added proper exports for both LocalLabClient and SyncLocalLabClient in package __init__.py
+- Ensured both sync and async clients are available through the main package import
+
+## [0.4.50] - 2024-04-21
+
+### Changed
+
+- Renamed Python client package from `locallab-client` to `locallab_client` for better import compatibility
+- Updated client package version to 0.3.0
+- Changed client package structure to use direct imports instead of nested packages
+- Improved client package documentation with correct import examples
+
 ## [0.4.49] - 2024-04-21
 
 ### Fixed

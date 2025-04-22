@@ -1,6 +1,6 @@
 import asyncio
 import os
-from locallab_client import LocalLabClient
+from locallab_client import LocalLabClient, ChatMessage
 
 # Get the server URL from environment or user input
 SERVER_URL = os.getenv("LOCALLAB_SERVER_URL") or input("Enter the ngrok URL from your Colab notebook: ").strip()
@@ -30,14 +30,14 @@ async def main():
 
         # Basic generation
         response = await client.generate("Hello, how are you?")
-        print("Generated response:", response.response)
+        print("Generated response:", response)
 
         # Chat completion
         chat_response = await client.chat([
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "What is the capital of France?"},
+            ChatMessage(role="system", content="You are a helpful assistant."),
+            ChatMessage(role="user", content="What is the capital of France?"),
         ])
-        print("Chat response:", chat_response.choices[0].message.content)
+        print("Chat response:", chat_response.choices[0]["message"]["content"])
 
         # Streaming generation
         print("\nStreaming response:")
@@ -61,25 +61,10 @@ async def main():
         print(f"CPU Usage: {system_info.cpu_usage}%")
         print(f"Memory Usage: {system_info.memory_usage}%")
         if system_info.gpu_info:
-            print(f"GPU: {system_info.gpu_info.device}")
-            print(f"GPU Memory: {system_info.gpu_info.used_memory}/{system_info.gpu_info.total_memory} MB")
-            print(f"GPU Utilization: {system_info.gpu_info.utilization}%")
+            print(f"GPU: {system_info.gpu_info}")
         print(f"Active Model: {system_info.active_model}")
         print(f"Uptime: {system_info.uptime/3600:.2f} hours")
-        print(f"Total Requests: {system_info.request_count}")
-
-        # WebSocket example
-        print("\nConnecting to WebSocket...")
-        await client.connect_ws()
-
-        async def message_handler(data):
-            print("Received message:", data)
-
-        print("Listening for messages (press Ctrl+C to stop)...")
-        try:
-            await client.on_message(message_handler)
-        except KeyboardInterrupt:
-            print("\nStopping WebSocket connection...")
+        print(f"Request Count: {system_info.request_count}")
 
     except Exception as e:
         print("Error:", e)
