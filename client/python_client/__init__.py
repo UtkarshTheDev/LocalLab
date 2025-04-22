@@ -20,7 +20,7 @@ from .client import (
 )
 from .sync_client import SyncLocalLabClient
 
-__version__ = "1.0.2"
+__version__ = "1.0.4"
 __author__ = "Utkarsh"
 __email__ = "utkarshweb2023@gmail.com"
 
