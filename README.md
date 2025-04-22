@@ -1,151 +1,172 @@
 # 🚀 LocalLab: Your Personal AI Lab
 
-LocalLab lets you run AI language models on your computer or Google Colab - no cloud services needed! Think of it as having ChatGPT-like capabilities right on your machine.
+Run powerful AI language models on your own computer or Google Colab - no cloud services needed! Think of it as having ChatGPT-like capabilities right on your machine.
 
 ## 🤔 What is LocalLab?
 
-LocalLab consists of two parts working together:
+LocalLab brings AI to your fingertips with two key components:
 
 ```mermaid
-graph LR
-    A[LocalLab Server] -->|Runs| B[AI Models]
-    C[Your Code] -->|Uses| D[LocalLab Client] -->|Talks to| A
+graph TD
+    A[Your Code] -->|Uses| B[LocalLab Client]
+    B -->|Talks to| C[LocalLab Server]
+    C -->|Runs| D[AI Models]
+    C -->|Manages| E[Memory & Resources]
+    C -->|Optimizes| F[Performance]
 ```
 
-### The Server (Your AI Engine)
+### 🎯 Key Features
 
-Think of the server as your personal AI engine. It:
+```
+📦 Easy Setup         🔒 Privacy First       🎮 Free GPU Access
+🤖 Multiple Models    💾 Memory Efficient    🔄 Auto-Optimization
+🌐 Local or Colab    ⚡ Fast Response       🔧 Simple API
+```
 
-- Downloads and runs AI models on your computer
-- Manages memory and resources automatically
-- Optimizes performance based on your hardware
-- Provides a simple API for accessing models
+### 🌟 Two Ways to Run
 
-You can run it:
-
-- On your computer (local mode)
-- On Google Colab (free GPU mode)
-
-### The Client (Your AI Controller)
-
-The client is how your code talks to the AI. It:
-
-- Connects to your LocalLab server
-- Sends requests for text generation
-- Handles chat conversations
-- Processes multiple requests at once
-- Streams responses in real-time
-
-## ✨ How It Works Together
-
-When you use LocalLab:
-
-1. **Server Setup**
-
-   ```python
-   from locallab import start_server
-   start_server()  # Server starts and loads AI model
+1. **On Your Computer (Local Mode)**
+   ```
+   💻 Your Computer
+   └── 🚀 LocalLab Server
+       └── 🤖 AI Model
+           └── 🔧 Auto-optimization
    ```
 
-2. **Client Connection**
-
-   ```python
-    # Async Usage
-        from locallab_client import LocalLabClient # Async client
-        server_url = "http://localhost:8000" # or "https://your-ngrok-url.ngrok.app"
-        client = LocalLabClient(server_url)
-    # Sync Usage
-        from locallab_client import SyncLocalLabClient # Sync client
-        server_url = "http://localhost:8000" # or "https://your-ngrok-url.ngrok.app"
-        client = SyncLocalLabClient(server_url)
+2. **On Google Colab (Free GPU Mode)**
+   ```
+   ☁️ Google Colab
+   └── 🎮 Free GPU
+       └── 🚀 LocalLab Server
+           └── 🤖 AI Model
+               └── ⚡ GPU Acceleration
    ```
 
-3. **AI Interaction**
+## 📦 Installation & Setup
 
-   ```python
-   # Your code sends requests through the client
-   # Async usage
-   response = await client.generate("Write a story")
-   print(response)  # Server processes and returns AI response
+### 1. Install Required Packages
 
-   # Or sync usage (New!)
-   response = client.generate("Write a story")
-   print(response)  # Same result, no async/await needed!
-   ```
+```bash
+# Install both server and client packages
+pip install locallab locallab-client
+```
 
-## 💡 Quick Examples
+### 2. Configure the Server (Recommended)
+
+```bash
+# Run interactive configuration
+locallab config
+
+# This will help you set up:
+# - Model selection
+# - Memory optimizations
+# - GPU settings
+# - System resources
+```
+
+### 3. Start the Server
+
+```bash
+# Start with saved configuration
+locallab start
+
+# Or start with specific options
+locallab start --model microsoft/phi-2 --quantize --quantize-type int8
+```
+
+
+## 💡 Basic Usage
+
+### Synchronous Usage (Easier for Beginners)
 
 ```python
-# Install the client
-# pip install locallab-client
+from locallab_client import SyncLocalLabClient
 
-# Import the appropriate client
-from locallab_client import LocalLabClient       # Async client
-from locallab_client import SyncLocalLabClient  # Sync client
+# Connect to server
+client = SyncLocalLabClient("http://localhost:8000")
 
-# Generate text (async or sync)
-response = await client.generate("Hello!")  # Async with LocalLabClient
-response = client.generate("Hello!")        # Sync with SyncLocalLabClient
+try:
+    # Generate text
+    response = client.generate("Write a story")
+    print(response)
 
-# Chat with AI (async or sync)
-response = await client.chat([              # Async with LocalLabClient
-    {"role": "user", "content": "Hi!"}
-])
-response = client.chat([                    # Sync with SyncLocalLabClient
-    {"role": "user", "content": "Hi!"}
-])
+    # Chat with AI
+    response = client.chat([
+        {"role": "system", "content": "You are helpful."},
+        {"role": "user", "content": "Hello!"}
+    ])
+    print(response.choices[0]["message"]["content"])
 
-# Process multiple prompts (async or sync)
-responses = await client.batch_generate([   # Async with LocalLabClient
-    "Write a joke",
-    "Tell a story"
-])
-responses = client.batch_generate([         # Sync with SyncLocalLabClient
-    "Write a joke",
-    "Tell a story"
-])
-
+finally:
+    # Always close the client
+    client.close()
 ```
 
-[➡️ See More Examples](./docs/guides/examples.md)
+### Asynchronous Usage (For Advanced Users)
+
+```python
+import asyncio
+from locallab_client import LocalLabClient
+
+async def main():
+    # Connect to server
+    client = LocalLabClient("http://localhost:8000")
+    
+    try:
+        # Generate text
+        response = await client.generate("Write a story")
+        print(response)
+
+        # Stream responses
+        async for token in client.stream_generate("Tell me a story"):
+            print(token, end="", flush=True)
+
+        # Chat with AI
+        response = await client.chat([
+            {"role": "system", "content": "You are helpful."},
+            {"role": "user", "content": "Hello!"}
+        ])
+        print(response.choices[0]["message"]["content"])
+
+    finally:
+        # Always close the client
+        await client.close()
+
+# Run the async function
+asyncio.run(main())
+```
+
+## 🌐 Google Colab Usage
+
+Run LocalLab on Google's free GPUs:
+
+```python
+# 1. Install packages
+!pip install locallab locallab-client
+
+# 2. Configure with CLI (notice the ! prefix)
+!locallab config
+
+# 3. Start server with CLI
+!locallab start --use-ngrok
+
+# 4. Connect client (Locally)
+from locallab_client import LocalLabClient
+client = LocalLabClient("https://your-server-ngrok-url.app")
+response = await client.generate("Hello!")
+```
 
 ## 💻 Requirements
 
-**Local Computer:**
-
+### Local Computer
 - Python 3.8+
-- 4GB RAM minimum
-- GPU optional (but recommended)
+- 4GB RAM minimum (8GB+ recommended)
+- GPU optional but recommended
+- Internet connection for downloading models
 
-**Google Colab:**
-
+### Google Colab
 - Just a Google account!
 - Free tier works fine
-
-## 📚 Getting Started
-
-### 1. Choose Your Path
-
-**New to AI/Programming?**
-
-1. Start with our [Getting Started Guide](./docs/guides/getting-started.md)
-2. Try the [Basic Examples](./docs/guides/examples.md)
-3. Join our [Community](https://github.com/UtkarshTheDev/LocalLab/discussions)
-
-**Developer?**
-
-1. Check [API Reference](./docs/guides/api.md)
-2. See [Client Libraries](./docs/clients/README.md)
-3. Read [Advanced Features](./docs/guides/advanced.md)
-
-### 2. Read the Docs
-
-Our [Documentation Guide](./docs/README.md) will help you:
-
-- Understand LocalLab's features
-- Learn best practices
-- Find solutions to common issues
-- Master advanced features
 
 ## 🌟 Features
 
@@ -154,10 +175,27 @@ Our [Documentation Guide](./docs/README.md) will help you:
 - **Resource Efficient**: Automatic optimization
 - **Privacy First**: All local, no data sent to cloud
 - **Free GPU**: Google Colab integration
-- **Flexible Client API**: Both async and sync clients available (New!)
-- **Automatic Resource Management**: Sessions close automatically (New!)
+- **Flexible Client API**: Both async and sync clients available
+- **Automatic Resource Management**: Sessions close automatically
 
 [➡️ See All Features](./docs/features/README.md)
+
+## 📚 Documentation
+
+### Getting Started
+1. [Installation Guide](./docs/guides/getting-started.md)
+2. [Basic Examples](./docs/guides/examples.md)
+3. [CLI Usage](./docs/guides/cli.md)
+
+### Advanced Topics
+1. [API Reference](./docs/guides/api.md)
+2. [Client Libraries](./docs/clients/README.md)
+3. [Advanced Features](./docs/guides/advanced.md)
+4. [Performance Guide](./docs/features/performance.md)
+
+### Deployment
+1. [Local Setup](./docs/deployment/local.md)
+2. [Google Colab Guide](./docs/colab/README.md)
 
 ## 🔍 Need Help?
 
@@ -170,6 +208,9 @@ Our [Documentation Guide](./docs/README.md) will help you:
 - [Contributing Guide](./docs/guides/contributing.md)
 - [Changelog](./CHANGELOG.md)
 - [License](./LICENSE)
+
+## 🌟 Star Us!
+If you find LocalLab helpful, please star our repository! It helps others discover the project.
 
 ---
 

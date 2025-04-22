@@ -1,114 +1,94 @@
 # Getting Started with LocalLab
 
-This guide will help you start using LocalLab, whether you're running it locally or on Google Colab.
+This guide will help you start using LocalLab, whether you're new to AI or an experienced developer.
 
-## Choose Your Environment
+## 🌟 What You'll Need
 
-### Local Setup
+### For Local Setup
+- Python 3.8 or higher installed
+- 4GB RAM minimum (8GB+ recommended)
+- GPU optional but recommended
+- Internet connection for downloading models
 
-1. **Install LocalLab**
+### For Google Colab
+- Just a Google account!
+- Internet connection
 
-   ```bash
-   pip install locallab
-   ```
+## 🚀 Step-by-Step Setup
 
-2. **Start the Server**
+### Step 1: Install Required Packages
 
-   **Using Command Line (Improved in v0.4.8!)**
+First, you need to install both the server and client packages:
 
-   ```bash
-   # Interactive setup wizard - now with faster startup and better error handling
-   locallab start
+```bash
+# Install the server package
+pip install locallab
 
-   # Or with specific options
-   locallab start --model microsoft/phi-2 --quantize --quantize-type int8 --attention-slicing
+# Install the client package
+pip install locallab-client
+```
 
-   # Run the configuration wizard without starting the server
-   locallab config
+### Step 2: Start the Server
 
-   # Check your system resources
-   locallab info
-   ```
+You have two options:
 
-   **Using Python**
+#### Option A: Using Command Line (Recommended for Beginners)
+```bash
+# Start with interactive setup
+locallab start
+```
+This will:
+- Guide you through setup
+- Help choose a model
+- Configure optimizations
+- Start the server
 
-   ```python
-   from locallab import start_server
-   start_server()
-   ```
+#### Option B: Using Python Code
+```python
+from locallab import start_server
+start_server()
+```
 
-3. **Connect Client**
+### Step 3: Connect with a Client
 
-   First, install the client package:
+Choose between async or sync client based on your needs:
 
-   ```bash
-   pip install locallab-client
-   ```
+#### Synchronous Client (Easier for Beginners)
+```python
+from locallab_client import SyncLocalLabClient
 
-   Then, use the client in your code:
+# Connect to the server
+client = SyncLocalLabClient("http://localhost:8000")
 
-   ```python
-   # For async usage
-   from locallab_client import LocalLabClient
-   client = LocalLabClient("http://localhost:8000")
+try:
+    # Generate text
+    response = client.generate("Write a story about a robot")
+    print(response)
+finally:
+    # Always close the client when done
+    client.close()
+```
 
-   # Or for sync usage (no async/await needed)
-   from locallab_client import SyncLocalLabClient
-   client = SyncLocalLabClient("http://localhost:8000")
-   ```
+#### Asynchronous Client (For Advanced Users)
+```python
+import asyncio
+from locallab_client import LocalLabClient
 
-### Google Colab Setup
+async def main():
+    # Connect to the server
+    client = LocalLabClient("http://localhost:8000")
+    
+    try:
+        # Generate text
+        response = await client.generate("Write a story about a robot")
+        print(response)
+    finally:
+        # Always close the client when done
+        await client.close()
 
-1. **Install LocalLab**
-
-   ```python
-   !pip install locallab
-   ```
-
-2. **Set Up Ngrok**
-
-   ```python
-   import os
-   os.environ["NGROK_AUTH_TOKEN"] = "your_token_here"
-   ```
-
-3. **Start Server**
-
-   **Using Interactive Setup (Enhanced in v0.4.8!)**
-
-   ```python
-   from locallab import start_server
-   # This will prompt for any missing settings, including ngrok token
-   # Now with improved error handling and faster startup
-   start_server(use_ngrok=True)
-   ```
-
-   **Using Manual Configuration**
-
-   ```python
-   from locallab import start_server
-   start_server(use_ngrok=True)  # Will show public URL in logs
-   ```
-
-4. **Connect Client**
-
-   First, install the client package:
-
-   ```bash
-   pip install locallab-client
-   ```
-
-   Then, use the client in your code:
-
-   ```python
-   # For async usage
-   from locallab_client import LocalLabClient
-   client = LocalLabClient("https://xxxx-xx-xx-xxx-xx.ngrok-free.app")  # Use URL from logs
-
-   # Or for sync usage (no async/await needed)
-   from locallab_client import SyncLocalLabClient
-   client = SyncLocalLabClient("https://xxxx-xx-xx-xxx-xx.ngrok-free.app")  # Use URL from logs
-   ```
+# Run the async function
+asyncio.run(main())
+```
 
 ## CLI Features (New & Improved in v0.4.8)
 

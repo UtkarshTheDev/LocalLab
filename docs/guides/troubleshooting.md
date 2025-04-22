@@ -1,6 +1,58 @@
 # Troubleshooting Guide
 
-This document provides solutions to common issues encountered while running LocalLab.
+## 🔍 Common Issues for Beginners
+
+### Installation Issues
+
+**Problem:** `pip install` fails
+```
+ERROR: Could not find a version that satisfies the requirement locallab
+```
+**Solution:**
+1. Make sure you have Python 3.8 or higher:
+   ```bash
+   python --version
+   ```
+2. Update pip:
+   ```bash
+   python -m pip install --upgrade pip
+   ```
+3. Try installing with specific Python version:
+   ```bash
+   python3.8 -m pip install locallab locallab-client
+   ```
+
+### Import Issues
+
+**Problem:** Import error with locallab_client
+```python
+ImportError: No module named locallab_client
+```
+**Solution:**
+Remember that while you install using `pip install locallab-client`, you import using underscore:
+```python
+# Correct imports:
+from locallab_client import LocalLabClient  # For async
+from locallab_client import SyncLocalLabClient  # For sync
+```
+
+### Connection Issues
+
+**Problem:** Cannot connect to server
+```
+ConnectionError: Failed to connect to http://localhost:8000
+```
+**Solution:**
+1. Make sure the server is running:
+   ```bash
+   locallab start
+   ```
+2. Wait for the "Server is running" message
+3. Check if the URL is correct
+4. Try with explicit localhost:
+   ```python
+   client = SyncLocalLabClient("http://127.0.0.1:8000")
+   ```
 
 ## Common Issues
 
