@@ -10,15 +10,48 @@ This guide will help you start using LocalLab, whether you're new to AI or an ex
 - GPU optional but recommended
 - Internet connection for downloading models
 
+#### Additional Requirements for Windows
+- Microsoft C++ Build Tools (for some dependencies)
+- CMake (for model compilation)
+- Python added to PATH
+
 ### For Google Colab
 - Just a Google account!
 - Internet connection
 
 ## 🚀 Step-by-Step Setup
 
-### Step 1: Install Required Packages
+### Windows Setup
 
-First, you need to install both the server and client packages:
+1. **Install Required Build Tools**
+   ```powershell
+   # First, install Microsoft C++ Build Tools
+   # Download from: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+   # Select "Desktop development with C++"
+
+   # Then install CMake
+   # Download from: https://cmake.org/download/
+   # Make sure to add to PATH during installation
+   ```
+
+2. **Install Python Packages**
+   ```powershell
+   # Install the server package
+   pip install locallab
+
+   # Install the client package
+   pip install locallab-client
+   ```
+
+3. **Add to PATH (if needed)**
+   - Find your Python Scripts directory:
+     ```powershell
+     where python
+     ```
+   - Add the Scripts folder to PATH (e.g., `C:\Users\YOU\AppData\Local\Programs\Python\Python311\Scripts\`)
+   - Restart your terminal
+
+### Linux/Mac Setup
 
 ```bash
 # Install the server package
@@ -28,25 +61,64 @@ pip install locallab
 pip install locallab-client
 ```
 
-### Step 2: Start the Server
+### Configure LocalLab (Required First Step)
 
-You have two options:
+Before starting the server, you should configure LocalLab. You have two options:
 
-#### Option A: Using Command Line (Recommended for Beginners)
+#### Option A: Using CLI (Recommended)
 ```bash
-# Start with interactive setup
-locallab start
+# Run the configuration wizard
+locallab config
 ```
-This will:
-- Guide you through setup
-- Help choose a model
-- Configure optimizations
-- Start the server
+
+This will help you configure:
+- Model selection
+- Memory optimizations
+- GPU settings
+- System resources
+
+#### Option B: Using Python Code
+```python
+from locallab.cli.config import set_config_value, save_config
+from locallab.cli.interactive import prompt_for_config
+
+# Method 1: Interactive Configuration
+config = prompt_for_config()
+save_config(config)
+
+# Method 2: Direct Configuration
+set_config_value("model_id", "microsoft/phi-2")
+set_config_value("enable_quantization", True)
+set_config_value("quantization_type", "int8")
+set_config_value("enable_attention_slicing", True)
+```
+
+### Start the Server
+
+After configuring, you can start the server:
+
+#### Option A: Using Command Line
+```bash
+# Start with saved configuration
+locallab start
+
+# Or start with specific options
+locallab start --model microsoft/phi-2 --quantize --quantize-type int8
+```
 
 #### Option B: Using Python Code
 ```python
 from locallab import start_server
+
+# Start with saved configuration
 start_server()
+
+# Or start with specific options
+start_server(
+    model_id="microsoft/phi-2",
+    enable_quantization=True,
+    quantization_type="int8"
+)
 ```
 
 ### Step 3: Connect with a Client

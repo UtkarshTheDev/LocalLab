@@ -2,6 +2,50 @@
 
 ## 🔍 Common Issues for Beginners
 
+### Windows-Specific Issues
+
+#### 'locallab' Command Not Found
+**Problem:** After installation, the `locallab` command isn't recognized
+```
+'locallab' is not recognized as an internal or external command
+```
+**Solution:**
+1. Check if Python's Scripts directory is in PATH:
+   ```cmd
+   where python
+   ```
+2. Add Python Scripts to PATH:
+   - Find your Python install location (e.g., `C:\Users\YOU\AppData\Local\Programs\Python\Python311\`)
+   - Add `Scripts` folder to PATH: `C:\Users\YOU\AppData\Local\Programs\Python\Python311\Scripts\`
+   - Restart your terminal
+
+Alternative: Use the module directly:
+```cmd
+python -m locallab start
+```
+
+#### Compiler/Build Tools Missing
+**Problem:** Installation fails with errors about missing compiler or CMake
+```
+error: Microsoft Visual C++ 14.0 or greater is required
+```
+or
+```
+'nmake' is not recognized
+CMAKE_C_COMPILER not set
+```
+**Solution:**
+1. Install Build Tools:
+   - Download [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+   - During installation, select "Desktop development with C++"
+2. Install CMake:
+   - Download from [cmake.org](https://cmake.org/download/)
+   - Add to PATH during installation
+3. Restart your terminal and try installation again:
+   ```cmd
+   pip install locallab --no-cache-dir
+   ```
+
 ### Installation Issues
 
 **Problem:** `pip install` fails

@@ -44,8 +44,30 @@ graph TD
 
 ## 📦 Installation & Setup
 
-### 1. Install Required Packages
+### Windows Setup
+1. **Install Required Build Tools**
+   - Install [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+     - Select "Desktop development with C++"
+   - Install [CMake](https://cmake.org/download/)
+     - Add to PATH during installation
 
+2. **Install Packages**
+   ```powershell
+   pip install locallab locallab-client
+   ```
+
+3. **Verify PATH**
+   - If `locallab` command isn't found, add Python Scripts to PATH:
+     ```powershell
+     # Find Python location
+     where python
+     # Add Scripts folder to PATH (e.g., C:\Users\YOU\AppData\Local\Programs\Python\Python311\Scripts\)
+     ```
+   - Or use: `python -m locallab start`
+
+> 🔍 Having issues? See our [Windows Troubleshooting Guide](./docs/guides/troubleshooting.md#windows-specific-issues)
+
+### Linux/Mac Setup
 ```bash
 # Install both server and client packages
 pip install locallab locallab-client
