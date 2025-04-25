@@ -229,6 +229,6 @@ For more details, see the [CLI Guide](./cli.md).
 ## Related Resources
 
 - [CLI Guide](./cli.md)
-- [API Reference](./api.md)
+- [API Reference](./API.md)
 - [Configuration Guide](../features/configuration.md)
 - [Troubleshooting](./troubleshooting.md)

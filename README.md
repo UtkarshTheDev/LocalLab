@@ -1,31 +1,66 @@
 # 🚀 LocalLab: Your Personal AI Lab
 
-Run powerful AI language models on your own computer or Google Colab - no cloud services needed! Think of it as having ChatGPT-like capabilities right on your machine.
+[![Version](https://img.shields.io/badge/version-0.4.49-blue)](https://pypi.org/project/locallab/) [![License](https://img.shields.io/badge/license-Apache%202.0-green)](./LICENSE) [![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
+
+**Run ChatGPT-like AI on your own computer!** LocalLab is a server that runs AI models locally and makes them accessible from anywhere.
 
 ## 🤔 What is LocalLab?
 
-LocalLab brings AI to your fingertips with two key components:
+LocalLab is like having your own personal ChatGPT that runs on your computer. Here's how it works:
+
+1. **LocalLab Server**: Runs on your computer and loads AI models
+2. **Python Client**: A separate package that connects to the server
+3. **Access From Anywhere**: Use your AI from any device with the ngrok feature
+
+No complicated setup, no monthly fees, and your data stays private. Perfect for developers, students, researchers, or anyone who wants to experiment with AI.
+
+## 🧠 How LocalLab Works (In Simple Terms)
+
+Think of LocalLab as having two parts:
+
+1. **The Server** (what you install with `pip install locallab`)
+
+   - This is like a mini-ChatGPT that runs on your computer
+   - It loads AI models and makes them available through a web server
+   - You start it with a simple command: `locallab start`
+
+2. **The Client** (what you install with `pip install locallab-client`)
+   - This is how your Python code talks to the server
+   - It's a separate package that connects to the server
+   - You use it in your code with: `client = SyncLocalLabClient("http://localhost:8000")`
 
 ```mermaid
 graph TD
-    A[Your Code] -->|Uses| B[LocalLab Client]
-    B -->|Talks to| C[LocalLab Server]
+    A[Your Python Code] -->|Uses| B[LocalLab Client Package]
+    B -->|Connects to| C[LocalLab Server]
     C -->|Runs| D[AI Models]
-    C -->|Manages| E[Memory & Resources]
-    C -->|Optimizes| F[Performance]
+    C -->|Optional| E[Ngrok for Remote Access]
+    style C fill:#f9f,stroke:#333,stroke-width:2px
+    style D fill:#bbf,stroke:#333,stroke-width:2px
 ```
+
+**The Magic Part**: With the `--use-ngrok` option, you can access your AI from anywhere - your phone, another computer, or share with friends!
 
 ### 🎯 Key Features
 
 ```
 📦 Easy Setup         🔒 Privacy First       🎮 Free GPU Access
 🤖 Multiple Models    💾 Memory Efficient    🔄 Auto-Optimization
-🌐 Local or Colab    ⚡ Fast Response       🔧 Simple API
+🌐 Local or Colab    ⚡ Fast Response       🔧 Simple Server
+🌍 Access Anywhere   🔌 Client Package      🛡️ Secure Tunneling
 ```
+
+**Two-Part System**:
+
+- **LocalLab Server**: Runs the AI models and exposes API endpoints
+- **LocalLab Client**: A separate Python package (`pip install locallab-client`) that connects to the server
+
+**Access From Anywhere**: With built-in ngrok integration, you can securely access your LocalLab server from any device, anywhere in the world - perfect for teams, remote work, or accessing your models on the go.
 
 ### 🌟 Two Ways to Run
 
 1. **On Your Computer (Local Mode)**
+
    ```
    💻 Your Computer
    └── 🚀 LocalLab Server
@@ -45,29 +80,45 @@ graph TD
 ## 📦 Installation & Setup
 
 ### Windows Setup
+
 1. **Install Required Build Tools**
+
    - Install [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
      - Select "Desktop development with C++"
    - Install [CMake](https://cmake.org/download/)
      - Add to PATH during installation
 
 2. **Install Packages**
+
    ```powershell
    pip install locallab locallab-client
    ```
 
 3. **Verify PATH**
+
    - If `locallab` command isn't found, add Python Scripts to PATH:
      ```powershell
      # Find Python location
      where python
-     # Add Scripts folder to PATH (e.g., C:\Users\YOU\AppData\Local\Programs\Python\Python311\Scripts\)
+     # This will show something like: C:\Users\YourName\AppData\Local\Programs\Python\Python311\python.exe
      ```
-   - Or use: `python -m locallab start`
+
+   **Adding to PATH in Windows:**
+
+   1. Press `Win + X` and select "System"
+   2. Click "Advanced system settings" on the right
+   3. Click "Environment Variables" button
+   4. Under "System variables", find and select "Path", then click "Edit"
+   5. Click "New" and add your Python Scripts path (e.g., `C:\Users\YourName\AppData\Local\Programs\Python\Python311\Scripts\`)
+   6. Click "OK" on all dialogs
+   7. Restart your command prompt
+
+   - Alternatively, use: `python -m locallab start`
 
 > 🔍 Having issues? See our [Windows Troubleshooting Guide](./docs/guides/troubleshooting.md#windows-specific-issues)
 
 ### Linux/Mac Setup
+
 ```bash
 # Install both server and client packages
 pip install locallab locallab-client
@@ -96,16 +147,21 @@ locallab start
 locallab start --model microsoft/phi-2 --quantize --quantize-type int8
 ```
 
+## 💡 Client Connection & Usage
 
-## 💡 Basic Usage
+After starting your LocalLab server (either locally or on Google Colab), you'll need to connect to it using the LocalLab client package. This is how your code interacts with the AI models running on the server.
 
-### Synchronous Usage (Easier for Beginners)
+### Synchronous Client Usage (Easier for Beginners)
 
 ```python
 from locallab_client import SyncLocalLabClient
 
-# Connect to server
+# Connect to server - choose ONE of these options:
+# 1. For local server (default)
 client = SyncLocalLabClient("http://localhost:8000")
+
+# 2. For remote server via ngrok (when using Google Colab or --use-ngrok)
+# client = SyncLocalLabClient("https://abc123.ngrok.app")  # Replace with your ngrok URL
 
 try:
     print("Generating text...")
@@ -131,16 +187,22 @@ finally:
     client.close()
 ```
 
-### Asynchronous Usage (For Advanced Users)
+> 💡 **Important**: When connecting to a server running on Google Colab or with ngrok enabled, always use the ngrok URL (https://abc123.ngrok.app) that was displayed when you started the server.
+
+### Asynchronous Client Usage (For Advanced Users)
 
 ```python
 import asyncio
 from locallab_client import LocalLabClient
 
 async def main():
-    # Connect to server
+    # Connect to server - choose ONE of these options:
+    # 1. For local server (default)
     client = LocalLabClient("http://localhost:8000")
-    
+
+    # 2. For remote server via ngrok (when using Google Colab or --use-ngrok)
+    # client = LocalLabClient("https://abc123.ngrok.app")  # Replace with your ngrok URL
+
     try:
         print("Generating text...")
         # Generate text
@@ -169,35 +231,92 @@ async def main():
 asyncio.run(main())
 ```
 
-## 🌐 Google Colab Usage
+## 🌐 Google Colab Usage with Remote Access
 
-Run LocalLab on Google's free GPUs:
+### Step 1: Set Up the Server on Google Colab
+
+First, you'll set up the LocalLab server on Google Colab to use their free GPU:
 
 ```python
-# 1. Install packages
-!pip install locallab locallab-client
+# In your Colab notebook:
+
+# 1. Install the server package
+!pip install locallab
 
 # 2. Configure with CLI (notice the ! prefix)
 !locallab config
 
-# 3. Start server with CLI
+# 3. Start server with ngrok for remote access
 !locallab start --use-ngrok
 
-# 4. Connect client (Locally)
-from locallab_client import LocalLabClient
-client = LocalLabClient("https://your-server-ngrok-url.app")
-response = await client.generate("Hello!")
+# The server will display a public URL like:
+# 🚀 Ngrok Public URL: https://abc123.ngrok.app
+# COPY THIS URL - you'll need it to connect!
 ```
+
+### Step 2: Connect to Your Server
+
+After setting up your server on Google Colab, you'll need to connect to it using the LocalLab client package. The server will display a ngrok URL that you'll use for the connection.
+
+#### Using the Client Connection Examples
+
+**You can now use the client connection examples from the [Client Connection & Usage](#-client-connection--usage) section above.**
+
+Just make sure to:
+
+1. Use your ngrok URL instead of localhost
+2. Install the client package if needed
+
+For example:
+
+```python
+# In another cell in the same Colab notebook:
+
+# 1. Install the client package
+!pip install locallab-client
+
+# 2. Import the client
+from locallab_client import SyncLocalLabClient
+
+# 3. Connect to your ngrok URL (replace with your actual URL from Step 1)
+client = SyncLocalLabClient("https://abc123.ngrok.app")  # ← REPLACE THIS with your URL!
+
+# 4. Now you can use any of the client methods
+response = client.generate("Write a poem about AI")
+print(response)
+
+# 5. Always close when done
+client.close()
+```
+
+#### Access From Any Device
+
+The power of using ngrok is that you can connect to your Colab server from anywhere:
+
+```python
+# On your local computer, phone, or any device with Python:
+pip install locallab-client
+
+from locallab_client import SyncLocalLabClient
+client = SyncLocalLabClient("https://abc123.ngrok.app")  # ← REPLACE THIS with your URL!
+response = client.generate("Hello from my device!")
+print(response)
+client.close()
+```
+
+> 💡 **Remote Access Tip**: The ngrok URL lets you access your LocalLab server from any device - your phone, tablet, another computer, or share with teammates. See the [Client Connection & Usage](#-client-connection--usage) section above for more examples of what you can do with the client.
 
 ## 💻 Requirements
 
 ### Local Computer
+
 - Python 3.8+
 - 4GB RAM minimum (8GB+ recommended)
 - GPU optional but recommended
 - Internet connection for downloading models
 
 ### Google Colab
+
 - Just a Google account!
 - Free tier works fine
 
@@ -210,23 +329,42 @@ response = await client.generate("Hello!")
 - **Free GPU**: Google Colab integration
 - **Flexible Client API**: Both async and sync clients available
 - **Automatic Resource Management**: Sessions close automatically
+- **Remote Access**: Access your models from anywhere with ngrok integration
+- **Secure Tunneling**: Share your models securely with teammates or access from mobile devices
+- **Client Libraries**: Python libraries for both synchronous and asynchronous usage
+
+### 🌍 Client-Server Architecture
+
+```mermaid
+graph LR
+    A[Your Application] -->|Uses| B[LocalLab Client]
+    B -->|API Requests| C[LocalLab Server]
+    C -->|Runs| D[AI Models]
+    C -->|Optional| E[Ngrok Tunnel]
+    E -->|Remote Access| F[Any Device, Anywhere]
+    style E fill:#f9f,stroke:#333,stroke-width:2px
+    style F fill:#bbf,stroke:#333,stroke-width:2px
+```
 
 [➡️ See All Features](./docs/features/README.md)
 
 ## 📚 Documentation
 
 ### Getting Started
+
 1. [Installation Guide](./docs/guides/getting-started.md)
 2. [Basic Examples](./docs/guides/examples.md)
 3. [CLI Usage](./docs/guides/cli.md)
 
 ### Advanced Topics
-1. [API Reference](./docs/guides/api.md)
+
+1. [API Reference](./docs/guides/API.md)
 2. [Client Libraries](./docs/clients/README.md)
 3. [Advanced Features](./docs/guides/advanced.md)
 4. [Performance Guide](./docs/features/performance.md)
 
 ### Deployment
+
 1. [Local Setup](./docs/deployment/local.md)
 2. [Google Colab Guide](./docs/colab/README.md)
 
@@ -243,6 +381,7 @@ response = await client.generate("Hello!")
 - [License](./LICENSE)
 
 ## 🌟 Star Us!
+
 If you find LocalLab helpful, please star our repository! It helps others discover the project.
 
 ---

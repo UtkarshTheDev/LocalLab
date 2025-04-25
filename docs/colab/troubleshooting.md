@@ -5,12 +5,16 @@
 ### Ngrok Connection Issues
 
 **Issue:** Ngrok authentication error
+
 ```
 ERROR: Failed to create ngrok tunnel: authentication failed
 ```
+
 **Solution:**
+
 1. Get a valid ngrok auth token from [ngrok dashboard](https://dashboard.ngrok.com)
 2. Set the token correctly:
+
 ```python
 import os
 os.environ["NGROK_AUTH_TOKEN"] = "your_token_here"
@@ -19,16 +23,36 @@ os.environ["NGROK_AUTH_TOKEN"] = "your_token_here"
 ### Memory Issues
 
 **Issue:** Out of Memory (OOM) errors
+
 ```
 RuntimeError: CUDA out of memory
 ```
+
 **Solution:**
-1. Enable memory optimizations:
+
+1. Enable memory optimizations using CLI (recommended):
+
+```python
+# In Colab, use the ! prefix
+!locallab config --quantize true --quantize-type int8
+```
+
+2. Or using environment variables (backup method):
+
 ```python
 os.environ["LOCALLAB_ENABLE_QUANTIZATION"] = "true"
 os.environ["LOCALLAB_QUANTIZATION_TYPE"] = "int8"
 ```
-2. Use a smaller model:
+
+3. Use a smaller model using CLI (recommended):
+
+```python
+# In Colab, use the ! prefix
+!locallab config --model microsoft/phi-2
+```
+
+4. Or using environment variables (backup method):
+
 ```python
 os.environ["HUGGINGFACE_MODEL"] = "microsoft/phi-2"  # Smaller model
 ```
@@ -36,10 +60,13 @@ os.environ["HUGGINGFACE_MODEL"] = "microsoft/phi-2"  # Smaller model
 ### Connection Issues
 
 **Issue:** Cannot connect to server
+
 ```
 ConnectionError: Failed to connect to server
 ```
+
 **Solution:**
+
 1. Ensure you're using the correct URL:
    - For local connections within Colab: `http://localhost:8000`
    - For external connections: Use the ngrok URL shown in server logs
@@ -50,6 +77,7 @@ ConnectionError: Failed to connect to server
 
 **Issue:** Runtime disconnected
 **Solution:**
+
 1. Keep Colab tab active
 2. Use "Connect to hosted runtime"
 3. Restart kernel if needed
@@ -57,11 +85,13 @@ ConnectionError: Failed to connect to server
 ## Best Practices
 
 1. **Memory Management**
+
    - Monitor memory usage
    - Use appropriate model size
    - Enable optimizations
 
 2. **Connection Management**
+
    - Save ngrok URL
    - Handle reconnections
    - Check server status

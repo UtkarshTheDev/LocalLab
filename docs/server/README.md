@@ -378,6 +378,7 @@ spec:
 - [Performance Optimization](./performance.md)
 
 ## Related Documentation
+
 - [Deployment Guide](../local_deployment.md)
-- [API Reference](../API.md)
+- [API Reference](../guides/API.md)
 - [Features Guide](../features/README.md)

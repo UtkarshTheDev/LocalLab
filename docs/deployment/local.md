@@ -93,6 +93,6 @@ os.environ["LOCALLAB_ENABLE_ATTENTION_SLICING"] = "true"
 
 ## Related Documentation
 
-- [API Documentation](./API.md)
+- [API Documentation](../guides/API.md)
 - [Features Guide](./features/README.md)
 - [Troubleshooting](./TROUBLESHOOTING.md)

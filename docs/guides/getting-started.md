@@ -5,17 +5,20 @@ This guide will help you start using LocalLab, whether you're new to AI or an ex
 ## 🌟 What You'll Need
 
 ### For Local Setup
+
 - Python 3.8 or higher installed
 - 4GB RAM minimum (8GB+ recommended)
 - GPU optional but recommended
 - Internet connection for downloading models
 
 #### Additional Requirements for Windows
+
 - Microsoft C++ Build Tools (for some dependencies)
 - CMake (for model compilation)
 - Python added to PATH
 
 ### For Google Colab
+
 - Just a Google account!
 - Internet connection
 
@@ -24,6 +27,7 @@ This guide will help you start using LocalLab, whether you're new to AI or an ex
 ### Windows Setup
 
 1. **Install Required Build Tools**
+
    ```powershell
    # First, install Microsoft C++ Build Tools
    # Download from: https://visualstudio.microsoft.com/visual-cpp-build-tools/
@@ -35,6 +39,7 @@ This guide will help you start using LocalLab, whether you're new to AI or an ex
    ```
 
 2. **Install Python Packages**
+
    ```powershell
    # Install the server package
    pip install locallab
@@ -44,12 +49,28 @@ This guide will help you start using LocalLab, whether you're new to AI or an ex
    ```
 
 3. **Add to PATH (if needed)**
+
    - Find your Python Scripts directory:
      ```powershell
      where python
      ```
    - Add the Scripts folder to PATH (e.g., `C:\Users\YOU\AppData\Local\Programs\Python\Python311\Scripts\`)
-   - Restart your terminal
+
+   **Adding to PATH in Windows:**
+
+   1. Press `Win + X` and select "System"
+   2. Click "Advanced system settings" on the right
+   3. Click "Environment Variables" button
+   4. Under "System variables", find and select "Path", then click "Edit"
+   5. Click "New" and add your Python Scripts path (e.g., `C:\Users\YourName\AppData\Local\Programs\Python\Python311\Scripts\`)
+   6. Click "OK" on all dialogs
+   7. Restart your command prompt
+
+   - Alternatively, use: `python -m locallab start`
+
+> 🔍 Having issues? See our [Windows Troubleshooting Guide](./troubleshooting.md#windows-specific-issues)
+
+- Restart your terminal
 
 ### Linux/Mac Setup
 
@@ -66,18 +87,21 @@ pip install locallab-client
 Before starting the server, you should configure LocalLab. You have two options:
 
 #### Option A: Using CLI (Recommended)
+
 ```bash
 # Run the configuration wizard
 locallab config
 ```
 
 This will help you configure:
+
 - Model selection
 - Memory optimizations
 - GPU settings
 - System resources
 
 #### Option B: Using Python Code
+
 ```python
 from locallab.cli.config import set_config_value, save_config
 from locallab.cli.interactive import prompt_for_config
@@ -98,6 +122,7 @@ set_config_value("enable_attention_slicing", True)
 After configuring, you can start the server:
 
 #### Option A: Using Command Line
+
 ```bash
 # Start with saved configuration
 locallab start
@@ -107,6 +132,7 @@ locallab start --model microsoft/phi-2 --quantize --quantize-type int8
 ```
 
 #### Option B: Using Python Code
+
 ```python
 from locallab import start_server
 
@@ -126,6 +152,7 @@ start_server(
 Choose between async or sync client based on your needs:
 
 #### Synchronous Client (Easier for Beginners)
+
 ```python
 from locallab_client import SyncLocalLabClient
 
@@ -142,6 +169,7 @@ finally:
 ```
 
 #### Asynchronous Client (For Advanced Users)
+
 ```python
 import asyncio
 from locallab_client import LocalLabClient
@@ -149,7 +177,7 @@ from locallab_client import LocalLabClient
 async def main():
     # Connect to the server
     client = LocalLabClient("http://localhost:8000")
-    
+
     try:
         # Generate text
         response = await client.generate("Write a story about a robot")
@@ -295,7 +323,7 @@ def sync_batch_example():
 
 1. Explore the [CLI Guide](./cli.md) for interactive configuration
 2. Check [Advanced Features](./advanced.md) for optimization options
-3. Read the [API Reference](./api.md) for detailed endpoint documentation
+3. Read the [API Reference](./API.md) for detailed endpoint documentation
 4. See the [Performance Guide](../features/performance.md) for optimization tips
 
 ## Need Help?

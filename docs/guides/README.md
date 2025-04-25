@@ -4,7 +4,7 @@
 
 - [Getting Started Guide](./getting-started.md) - Start here!
 - [CLI Guide](./cli.md) - Interactive command-line interface
-- [API Reference](./api.md)
+- [API Reference](./API.md)
 - [FAQ](./faq.md)
 - [Troubleshooting](./troubleshooting.md)
 
