@@ -13,7 +13,7 @@ HF_TOKEN_ENV = "HUGGINGFACE_TOKEN"   # Standard HF token env var
 def get_env_var(key: str, *, default: Any = None, var_type: Type = str) -> Any:
     """Get environment variable with type conversion and validation."""
     value = os.environ.get(key)
-    
+
     if value is None:
         try:
             from .cli.config import get_config_value
@@ -22,13 +22,13 @@ def get_env_var(key: str, *, default: Any = None, var_type: Type = str) -> Any:
                 config_key = "ngrok_auth_token"
             elif key == HF_TOKEN_ENV:
                 config_key = "huggingface_token"
-            
+
             config_value = get_config_value(config_key)
             if config_value is not None:
                 value = config_value
         except:
             pass
-    
+
     if value is None:
         return default
 
@@ -61,20 +61,20 @@ def get_ngrok_token() -> Optional[str]:
 def save_config(config: Dict[str, Any]):
     """Save configuration to file"""
     from .cli.config import ensure_config_dir, CONFIG_FILE
-    
+
     ensure_config_dir()
-    
+
     # Ensure tokens are stored as proper strings
     if "ngrok_auth_token" in config:
         token = str(config["ngrok_auth_token"]).strip()
         config["ngrok_auth_token"] = token
         set_env_var(NGROK_TOKEN_ENV, token)
-        
+
     if "huggingface_token" in config:
         token = str(config["huggingface_token"]).strip()
         config["huggingface_token"] = token
         set_env_var(HF_TOKEN_ENV, token)
-    
+
     try:
         with open(CONFIG_FILE, "w") as f:
             json.dump(config, f, indent=2)
@@ -159,18 +159,18 @@ def can_run_model(model_id: str) -> bool:
 
     # Get available memory with a buffer
     available_ram = (psutil.virtual_memory().available / (1024 ** 3)) * 0.8  # 80% of available RAM in GB
-    
+
     # Adjust requirements based on optimizations
     if get_env_var("LOCALLAB_ENABLE_QUANTIZATION", default=False, var_type=bool):
         # Quantization reduces memory usage
         requirements["min_ram"] *= 0.5
         if "min_vram" in requirements:
             requirements["min_vram"] *= 0.5
-    
+
     if get_env_var("LOCALLAB_ENABLE_CPU_OFFLOADING", default=False, var_type=bool):
         # CPU offloading allows running with less RAM
         requirements["min_ram"] *= 0.7
-    
+
     # Check RAM
     if available_ram < requirements["min_ram"]:
         logger.warning(f"Insufficient RAM. Available: {available_ram:.1f}GB, Required: {requirements['min_ram']}GB")
@@ -324,18 +324,26 @@ ENABLE_CONSOLE_LOGGING = get_env_var(
 ENABLE_FILE_LOGGING = get_env_var(
     "LOCALLAB_ENABLE_FILE_LOGGING", default=False, var_type=bool)
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL.upper()),
-    format=LOG_FORMAT,
-    handlers=[
-        logging.StreamHandler() if ENABLE_CONSOLE_LOGGING else logging.NullHandler(),
-        logging.FileHandler(
-            LOG_FILE) if ENABLE_FILE_LOGGING and LOG_FILE else logging.NullHandler()
-    ]
-)
+# Import our logger instead of using basicConfig
+# This prevents duplicate logging configuration
+from .logger import get_logger
 
-logger = logging.getLogger("locallab")
+# Set up file logging if enabled
+if ENABLE_FILE_LOGGING and LOG_FILE:
+    # Add file handler to root logger
+    file_handler = logging.FileHandler(LOG_FILE)
+    file_formatter = logging.Formatter(LOG_FORMAT)
+    file_handler.setFormatter(file_formatter)
+
+    # Add to root logger
+    root_logger = logging.getLogger()
+    root_logger.addHandler(file_handler)
+
+    # Set log level
+    root_logger.setLevel(getattr(logging, LOG_LEVEL.upper()))
+
+# Get the logger for this module
+logger = get_logger("locallab")
 
 
 def get_system_resources() -> Dict[str, Any]:
@@ -563,7 +571,7 @@ def get_env_var(key: str, *, default: Any = None, var_type: Type = str) -> Any:
     """
     # First check environment variables
     value = os.environ.get(key)
-    
+
     # If not found in environment, try the config file
     if value is None:
         try:
@@ -574,14 +582,14 @@ def get_env_var(key: str, *, default: Any = None, var_type: Type = str) -> Any:
                 config_key = key[9:].lower()
             else:
                 config_key = key.lower()
-            
+
             config_value = get_config_value(config_key)
             if config_value is not None:
                 value = config_value
         except (ImportError, ModuleNotFoundError):
             # If the config module isn't available yet, just use the environment variable
             pass
-    
+
     # If still not found, use default
     if value is None:
         return default
@@ -602,7 +610,7 @@ def get_hf_token(interactive: bool = False) -> Optional[str]:
     """Get HuggingFace token from environment or config"""
     # First check environment
     token = os.environ.get("HUGGINGFACE_TOKEN", "").strip()
-    
+
     # Then check config
     if not token:
         try:
@@ -613,28 +621,28 @@ def get_hf_token(interactive: bool = False) -> Optional[str]:
                 os.environ["HUGGINGFACE_TOKEN"] = token
         except:
             pass
-    
+
     # If interactive and still no token, prompt user
     if not token and interactive:
         try:
             click.echo("\n🔑 HuggingFace token is required for accessing this model.")
             click.echo("Get your token from: https://huggingface.co/settings/tokens")
-            
+
             token = click.prompt(
                 "Enter your HuggingFace token",
                 type=str,
                 default="",
                 show_default=False
             ).strip()
-            
+
             if token:
                 if len(token) < 20:
                     click.echo("\n❌ Invalid token format. Please check your token.")
                     return None
-                    
+
                 click.echo(f"\n✅ Token saved: {token}")
                 os.environ["HUGGINGFACE_TOKEN"] = token
-                
+
                 # Save to config
                 from .cli.config import set_config_value
                 set_config_value("huggingface_token", token)
@@ -642,14 +650,14 @@ def get_hf_token(interactive: bool = False) -> Optional[str]:
                 click.echo("\nSkipping token...")
         except:
             pass
-            
+
     return token
 
 def get_ngrok_token() -> Optional[str]:
     """Get ngrok token from environment or config"""
     # First check environment
     token = os.environ.get("NGROK_AUTHTOKEN", "").strip()
-    
+
     # Then check config
     if not token:
         try:
@@ -660,26 +668,26 @@ def get_ngrok_token() -> Optional[str]:
                 os.environ["NGROK_AUTHTOKEN"] = token
         except:
             pass
-    
+
     return token
 
 def save_config(config: Dict[str, Any]):
     """Save configuration to file"""
     from .cli.config import ensure_config_dir, CONFIG_FILE
-    
+
     ensure_config_dir()
-    
+
     # Ensure tokens are stored as proper strings
     if "ngrok_auth_token" in config:
         token = str(config["ngrok_auth_token"]).strip()
         config["ngrok_auth_token"] = token
         set_env_var(NGROK_TOKEN_ENV, token)
-        
+
     if "huggingface_token" in config:
         token = str(config["huggingface_token"]).strip()
         config["huggingface_token"] = token
         set_env_var(HF_TOKEN_ENV, token)
-    
+
     try:
         with open(CONFIG_FILE, "w") as f:
             json.dump(config, f, indent=2)

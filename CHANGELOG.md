@@ -2,9 +2,22 @@
 
 All notable changes to LocalLab will be documented in this file.
 
-## [0.4.53] - 2024-04-21
+## [0.5.2] - 2024-04-30
+
+### Fixed
+
+- Fixed duplicate logging issue where the same log message appeared multiple times
+- Improved color detection for terminal output - now only uses colors when supported
+- Prevented multiple handlers from being added to the same logger
+- Disabled uvicorn's default logging configuration to prevent duplication
+- Enhanced logger initialization to ensure consistent formatting
+- Added proper cleanup of existing handlers before adding new ones
+- Improved compatibility with different terminal environments
+
+## [0.5.1] - 2024-04-21
 
 ### Added
+
 - Enhanced error handling and reliability in both clients
 - Added timeout handling to sync client streaming methods
 - Improved event loop cleanup and resource management
@@ -14,26 +27,29 @@ All notable changes to LocalLab will be documented in this file.
 - Added proper cleanup of resources on client closure
 
 ### Fixed
+
 - Fixed potential memory leaks in event loop handling
 - Fixed thread cleanup in synchronous client
 - Improved error propagation between async and sync clients
 - Added proper timeout handling in streaming operations
 - Enhanced connection state management
 
-## [0.4.52] - 2024-04-21
+## [0.5.0] - 2024-04-21
 
 ### Fixed
+
 - Fixed package structure to avoid duplicate exports
 - Updated version numbers to be consistent across all files
 - Fixed imports in sync_client.py to use correct package name
 - Improved package import reliability
 - Ensured both LocalLabClient and SyncLocalLabClient are properly exported
 
-## [0.4.51] - 2024-04-21
+## [0.5.01] - 2024-04-21
 
 ### Fixed
+
 - Fixed SyncLocalLabClient not being exported from locallab_client package
-- Added proper exports for both LocalLabClient and SyncLocalLabClient in package __init__.py
+- Added proper exports for both LocalLabClient and SyncLocalLabClient in package **init**.py
 - Ensured both sync and async clients are available through the main package import
 
 ## [0.4.50] - 2024-04-21

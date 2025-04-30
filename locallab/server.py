@@ -536,6 +536,10 @@ class ServerWithCallback(uvicorn.Server):
         self.should_exit = False
         self.callback_triggered = False  # Flag to track if callback has been triggered
 
+        # Disable uvicorn's default logging setup to prevent duplication
+        self.config.log_config = None
+        self.config.access_log = False
+
     def install_signal_handlers(self):
         def handle_exit(signum, frame):
             if hasattr(handle_exit, 'called') and handle_exit.called:
@@ -867,9 +871,18 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
             server_ref = [None]
 
             # Set up the log handler for startup detection
+            # We'll use a custom handler that doesn't duplicate logs
             startup_handler = StartupDetectionHandler(server_ref)
-            logging.getLogger("uvicorn").addHandler(startup_handler)
-            logging.getLogger("uvicorn.error").addHandler(startup_handler)
+
+            # Only add the handler if it's not already present
+            uvicorn_logger = logging.getLogger("uvicorn")
+            if not any(isinstance(h, StartupDetectionHandler) for h in uvicorn_logger.handlers):
+                uvicorn_logger.addHandler(startup_handler)
+
+            # Only add to error logger if needed
+            uvicorn_error_logger = logging.getLogger("uvicorn.error")
+            if not any(isinstance(h, StartupDetectionHandler) for h in uvicorn_error_logger.handlers):
+                uvicorn_error_logger.addHandler(startup_handler)
 
             if in_colab or use_ngrok:
                 # Colab environment setup
@@ -887,6 +900,8 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                     port=port,
                     reload=False,
                     log_level="info",
+                    log_config=None,  # Disable uvicorn's default logging config
+                    access_log=False,  # Disable access logs to prevent duplication
                     callback_notify=callback_notify_function  # Use a function, not a list
                 )
 
@@ -941,6 +956,8 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                     reload=False,
                     workers=1,
                     log_level="info",
+                    log_config=None,  # Disable uvicorn's default logging config
+                    access_log=False,  # Disable access logs to prevent duplication
                     callback_notify=callback_notify_function  # Use a function, not a lambda or list
                 )
 
@@ -1010,6 +1027,8 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                     host="127.0.0.1",
                     port=port or 8000,
                     log_level="info",
+                    log_config=None,  # Disable uvicorn's default logging config
+                    access_log=False,  # Disable access logs to prevent duplication
                     callback_notify=None  # Don't use callbacks in the minimal server
                 )
 
