@@ -22,43 +22,58 @@ def setup_ngrok(port: int) -> Optional[str]:
     try:
         from pyngrok import ngrok, conf
         from colorama import Fore, Style
-        
+
         # Get ngrok token using the standardized function
         auth_token = get_ngrok_token()
-        
+
         if not auth_token:
             logger.error(f"{Fore.RED}Ngrok auth token not found. Please configure it using 'locallab config'{Style.RESET_ALL}")
             return None
-            
+
         # Ensure token is properly set in environment
         set_env_var(NGROK_TOKEN_ENV, auth_token)
-        
+
         # Configure ngrok
         ngrok.set_auth_token(auth_token)
         conf.get_default().auth_token = auth_token
-        
+
         # Start tunnel with simplified configuration
         tunnel = ngrok.connect(
             addr=port,
             proto="http",
             bind_tls=True  # Enable HTTPS
         )
-        
+
         public_url = tunnel.public_url
-        
+
         # Store the URL in environment for clients
         os.environ["LOCALLAB_NGROK_URL"] = public_url
-        
+
+        # Calculate banner width based on URL length (minimum 80 characters)
+        url_length = len(public_url)
+        banner_width = max(80, url_length + 20)  # Add padding for aesthetics
+
+        # Create dynamic width horizontal lines
+        h_line = "═" * (banner_width - 2)
+
+        # Create centered title with proper padding
+        title = "✨ NGROK TUNNEL ACTIVE ✨"
+        title_padding = (banner_width - len(title) - 2) // 2
+        padded_title = " " * title_padding + title + " " * title_padding
+        # Adjust if odd number
+        if len(padded_title) < banner_width - 2:
+            padded_title += " "
+
         # Display banner
         logger.info(f"""
-{Fore.GREEN}╔═══════════════════════════════════════════════════════════════════╗{Style.RESET_ALL}
-{Fore.GREEN}                      ✨ NGROK TUNNEL ACTIVE ✨                      {Style.RESET_ALL}
-{Fore.GREEN}╠═══════════════════════════════════════════════════════════════════╣{Style.RESET_ALL}
-{Fore.CYAN}  Public URL: {Fore.YELLOW}{public_url}{Style.RESET_ALL}
-{Fore.GREEN}╚═══════════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
+{Fore.CYAN}╔{h_line}╗{Style.RESET_ALL}
+{Fore.CYAN}║{padded_title}║{Style.RESET_ALL}
+{Fore.CYAN}╠{h_line}╣{Style.RESET_ALL}
+{Fore.CYAN}║{Style.RESET_ALL} {Fore.GREEN}Public URL:{Style.RESET_ALL} {Fore.YELLOW}{public_url}{Style.RESET_ALL}{" " * (banner_width - len(public_url) - 14)}{Fore.CYAN}║{Style.RESET_ALL}
+{Fore.CYAN}╚{h_line}╝{Style.RESET_ALL}
 """)
         return public_url
-        
+
     except Exception as e:
         logger.error(f"{Fore.RED}Failed to setup ngrok: {str(e)}{Style.RESET_ALL}")
         logger.info(f"{Fore.YELLOW}Please check your ngrok token using 'locallab config'{Style.RESET_ALL}")
@@ -91,7 +106,7 @@ def get_network_interfaces() -> List[Dict[str, str]]:
             })
         except Exception:
             pass
-            
+
     return interfaces
 
 def get_public_ip() -> Optional[str]:
@@ -105,7 +120,7 @@ def get_public_ip() -> Optional[str]:
 def get_network_interfaces() -> dict:
     """
     Get information about available network interfaces
-    
+
     Returns:
         A dictionary with interface names as keys and their addresses as values
     """
@@ -113,7 +128,7 @@ def get_network_interfaces() -> dict:
     try:
         import socket
         import netifaces
-        
+
         for interface in netifaces.interfaces():
             addresses = netifaces.ifaddresses(interface)
             # Get IPv4 addresses if available
@@ -143,13 +158,13 @@ def get_network_interfaces() -> dict:
     except Exception as e:
         logger.warning(f"Failed to get network interface information: {str(e)}")
         interfaces["error"] = str(e)
-    
+
     return interfaces
 
 async def get_public_ip() -> str:
     """
     Get the public IP address of this machine
-    
+
     Returns:
         The public IP address as a string, or an empty string if it cannot be determined
     """
@@ -159,7 +174,7 @@ async def get_public_ip() -> str:
         "https://checkip.amazonaws.com",
         "https://ipinfo.io/ip"
     ]
-    
+
     try:
         # Try to use httpx for async requests
         import httpx
@@ -184,6 +199,6 @@ async def get_public_ip() -> str:
                     continue
         except ImportError:
             logger.warning(f"{Fore.YELLOW}Neither httpx nor requests packages found. Cannot determine public IP.{Style.RESET_ALL}")
-    
+
     # If we couldn't get the IP from any service, return empty string
     return ""

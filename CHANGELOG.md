@@ -2,6 +2,16 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.5.4] - 2024-04-30
+
+### Improved
+
+- Enhanced log coloring with lighter shades for better readability
+- Redesigned ngrok tunnel banner with dynamic width to accommodate long URLs
+- Improved visual aesthetics of the ngrok tunnel banner with modern styling
+- Added automatic width adjustment for banners based on content length
+- Fine-tuned color scheme to ensure all logs remain visible while not competing with important banners
+
 ## [0.5.3] - 2024-04-30
 
 ### Improved

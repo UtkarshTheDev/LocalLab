@@ -57,11 +57,14 @@ class Colors:
     BRIGHT_YELLOW = Fore.YELLOW
     BRIGHT_RED = Fore.RED
 
-    # Subdued colors for regular logs
-    SUBDUED_DEBUG = Fore.BLUE + Style.DIM  # Dimmed blue for debug
-    SUBDUED_INFO = Fore.WHITE + Style.DIM   # Dimmed white for info
+    # Subdued colors for regular logs - using lighter shades
+    SUBDUED_DEBUG = Fore.CYAN + Style.DIM  # Dimmed cyan for debug
+    SUBDUED_INFO = Fore.WHITE  # White for info (not dimmed)
     SUBDUED_WARNING = Fore.YELLOW + Style.DIM  # Dimmed yellow for warnings
     SUBDUED_ERROR = Fore.RED + Style.DIM  # Dimmed red for errors
+
+    # Special colors for very unimportant logs
+    VERY_SUBDUED = Fore.LIGHTBLACK_EX  # Light gray for very unimportant logs
 
     # Reset
     RESET = Style.RESET_ALL
@@ -122,8 +125,8 @@ class SubduedColoredFormatter(logging.Formatter):
 
         # Determine the appropriate color based on log level and importance
         if is_ngrok_log or is_uvicorn_log:
-            # Make ngrok and uvicorn logs very subdued (dark gray)
-            color = Fore.BLACK + Style.BRIGHT  # This creates a dark gray color on most terminals
+            # Make ngrok and uvicorn logs subdued but still readable (light gray)
+            color = Colors.VERY_SUBDUED
         elif record.levelno == logging.DEBUG:
             color = Colors.BRIGHT_CYAN if is_important else Colors.SUBDUED_DEBUG
         elif record.levelno == logging.INFO:
