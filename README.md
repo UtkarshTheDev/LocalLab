@@ -1,6 +1,6 @@
 # 🚀 LocalLab: Your Personal AI Lab
 
-[![Version](https://img.shields.io/badge/version-0.4.49-blue)](https://pypi.org/project/locallab/) [![License](https://img.shields.io/badge/license-Apache%202.0-green)](./LICENSE) [![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
+[![LocalLab Server](https://img.shields.io/pypi/v/locallab.svg?label=locallab&color=blue)](https://pypi.org/project/locallab/) [![LocalLab Client](https://img.shields.io/pypi/v/locallab-client.svg?label=locallab-client&color=green)](https://pypi.org/project/locallab-client/) [![License](https://img.shields.io/badge/license-Apache%202.0-green)](./LICENSE) [![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
 
 **Run ChatGPT-like AI on your own computer!** LocalLab is a server that runs AI models locally and makes them accessible from anywhere.
 
@@ -78,6 +78,11 @@ graph TD
    ```
 
 ## 📦 Installation & Setup
+
+> **Latest Package Versions:**
+>
+> - **LocalLab Server**: [![LocalLab Server](https://img.shields.io/pypi/v/locallab.svg?label=locallab&color=blue)](https://pypi.org/project/locallab/)
+> - **LocalLab Client**: [![LocalLab Client](https://img.shields.io/pypi/v/locallab-client.svg?label=locallab-client&color=green)](https://pypi.org/project/locallab-client/)
 
 ### Windows Setup
 

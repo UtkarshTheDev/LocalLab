@@ -14,6 +14,16 @@ All notable changes to LocalLab will be documented in this file.
 - Added proper cleanup of existing handlers before adding new ones
 - Improved compatibility with different terminal environments
 
+### Improved
+
+- Completely redesigned the LocalLab ASCII art logo with a modern, aesthetically pleasing look
+- Created beautiful boxed status indicators for both INITIALIZING and RUNNING states
+- Enhanced visual hierarchy with prominent logo and clear status indicators
+- Added detailed bullet points in status boxes for better user guidance
+- Standardized the formatting of server details and ngrok tunnel information boxes
+- Improved overall visual consistency across all UI elements
+- Made server status much easier to distinguish at a glance
+
 ## [0.5.1] - 2024-04-21
 
 ### Added

@@ -20,15 +20,23 @@ def print_initializing_banner(version: str = "0.4.25"):
 {Fore.CYAN}Your lightweight AI inference server for running LLMs locally{Style.RESET_ALL}
 
 {Fore.BLUE}
- ██       ██████   ██████  █████  ██      ██       █████  ██████  
- ██      ██    ██ ██      ██   ██ ██      ██      ██   ██ ██   ██ 
- ██      ██    ██ ██      ███████ ██      ██      ███████ ██████  
- ██      ██    ██ ██      ██   ██ ██      ██      ██   ██ ██   ██ 
- ███████  ██████   ██████ ██   ██ ███████ ███████ ██   ██ ██████  
+  ██╗      ██████╗  ██████╗ █████╗ ██╗     ██╗      █████╗ ██████╗
+  ██║     ██╔═══██╗██╔════╝██╔══██╗██║     ██║     ██╔══██╗██╔══██╗
+  ██║     ██║   ██║██║     ███████║██║     ██║     ███████║██████╔╝
+  ██║     ██║   ██║██║     ██╔══██║██║     ██║     ██╔══██║██╔══██╗
+  ███████╗╚██████╔╝╚██████╗██║  ██║███████╗███████╗██║  ██║██████╔╝
+  ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝
 {Style.RESET_ALL}
 
-{Fore.RED}⚠️  SERVER STARTING - DO NOT MAKE API REQUESTS YET                ⚠️{Style.RESET_ALL}
-{Fore.RED}⚠️  PLEASE WAIT FOR THE "RUNNING" BANNER TO APPEAR                ⚠️{Style.RESET_ALL}
+{Fore.YELLOW}
+  ╔═══════════════════════════════════════════════════════════════╗
+  ║                      ⚠️  INITIALIZING  ⚠️                      ║
+  ║                                                               ║
+  ║  • Server is starting up - please wait                        ║
+  ║  • Do not make API requests yet                               ║
+  ║  • Wait for the "RUNNING" banner to appear                    ║
+  ╚═══════════════════════════════════════════════════════════════╝
+{Style.RESET_ALL}
 
 {Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
 
@@ -52,23 +60,30 @@ def print_running_banner(version: str):
 {Fore.CYAN}Your AI model is now running and ready to process requests{Style.RESET_ALL}
 
 {Fore.GREEN}
-  _____  _    _ _   _ _   _ _____ _   _  _____ 
- |  __ \| |  | | \ | | \ | |_   _| \ | |/ ____|
- | |__) | |  | |  \| |  \| | | | |  \| | |  __ 
- |  _  /| |  | | . ` | . ` | | | | . ` | | |_ |
- | | \ \| |__| | |\  | |\  |_| |_| |\  | |__| |
- |_|  \_\\____/|_| \_|_| \_|_____|_| \_|\_____|
+  ██╗      ██████╗  ██████╗ █████╗ ██╗     ██╗      █████╗ ██████╗
+  ██║     ██╔═══██╗██╔════╝██╔══██╗██║     ██║     ██╔══██╗██╔══██╗
+  ██║     ██║   ██║██║     ███████║██║     ██║     ███████║██████╔╝
+  ██║     ██║   ██║██║     ██╔══██║██║     ██║     ██╔══██║██╔══██╗
+  ███████╗╚██████╔╝╚██████╗██║  ██║███████╗███████╗██║  ██║██████╔╝
+  ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝
 {Style.RESET_ALL}
-
-{Fore.GREEN}✅ SERVER READY! YOU CAN NOW MAKE API REQUESTS                      ✅{Style.RESET_ALL}
-{Fore.GREEN}✅ MODEL LOADING WILL CONTINUE IN BACKGROUND IF NOT FINISHED        ✅{Style.RESET_ALL}
+{Fore.GREEN}
+  ╔═══════════════════════════════════════════════════════════════╗
+  ║                        ✅  RUNNING  ✅                         ║
+  ║                                                               ║
+  ║  • Server is ready - you can now make API requests            ║
+  ║  • Prefer to use the client packages for easier interaction   ║
+  ║  • Model loading will continue in the background              ║
+  ║  • API documentation is available below                       ║
+  ╚═══════════════════════════════════════════════════════════════╝
+{Style.RESET_ALL}
 
 {Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
 """
-        
+
         # Make sure we flush the output to ensure it appears
         print(running_banner, flush=True)
-        
+
         # Return the banner in case it needs to be logged
         return running_banner
     except Exception as e:
@@ -84,7 +99,7 @@ def print_system_resources():
         # Import here to avoid circular imports
         try:
             from ..utils.system import get_system_info
-            
+
             resources = get_system_info()
         except ImportError:
             # Fallback if get_system_info is not available
@@ -101,27 +116,27 @@ def print_system_resources():
                     'gpu_available': False,
                     'gpu_info': []
                 }
-        
+
         ram_gb = resources.get('ram_gb', 0)
         cpu_count = resources.get('cpu_count', 0)
         gpu_available = resources.get('gpu_available', False)
         gpu_info = resources.get('gpu_info', [])
-        
+
         system_info = f"""
 {Fore.CYAN}════════════════════════════════════ System Resources ════════════════════════════════════{Style.RESET_ALL}
 
 💻 CPU: {Fore.GREEN}{cpu_count} cores{Style.RESET_ALL}
 🧠 RAM: {Fore.GREEN}{ram_gb:.1f} GB{Style.RESET_ALL}
 """
-        
+
         if gpu_available and gpu_info:
             for i, gpu in enumerate(gpu_info):
                 system_info += f"🎮 GPU {i}: {Fore.GREEN}{gpu.get('name', 'Unknown')} ({gpu.get('total_memory', 0)} MB){Style.RESET_ALL}\n"
         else:
             system_info += f"🎮 GPU: {Fore.YELLOW}Not available{Style.RESET_ALL}\n"
-            
+
         system_info += f"\n{Fore.CYAN}═══════════════════════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}\n"
-        
+
         print(system_info, flush=True)
         return system_info
     except Exception as e:
@@ -137,15 +152,15 @@ def print_model_info():
         try:
             from ..config import get_env_var
             from ..model_manager import ModelManager
-            
+
             # Get model information from model manager first
             model_manager = ModelManager()
             model_id = model_manager.current_model if model_manager.current_model else None
-            
+
             # If no model loaded, check environment/config
             if not model_id:
                 model_id = get_env_var("HUGGINGFACE_MODEL") or get_env_var("LOCALLAB_MODEL_ID") or "microsoft/phi-2"
-            
+
             # Get optimization settings
             enable_quantization = get_env_var("LOCALLAB_ENABLE_QUANTIZATION", default="false").lower() == "true"
             quantization_type = get_env_var("LOCALLAB_QUANTIZATION_TYPE", default="int8")
@@ -153,7 +168,7 @@ def print_model_info():
             enable_flash_attention = get_env_var("LOCALLAB_ENABLE_FLASH_ATTENTION", default="false").lower() == "true"
             enable_better_transformer = get_env_var("LOCALLAB_ENABLE_BETTERTRANSFORMER", default="false").lower() == "true"
             enable_cpu_offloading = get_env_var("LOCALLAB_ENABLE_CPU_OFFLOADING", default="false").lower() == "true"
-            
+
             # Format model information
             model_info = f"""
 {Fore.CYAN}════════════════════════════════════ Model Configuration ════════════════════════════════════{Style.RESET_ALL}
@@ -180,7 +195,7 @@ def print_model_info():
 
 {Fore.CYAN}═══════════════════════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
 """
-        
+
         print(model_info, flush=True)
         return model_info
     except Exception as e:
@@ -194,9 +209,9 @@ def print_system_instructions():
     try:
         # Import here to avoid circular imports
         from ..config import system_instructions
-        
+
         instructions_text = system_instructions.get_instructions()
-        
+
         system_instructions_text = f"""
 {Fore.CYAN}════════════════════════════════════ System Instructions ═══════════════════════════════════{Style.RESET_ALL}
 
@@ -218,21 +233,21 @@ def print_api_docs():
         # Check if ngrok is enabled and get the public URL
         # Get the port from environment or use default
         port = os.environ.get("LOCALLAB_PORT", "8000")
-        
+
         # Check if ngrok is enabled
         use_ngrok = os.environ.get("LOCALLAB_USE_NGROK", "").lower() in ("true", "1", "yes")
-        
+
         # Get the ngrok URL if available
         ngrok_url = os.environ.get("LOCALLAB_NGROK_URL", "")
-        
+
         # Determine the server URL to display in examples
         if use_ngrok and ngrok_url:
             server_url = ngrok_url
-            url_description = "ngrok public URL"
+            # URL description available for future use if needed
         else:
             server_url = f"http://localhost:{port}"
-            url_description = "local URL"
-        
+            # Local URL description available for future use if needed
+
         api_docs = f"""
 {Fore.CYAN}════════════════════════════════════ API Documentation ════════════════════════════════════{Style.RESET_ALL}
 
@@ -317,14 +332,14 @@ def print_footer():
     try:
         footer = f"""
 {Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
-  Created by: Utkarsh Tiwari                                    
-  GitHub: https://github.com/UtkarshTheDev                   
-  Twitter: https://twitter.com/UtkarshTheDev                   
-  Instagram: https://instagram.com/UtkarshTheDev                 
-                                                                    
-  ⭐ Star this project: https://github.com/UtkarshTheDev/LocalLab  
-                                                                    
-  Thank you for using LocalLab! Feedback and contributions welcome!  
+  Created by: Utkarsh Tiwari
+  GitHub: https://github.com/UtkarshTheDev
+  Twitter: https://twitter.com/UtkarshTheDev
+  Instagram: https://instagram.com/UtkarshTheDev
+
+  ⭐ Star this project: https://github.com/UtkarshTheDev/LocalLab
+
+  Thank you for using LocalLab! Feedback and contributions welcome!
 {Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
 """
         print(footer, flush=True)

@@ -736,7 +736,13 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
             if public_url:
                 os.environ["LOCALLAB_NGROK_URL"] = public_url
 
-                ngrok_section = f"\n{Fore.CYAN}┌────────────────────────── Ngrok Tunnel Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🚀 Ngrok Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
+                ngrok_section = f"""
+{Fore.CYAN}═══════════════════════════════════════════════════════════════════════════════ Ngrok Tunnel Details ════════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
+
+  🚀 Ngrok Public URL: {Fore.GREEN}{public_url}{Style.RESET_ALL}
+
+{Fore.CYAN}═════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
+"""
                 print(ngrok_section)
             else:
                 logger.error(f"Failed to set up ngrok tunnel. Server will run locally on port {port}.")
@@ -748,7 +754,15 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
         os.environ["LOCALLAB_PORT"] = str(port)
 
         # Server info section
-        server_section = f"\n{Fore.CYAN}┌────────────────────────── Server Details ─────────────────────────────┐{Style.RESET_ALL}\n│\n│  🖥️ Local URL: {Fore.GREEN}http://localhost:{port}{Style.RESET_ALL}\n│  ⚙️ Status: {Fore.GREEN}Starting{Style.RESET_ALL}\n│  🔄 Model Loading: {Fore.YELLOW}In Progress{Style.RESET_ALL}\n│\n{Fore.CYAN}└──────────────────────────────────────────────────────────────────────────────┘{Style.RESET_ALL}\n"
+        server_section = f"""
+{Fore.CYAN}════════════════════════════════════ Server Details ════════════════════════════════════{Style.RESET_ALL}
+
+  🖥️ Local URL: {Fore.GREEN}http://localhost:{port}{Style.RESET_ALL}
+  ⚙️ Status: {Fore.YELLOW}Starting{Style.RESET_ALL}
+  🔄 Model Loading: {Fore.YELLOW}In Progress{Style.RESET_ALL}
+
+{Fore.CYAN}═══════════════════════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
+"""
         print(server_section, flush=True)
 
         # Set up signal handlers for graceful shutdown
