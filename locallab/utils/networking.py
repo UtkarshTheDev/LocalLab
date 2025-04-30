@@ -53,24 +53,24 @@ def setup_ngrok(port: int) -> Optional[str]:
         url_length = len(public_url)
         banner_width = max(80, url_length + 20)  # Add padding for aesthetics
 
-        # Create dynamic width horizontal lines
-        h_line = "═" * (banner_width - 2)
+        # Create dynamic width horizontal lines with thicker borders
+        h_line_top = "▄" * banner_width
+        h_line_bottom = "▀" * banner_width
 
-        # Create centered title with proper padding
+        # Create centered title
         title = "✨ NGROK TUNNEL ACTIVE ✨"
-        title_padding = (banner_width - len(title) - 2) // 2
+        title_padding = (banner_width - len(title)) // 2
         padded_title = " " * title_padding + title + " " * title_padding
         # Adjust if odd number
-        if len(padded_title) < banner_width - 2:
+        if len(padded_title) < banner_width:
             padded_title += " "
 
-        # Display banner
+        # Display banner with no side borders and prominent top/bottom borders
         logger.info(f"""
-{Fore.CYAN}╔{h_line}╗{Style.RESET_ALL}
-{Fore.CYAN}║{padded_title}║{Style.RESET_ALL}
-{Fore.CYAN}╠{h_line}╣{Style.RESET_ALL}
-{Fore.CYAN}║{Style.RESET_ALL} {Fore.GREEN}Public URL:{Style.RESET_ALL} {Fore.YELLOW}{public_url}{Style.RESET_ALL}{" " * (banner_width - len(public_url) - 14)}{Fore.CYAN}║{Style.RESET_ALL}
-{Fore.CYAN}╚{h_line}╝{Style.RESET_ALL}
+{Fore.CYAN}{h_line_top}{Style.RESET_ALL}
+{Fore.CYAN}{padded_title}{Style.RESET_ALL}
+{Fore.GREEN}Public URL: {Fore.YELLOW}{public_url}{Style.RESET_ALL}
+{Fore.CYAN}{h_line_bottom}{Style.RESET_ALL}
 """)
         return public_url
 

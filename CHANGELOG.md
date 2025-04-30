@@ -2,6 +2,14 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.5.5] - 2024-04-30
+
+### Fixed
+
+- Fixed extra spacing in the boundary of status banners
+- Improved alignment of INITIALIZING and RUNNING status boxes
+- Enhanced visual consistency across all UI elements
+
 ## [0.5.4] - 2024-04-30
 
 ### Improved

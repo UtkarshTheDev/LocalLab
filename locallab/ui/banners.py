@@ -28,14 +28,13 @@ def print_initializing_banner(version: str = "0.4.25"):
   ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝
 {Style.RESET_ALL}
 
-{Fore.YELLOW}
-  ╔═══════════════════════════════════════════════════════════════╗
-  ║                      ⚠️  INITIALIZING  ⚠️                      ║
-  ║                                                               ║
-  ║  • Server is starting up - please wait                        ║
-  ║  • Do not make API requests yet                               ║
-  ║  • Wait for the "RUNNING" banner to appear                    ║
-  ╚═══════════════════════════════════════════════════════════════╝
+{Fore.YELLOW}▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+                      ⚠️  INITIALIZING  ⚠️
+
+  • Server is starting up - please wait
+  • Do not make API requests yet
+  • Wait for the "RUNNING" banner to appear
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 {Style.RESET_ALL}
 
 {Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
@@ -67,15 +66,14 @@ def print_running_banner(version: str):
   ███████╗╚██████╔╝╚██████╗██║  ██║███████╗███████╗██║  ██║██████╔╝
   ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝
 {Style.RESET_ALL}
-{Fore.GREEN}
-  ╔═══════════════════════════════════════════════════════════════╗
-  ║                        ✅  RUNNING  ✅                         ║
-  ║                                                               ║
-  ║  • Server is ready - you can now make API requests            ║
-  ║  • Prefer to use the client packages for easier interaction   ║
-  ║  • Model loading will continue in the background              ║
-  ║  • API documentation is available below                       ║
-  ╚═══════════════════════════════════════════════════════════════╝
+{Fore.GREEN}▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+                        ✅  RUNNING  ✅
+
+  • Server is ready - you can now make API requests
+  • Prefer to use the client packages for easier interaction
+  • Model loading will continue in the background
+  • API documentation is available below
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 {Style.RESET_ALL}
 
 {Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
