@@ -5,6 +5,7 @@ Logging utilities for LocalLab
 import logging
 import sys
 import os
+import re
 from colorama import Fore, Style, init as colorama_init
 
 # Initialize colorama with autoreset
@@ -48,20 +49,95 @@ def supports_color():
 # Use color only if supported
 USE_COLOR = supports_color()
 
+# Define subdued colors for less important logs
+class Colors:
+    # Bright colors for important messages
+    BRIGHT_CYAN = Fore.CYAN
+    BRIGHT_GREEN = Fore.GREEN
+    BRIGHT_YELLOW = Fore.YELLOW
+    BRIGHT_RED = Fore.RED
+
+    # Subdued colors for regular logs
+    SUBDUED_DEBUG = Fore.BLUE + Style.DIM  # Dimmed blue for debug
+    SUBDUED_INFO = Fore.WHITE + Style.DIM   # Dimmed white for info
+    SUBDUED_WARNING = Fore.YELLOW + Style.DIM  # Dimmed yellow for warnings
+    SUBDUED_ERROR = Fore.RED + Style.DIM  # Dimmed red for errors
+
+    # Reset
+    RESET = Style.RESET_ALL
+
+# Patterns for important log messages that should stand out
+IMPORTANT_PATTERNS = [
+    # Server status messages
+    r'Server status changed to',
+    r'SERVER (READY|STARTING)',
+    r'Starting server on port',
+    r'Server startup',
+    r'Application startup complete',
+
+    # Model-related messages
+    r'Model loaded',
+    r'Loading model',
+    r'Model configuration',
+
+    # Error and warning messages
+    r'Error',
+    r'Exception',
+    r'Failed',
+    r'CRITICAL',
+    r'WARNING',
+
+    # Ngrok-related messages
+    r'NGROK TUNNEL ACTIVE',
+    r'Ngrok tunnel established',
+
+    # Other important messages
+    r'FastAPI application startup',
+    r'HuggingFace token',
+    r'SERVER READY',
+    r'INITIALIZING'
+]
+
+# Compiled regex patterns for performance
+IMPORTANT_REGEX = [re.compile(pattern, re.IGNORECASE) for pattern in IMPORTANT_PATTERNS]
+
 # Define formatters
-class ColoredFormatter(logging.Formatter):
-    """Formatter that adds colors to log messages"""
-    FORMATS = {
-        logging.DEBUG: f'{Fore.CYAN}%(asctime)s - %(name)s - %(levelname)s - %(message)s{Style.RESET_ALL}',
-        logging.INFO: f'{Fore.GREEN}%(asctime)s - %(name)s - %(levelname)s - %(message)s{Style.RESET_ALL}',
-        logging.WARNING: f'{Fore.YELLOW}%(asctime)s - %(name)s - %(levelname)s - %(message)s{Style.RESET_ALL}',
-        logging.ERROR: f'{Fore.RED}%(asctime)s - %(name)s - %(levelname)s - %(message)s{Style.RESET_ALL}',
-        logging.CRITICAL: f'{Fore.RED}{Style.BRIGHT}%(asctime)s - %(name)s - %(levelname)s - %(message)s{Style.RESET_ALL}'
-    }
+class SubduedColoredFormatter(logging.Formatter):
+    """Formatter that adds subdued colors to regular logs and bright colors to important logs"""
 
     def format(self, record):
-        log_format = self.FORMATS.get(record.levelno)
-        formatter = logging.Formatter(log_format)
+        # Check if this is an important message that should stand out
+        is_important = False
+
+        # Check message content against important patterns
+        if hasattr(record, 'msg') and isinstance(record.msg, str):
+            for pattern in IMPORTANT_REGEX:
+                if pattern.search(record.msg):
+                    is_important = True
+                    break
+
+        # Special case for certain types of logs - make them very subdued
+        is_ngrok_log = hasattr(record, 'name') and record.name.startswith('pyngrok')
+        is_uvicorn_log = hasattr(record, 'name') and record.name.startswith('uvicorn')
+
+        # Determine the appropriate color based on log level and importance
+        if is_ngrok_log or is_uvicorn_log:
+            # Make ngrok and uvicorn logs very subdued (dark gray)
+            color = Fore.BLACK + Style.BRIGHT  # This creates a dark gray color on most terminals
+        elif record.levelno == logging.DEBUG:
+            color = Colors.BRIGHT_CYAN if is_important else Colors.SUBDUED_DEBUG
+        elif record.levelno == logging.INFO:
+            color = Colors.BRIGHT_GREEN if is_important else Colors.SUBDUED_INFO
+        elif record.levelno == logging.WARNING:
+            color = Colors.BRIGHT_YELLOW if is_important else Colors.SUBDUED_WARNING
+        elif record.levelno >= logging.ERROR:  # ERROR and CRITICAL
+            color = Colors.BRIGHT_RED  # Always use bright red for errors
+        else:
+            color = Colors.SUBDUED_INFO  # Default
+
+        # Format with the appropriate color
+        formatted_message = f'{color}%(asctime)s - %(name)s - %(levelname)s - %(message)s{Colors.RESET}'
+        formatter = logging.Formatter(formatted_message)
         return formatter.format(record)
 
 # Plain formatter without colors
@@ -86,7 +162,7 @@ def configure_root_logger():
     handler = logging.StreamHandler(sys.stdout)
 
     if USE_COLOR:
-        handler.setFormatter(ColoredFormatter())
+        handler.setFormatter(SubduedColoredFormatter())
     else:
         handler.setFormatter(plain_formatter)
 

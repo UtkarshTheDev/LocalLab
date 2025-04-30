@@ -2,6 +2,24 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.5.3] - 2024-04-30
+
+### Improved
+
+- Implemented intelligent log coloring that uses subdued colors for routine logs
+- Added smart detection of important log messages to highlight critical information
+- Enhanced visual focus on banners and important messages by de-emphasizing routine logs
+- Added special handling for ngrok and uvicorn logs to make them even more subdued
+- Created a comprehensive pattern matching system to identify and highlight important logs
+- Improved overall readability by reducing visual noise from routine log messages
+- Completely redesigned the LocalLab ASCII art logo with a modern, aesthetically pleasing look
+- Created beautiful boxed status indicators for both INITIALIZING and RUNNING states
+- Enhanced visual hierarchy with prominent logo and clear status indicators
+- Added detailed bullet points in status boxes for better user guidance
+- Standardized the formatting of server details and ngrok tunnel information boxes
+- Improved overall visual consistency across all UI elements
+- Made server status much easier to distinguish at a glance
+
 ## [0.5.2] - 2024-04-30
 
 ### Fixed
@@ -13,16 +31,6 @@ All notable changes to LocalLab will be documented in this file.
 - Enhanced logger initialization to ensure consistent formatting
 - Added proper cleanup of existing handlers before adding new ones
 - Improved compatibility with different terminal environments
-
-### Improved
-
-- Completely redesigned the LocalLab ASCII art logo with a modern, aesthetically pleasing look
-- Created beautiful boxed status indicators for both INITIALIZING and RUNNING states
-- Enhanced visual hierarchy with prominent logo and clear status indicators
-- Added detailed bullet points in status boxes for better user guidance
-- Standardized the formatting of server details and ngrok tunnel information boxes
-- Improved overall visual consistency across all UI elements
-- Made server status much easier to distinguish at a glance
 
 ## [0.5.1] - 2024-04-21
 
