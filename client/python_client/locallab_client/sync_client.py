@@ -427,7 +427,7 @@ class SyncLocalLabClient:
         Args:
             prompts: List of prompts to generate text from
             model_id: Optional model ID to use
-            max_length: Maximum length of the generated text (defaults to 1024 if None)
+            max_length: Maximum length of the generated text (defaults to 8192 if None)
             temperature: Temperature for sampling
             top_p: Top-p for nucleus sampling
             repetition_penalty: Penalty for repetition (higher values = less repetition)
@@ -437,7 +437,7 @@ class SyncLocalLabClient:
         """
         # Use a higher max_length by default to ensure complete responses
         if max_length is None:
-            max_length = 4096  # Default to 4096 tokens for more complete responses
+            max_length = 8192  # Default to 8192 tokens to match server's default
 
         return self._run_coroutine(
             self._async_client.batch_generate(

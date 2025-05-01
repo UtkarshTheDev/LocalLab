@@ -301,7 +301,7 @@ class LocalLabClient:
 
         # Use a higher max_length by default to ensure complete responses
         if max_length is None:
-            max_length = 4096  # Default to 4096 tokens for more complete responses
+            max_length = 8192  # Default to 8192 tokens to match server's default
 
         payload = {
             "prompt": prompt,
@@ -311,7 +311,7 @@ class LocalLabClient:
             "temperature": temperature,
             "top_p": top_p,
             # Add repetition_penalty for better quality
-            "repetition_penalty": 1.1
+            "repetition_penalty": 1.15
         }
 
         # Create a timeout for this specific request

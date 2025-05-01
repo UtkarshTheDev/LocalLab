@@ -2,6 +2,39 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.5.8] - 2024-05-02
+
+### Added
+
+- Added optional Response Quality Settings section to the CLI configuration
+- Added detailed parameter descriptions for all response quality settings
+- Increased default max_length from 4096 to 8192 tokens for more complete responses
+- Increased default top_k from 50 to 80 for better quality responses
+- Added max_time parameter (default: 120 seconds) to control generation time
+- Improved token-level streaming with larger token batches (4 tokens at a time)
+- Enhanced stop sequence detection to only check for definitive end markers
+- Improved repetition detection to only stop for extreme repetition
+- Added better error recovery for out-of-memory situations
+
+### Changed
+
+- Made Response Quality Settings section optional in CLI (default: skip)
+- Updated client timeouts from 180 to 300 seconds (5 minutes) for more complete responses
+- Increased client default max_length from 1024 to 8192 tokens to match server's default
+- Increased repetition_penalty from 1.1 to 1.15 for better quality
+- Updated all API routes to include top_k and repetition_penalty parameters
+- Enhanced memory management to prevent OOM errors
+- Improved error handling in streaming responses
+
+### Client Package Changes (v1.0.7)
+
+- Increased default timeouts for all operations
+- Added repetition_penalty parameter to all generation methods
+- Improved error handling and recovery in streaming
+- Added better buffering for token-level streaming
+- Increased retry counts for better reliability
+- Added top_k parameter to all generation methods
+
 ## [0.5.7] - 2024-05-01
 
 ### Improved

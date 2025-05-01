@@ -107,37 +107,72 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
     click.echo("\n⚡ Model Optimization Settings")
     click.echo("─────────────────────────────")
 
-    config["enable_quantization"] = click.confirm(
-        "Enable model quantization?",
-        default=config.get("enable_quantization", ENABLE_QUANTIZATION)
+    # Show current values for reference
+    click.echo("\nCurrent optimization settings:")
+    click.echo(f"  Quantization: {'Enabled' if config.get('enable_quantization', ENABLE_QUANTIZATION) else 'Disabled'}")
+    if config.get('enable_quantization', ENABLE_QUANTIZATION):
+        click.echo(f"  Quantization Type: {config.get('quantization_type', QUANTIZATION_TYPE)}")
+    click.echo(f"  CPU Offloading: {'Enabled' if config.get('enable_cpu_offloading', ENABLE_CPU_OFFLOADING) else 'Disabled'}")
+    click.echo(f"  Attention Slicing: {'Enabled' if config.get('enable_attention_slicing', ENABLE_ATTENTION_SLICING) else 'Disabled'}")
+    click.echo(f"  Flash Attention: {'Enabled' if config.get('enable_flash_attention', ENABLE_FLASH_ATTENTION) else 'Disabled'}")
+    click.echo(f"  Better Transformer: {'Enabled' if config.get('enable_bettertransformer', ENABLE_BETTERTRANSFORMER) else 'Disabled'}")
+
+    # Ask if user wants to configure optimization settings
+    configure_optimization = click.confirm(
+        "\nWould you like to configure model optimization settings?",
+        default=True  # Default to Yes for optimization settings
     )
 
-    if config["enable_quantization"]:
-        config["quantization_type"] = click.prompt(
-            "Quantization type (fp16/int8/int4)",
-            default=config.get("quantization_type", QUANTIZATION_TYPE),
-            type=click.Choice(["fp16", "int8", "int4"])
+    if configure_optimization:
+        config["enable_quantization"] = click.confirm(
+            "Enable model quantization?",
+            default=config.get("enable_quantization", ENABLE_QUANTIZATION)
         )
 
-    config["enable_cpu_offloading"] = click.confirm(
-        "Enable CPU offloading?",
-        default=config.get("enable_cpu_offloading", ENABLE_CPU_OFFLOADING)
-    )
+        if config["enable_quantization"]:
+            config["quantization_type"] = click.prompt(
+                "Quantization type (fp16/int8/int4)",
+                default=config.get("quantization_type", QUANTIZATION_TYPE),
+                type=click.Choice(["fp16", "int8", "int4"])
+            )
 
-    config["enable_attention_slicing"] = click.confirm(
-        "Enable attention slicing?",
-        default=config.get("enable_attention_slicing", ENABLE_ATTENTION_SLICING)
-    )
+        config["enable_cpu_offloading"] = click.confirm(
+            "Enable CPU offloading?",
+            default=config.get("enable_cpu_offloading", ENABLE_CPU_OFFLOADING)
+        )
 
-    config["enable_flash_attention"] = click.confirm(
-        "Enable flash attention?",
-        default=config.get("enable_flash_attention", ENABLE_FLASH_ATTENTION)
-    )
+        config["enable_attention_slicing"] = click.confirm(
+            "Enable attention slicing?",
+            default=config.get("enable_attention_slicing", ENABLE_ATTENTION_SLICING)
+        )
 
-    config["enable_better_transformer"] = click.confirm(
-        "Enable better transformer?",
-        default=config.get("enable_bettertransformer", ENABLE_BETTERTRANSFORMER)
-    )
+        config["enable_flash_attention"] = click.confirm(
+            "Enable flash attention?",
+            default=config.get("enable_flash_attention", ENABLE_FLASH_ATTENTION)
+        )
+
+        config["enable_better_transformer"] = click.confirm(
+            "Enable better transformer?",
+            default=config.get("enable_bettertransformer", ENABLE_BETTERTRANSFORMER)
+        )
+
+        click.echo("\n✅ Optimization settings updated!")
+    else:
+        # If user doesn't want to configure, use the current values or defaults
+        if 'enable_quantization' not in config:
+            config["enable_quantization"] = ENABLE_QUANTIZATION
+        if config["enable_quantization"] and 'quantization_type' not in config:
+            config["quantization_type"] = QUANTIZATION_TYPE
+        if 'enable_cpu_offloading' not in config:
+            config["enable_cpu_offloading"] = ENABLE_CPU_OFFLOADING
+        if 'enable_attention_slicing' not in config:
+            config["enable_attention_slicing"] = ENABLE_ATTENTION_SLICING
+        if 'enable_flash_attention' not in config:
+            config["enable_flash_attention"] = ENABLE_FLASH_ATTENTION
+        if 'enable_bettertransformer' not in config:
+            config["enable_bettertransformer"] = ENABLE_BETTERTRANSFORMER
+
+        click.echo("\nUsing current optimization settings.")
 
     # Advanced Settings
     # ----------------
@@ -150,40 +185,89 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
         type=int
     )
 
-    # Generation Parameters
-    # -------------------
-    click.echo("\n🔄 Generation Parameters")
-    click.echo("─────────────────────")
+    # Response Quality Settings
+    # -----------------------
+    click.echo("\n🎯 Response Quality Settings")
+    click.echo("───────────────────────────")
 
-    config["max_length"] = click.prompt(
-        "Maximum generation length (tokens)",
-        default=config.get("max_length", 8192),
-        type=int
+    # Show current values for reference with descriptions
+    click.echo("\nCurrent response quality settings:")
+    click.echo(f"  Max Length: {config.get('max_length', 8192)} tokens - Maximum number of tokens in the generated response")
+    click.echo(f"  Temperature: {config.get('temperature', 0.7)} - Controls randomness (higher = more creative, lower = more focused)")
+    click.echo(f"  Top-p: {config.get('top_p', 0.9)} - Nucleus sampling parameter (higher = more diverse responses)")
+    click.echo(f"  Top-k: {config.get('top_k', 80)} - Limits vocabulary to top K tokens (higher = more diverse vocabulary)")
+    click.echo(f"  Repetition Penalty: {config.get('repetition_penalty', 1.15)} - Penalizes repetition (higher = less repetition)")
+    click.echo(f"  Max Time: {config.get('max_time', 120.0)} seconds - Maximum time allowed for generation")
+
+    # Ask if user wants to configure response quality settings
+    configure_response_quality = click.confirm(
+        "\nWould you like to configure response quality settings?",
+        default=False  # Default to No
     )
 
-    config["temperature"] = click.prompt(
-        "Temperature (0.1-1.0)",
-        default=config.get("temperature", 0.7),
-        type=float
-    )
+    if configure_response_quality:
+        # If user wants to configure, show the prompts with descriptions
+        config["max_length"] = click.prompt(
+            "Maximum generation length in tokens (higher = longer responses, but slower)",
+            default=config.get("max_length", 8192),
+            type=int
+        )
 
-    config["top_p"] = click.prompt(
-        "Top-p (0.1-1.0)",
-        default=config.get("top_p", 0.9),
-        type=float
-    )
+        config["temperature"] = click.prompt(
+            "Temperature (0.1-1.0, higher = more creative, lower = more focused)",
+            default=config.get("temperature", 0.7),
+            type=float
+        )
 
-    config["top_k"] = click.prompt(
-        "Top-k (1-100)",
-        default=config.get("top_k", 80),
-        type=int
-    )
+        config["top_p"] = click.prompt(
+            "Top-p (0.1-1.0, higher = more diverse responses)",
+            default=config.get("top_p", 0.9),
+            type=float
+        )
 
-    config["repetition_penalty"] = click.prompt(
-        "Repetition penalty (1.0-2.0)",
-        default=config.get("repetition_penalty", 1.15),
-        type=float
-    )
+        config["top_k"] = click.prompt(
+            "Top-k (1-100, higher = more diverse vocabulary)",
+            default=config.get("top_k", 80),
+            type=int
+        )
+
+        config["repetition_penalty"] = click.prompt(
+            "Repetition penalty (1.0-2.0, higher = less repetition)",
+            default=config.get("repetition_penalty", 1.15),
+            type=float
+        )
+
+        config["max_time"] = click.prompt(
+            "Maximum generation time in seconds (higher = more complete responses, but slower)",
+            default=config.get("max_time", 120.0),
+            type=float
+        )
+
+        click.echo("\n✅ Response quality settings updated!")
+    else:
+        # If user doesn't want to configure, use the current values or defaults
+        if 'max_length' not in config:
+            config["max_length"] = 8192
+        if 'temperature' not in config:
+            config["temperature"] = 0.7
+        if 'top_p' not in config:
+            config["top_p"] = 0.9
+        if 'top_k' not in config:
+            config["top_k"] = 80
+        if 'repetition_penalty' not in config:
+            config["repetition_penalty"] = 1.15
+        if 'max_time' not in config:
+            config["max_time"] = 120.0
+
+        click.echo("\nUsing default response quality settings.")
+
+    # Set environment variables for these settings
+    os.environ["DEFAULT_MAX_LENGTH"] = str(config["max_length"])
+    os.environ["DEFAULT_TEMPERATURE"] = str(config["temperature"])
+    os.environ["DEFAULT_TOP_P"] = str(config["top_p"])
+    os.environ["DEFAULT_TOP_K"] = str(config["top_k"])
+    os.environ["DEFAULT_REPETITION_PENALTY"] = str(config["repetition_penalty"])
+    os.environ["DEFAULT_MAX_TIME"] = str(config["max_time"])
 
     # Cache Settings
     # -------------
