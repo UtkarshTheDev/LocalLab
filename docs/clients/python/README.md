@@ -150,8 +150,11 @@ response = await client.generate(
     prompt: str,
     model_id: str = None,
     temperature: float = 0.7,
-    max_length: int = None,
-    top_p: float = 0.9
+    max_length: int = 8192,  # Default is 8192 tokens for complete responses
+    top_p: float = 0.9,
+    top_k: int = 80,  # Limits vocabulary to top K tokens
+    repetition_penalty: float = 1.15,  # Reduces repetition
+    timeout: float = 180.0  # 3 minutes timeout for complete responses
 ) -> str
 
 # Sync usage with SyncLocalLabClient
@@ -159,10 +162,28 @@ response = client.generate(
     prompt: str,
     model_id: str = None,
     temperature: float = 0.7,
-    max_length: int = None,
-    top_p: float = 0.9
+    max_length: int = 8192,  # Default is 8192 tokens for complete responses
+    top_p: float = 0.9,
+    top_k: int = 80,  # Limits vocabulary to top K tokens
+    repetition_penalty: float = 1.15,  # Reduces repetition
+    timeout: float = 180.0  # 3 minutes timeout for complete responses
 ) -> str
 ```
+
+#### Response Quality Parameters
+
+The client now supports advanced response quality parameters:
+
+| Parameter            | Default | Description                                                          |
+| -------------------- | ------- | -------------------------------------------------------------------- |
+| `max_length`         | 8192    | Maximum number of tokens in the generated response                   |
+| `temperature`        | 0.7     | Controls randomness (higher = more creative, lower = more focused)   |
+| `top_p`              | 0.9     | Nucleus sampling parameter (higher = more diverse responses)         |
+| `top_k`              | 80      | Limits vocabulary to top K tokens (higher = more diverse vocabulary) |
+| `repetition_penalty` | 1.15    | Penalizes repetition (higher = less repetition)                      |
+| `timeout`            | 180.0   | Maximum time in seconds allowed for generation                       |
+
+These parameters work together to produce high-quality, complete responses that are both relevant and diverse, with minimal repetition.
 
 #### Streaming Generation
 
@@ -172,9 +193,11 @@ async for token in client.stream_generate(
     prompt: str,
     model_id: str = None,
     temperature: float = 0.7,
-    max_length: int = None,
+    max_length: int = 8192,  # Default is 8192 tokens for complete responses
     top_p: float = 0.9,
-    timeout: float = 60.0  # Control request timeout
+    top_k: int = 80,  # Limits vocabulary to top K tokens
+    repetition_penalty: float = 1.15,  # Reduces repetition
+    timeout: float = 300.0  # 5 minutes timeout for streaming
 ):
     print(token, end="", flush=True)
 
@@ -183,9 +206,11 @@ for token in client.stream_generate(
     prompt: str,
     model_id: str = None,
     temperature: float = 0.7,
-    max_length: int = None,
+    max_length: int = 8192,  # Default is 8192 tokens for complete responses
     top_p: float = 0.9,
-    timeout: float = 60.0
+    top_k: int = 80,  # Limits vocabulary to top K tokens
+    repetition_penalty: float = 1.15,  # Reduces repetition
+    timeout: float = 300.0  # 5 minutes timeout for streaming
 ):
     print(token, end="", flush=True)
 ```
@@ -198,8 +223,11 @@ response = await client.chat(
     messages: list[dict],
     model_id: str = None,
     temperature: float = 0.7,
-    max_length: int = None,
-    top_p: float = 0.9
+    max_length: int = 8192,  # Default is 8192 tokens for complete responses
+    top_p: float = 0.9,
+    top_k: int = 80,  # Limits vocabulary to top K tokens
+    repetition_penalty: float = 1.15,  # Reduces repetition
+    timeout: float = 180.0  # 3 minutes timeout for complete responses
 ) -> dict
 
 # Sync usage with SyncLocalLabClient
@@ -207,12 +235,47 @@ response = client.chat(
     messages: list[dict],
     model_id: str = None,
     temperature: float = 0.7,
-    max_length: int = None,
-    top_p: float = 0.9
+    max_length: int = 8192,  # Default is 8192 tokens for complete responses
+    top_p: float = 0.9,
+    top_k: int = 80,  # Limits vocabulary to top K tokens
+    repetition_penalty: float = 1.15,  # Reduces repetition
+    timeout: float = 180.0  # 3 minutes timeout for complete responses
 ) -> dict
 ```
 
-Example:
+#### Streaming Chat
+
+```python
+# Async usage with LocalLabClient
+async for chunk in client.stream_chat(
+    messages: list[dict],
+    model_id: str = None,
+    temperature: float = 0.7,
+    max_length: int = 8192,  # Default is 8192 tokens for complete responses
+    top_p: float = 0.9,
+    top_k: int = 80,  # Limits vocabulary to top K tokens
+    repetition_penalty: float = 1.15,  # Reduces repetition
+    timeout: float = 300.0  # 5 minutes timeout for streaming
+):
+    if "content" in chunk:
+        print(chunk["content"], end="", flush=True)
+
+# Sync usage with SyncLocalLabClient
+for chunk in client.stream_chat(
+    messages: list[dict],
+    model_id: str = None,
+    temperature: float = 0.7,
+    max_length: int = 8192,  # Default is 8192 tokens for complete responses
+    top_p: float = 0.9,
+    top_k: int = 80,  # Limits vocabulary to top K tokens
+    repetition_penalty: float = 1.15,  # Reduces repetition
+    timeout: float = 300.0  # 5 minutes timeout for streaming
+):
+    if "content" in chunk:
+        print(chunk["content"], end="", flush=True)
+```
+
+#### Example
 
 ```python
 messages = [
@@ -237,8 +300,11 @@ responses = await client.batch_generate(
     prompts: list[str],
     model_id: str = None,
     temperature: float = 0.7,
-    max_length: int = None,
-    top_p: float = 0.9
+    max_length: int = 8192,  # Default is 8192 tokens for complete responses
+    top_p: float = 0.9,
+    top_k: int = 80,  # Limits vocabulary to top K tokens
+    repetition_penalty: float = 1.15,  # Reduces repetition
+    timeout: float = 300.0  # 5 minutes timeout for batch operations
 ) -> dict
 
 # Sync usage with SyncLocalLabClient
@@ -246,12 +312,15 @@ responses = client.batch_generate(
     prompts: list[str],
     model_id: str = None,
     temperature: float = 0.7,
-    max_length: int = None,
-    top_p: float = 0.9
+    max_length: int = 8192,  # Default is 8192 tokens for complete responses
+    top_p: float = 0.9,
+    top_k: int = 80,  # Limits vocabulary to top K tokens
+    repetition_penalty: float = 1.15,  # Reduces repetition
+    timeout: float = 300.0  # 5 minutes timeout for batch operations
 ) -> dict
 ```
 
-Example:
+#### Example
 
 ```python
 prompts = [
@@ -272,6 +341,24 @@ for prompt, response in zip(prompts, responses["responses"]):
     print(f"\nPrompt: {prompt}")
     print(f"Response: {response}")
 ```
+
+#### Using Default Parameters
+
+All generation methods work with sensible defaults, so you can use them without specifying any parameters:
+
+```python
+# Simple generation with all default parameters
+response = client.generate("Explain quantum computing")
+
+# Simple chat with all default parameters
+messages = [{"role": "user", "content": "Hello, how are you?"}]
+response = client.chat(messages)
+
+# Simple batch generation with all default parameters
+responses = client.batch_generate(["Write a poem", "Tell a story"])
+```
+
+The client will automatically use the optimal parameters for high-quality responses.
 
 ## 🛠️ Troubleshooting
 
@@ -303,19 +390,32 @@ For slow responses or large generations, increase the timeout:
 # For async client initialization
 client = LocalLabClient(
     "http://localhost:8000",
-    timeout=60.0  # 60 seconds timeout
+    timeout=60.0  # 60 seconds timeout for connection
 )
 
 # For sync client initialization
 client = SyncLocalLabClient(
     "http://localhost:8000",
-    timeout=60.0  # 60 seconds timeout
+    timeout=60.0  # 60 seconds timeout for connection
+)
+
+# For individual requests (recommended approach)
+response = client.generate(
+    "Write a detailed essay on quantum computing",
+    max_length=8192,
+    timeout=300.0  # 5 minutes timeout for this specific request
 )
 
 # For streaming requests
-for token in client.stream_generate("Hello", timeout=120.0):
+for token in client.stream_generate(
+    "Write a detailed essay on quantum computing",
+    max_length=8192,
+    timeout=300.0  # 5 minutes timeout for streaming
+):
     print(token, end="")
 ```
+
+> **Note**: The `timeout` parameter in the client initialization controls the connection timeout, while the `timeout` parameter in the generation methods controls the request timeout. For long generations, it's recommended to use a higher timeout in the generation methods.
 
 #### 3. Memory Management
 

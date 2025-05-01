@@ -17,9 +17,23 @@ Generate text using the loaded model.
   "stream": "boolean",
   "max_length": "integer | null",
   "temperature": "float",
-  "top_p": "float"
+  "top_p": "float",
+  "top_k": "integer",
+  "repetition_penalty": "float"
 }
 ```
+
+**Response Quality Parameters:**
+
+| Parameter            | Default | Description                                                          |
+| -------------------- | ------- | -------------------------------------------------------------------- |
+| `max_length`         | 8192    | Maximum number of tokens in the generated response                   |
+| `temperature`        | 0.7     | Controls randomness (higher = more creative, lower = more focused)   |
+| `top_p`              | 0.9     | Nucleus sampling parameter (higher = more diverse responses)         |
+| `top_k`              | 80      | Limits vocabulary to top K tokens (higher = more diverse vocabulary) |
+| `repetition_penalty` | 1.15    | Penalizes repetition (higher = less repetition)                      |
+
+> **Note**: All parameters are optional. If not provided, the server will use the default values shown above.
 
 **Response:**
 
@@ -61,9 +75,13 @@ Chat completion endpoint similar to OpenAI's API.
   "stream": "boolean",
   "max_length": "integer | null",
   "temperature": "float",
-  "top_p": "float"
+  "top_p": "float",
+  "top_k": "integer",
+  "repetition_penalty": "float"
 }
 ```
+
+> **Note**: The same response quality parameters from the `/generate` endpoint apply here. All parameters are optional and use the same defaults.
 
 **Response:**
 
@@ -78,6 +96,41 @@ Chat completion endpoint similar to OpenAI's API.
       "finish_reason": "stop"
     }
   ],
+  "usage": {
+    "prompt_tokens": "integer",
+    "completion_tokens": "integer",
+    "total_tokens": "integer"
+  }
+}
+```
+
+### Batch Generation
+
+#### POST `/generate/batch`
+
+Generate text for multiple prompts in parallel.
+
+**Request Body:**
+
+```json
+{
+  "prompts": ["string", "string", ...],
+  "model_id": "string | null",
+  "max_length": "integer | null",
+  "temperature": "float",
+  "top_p": "float",
+  "top_k": "integer",
+  "repetition_penalty": "float"
+}
+```
+
+> **Note**: The same response quality parameters from the `/generate` endpoint apply here. All parameters are optional and use the same defaults.
+
+**Response:**
+
+```json
+{
+  "responses": ["string", "string", ...],
   "usage": {
     "prompt_tokens": "integer",
     "completion_tokens": "integer",
@@ -149,5 +202,5 @@ Error responses include a detail message:
 
 ---
 
-Made with ❤️ by Utkarsh Tiwari  
+Made with ❤️ by Utkarsh Tiwari
 GitHub: [UtkarshTheDev](https://github.com/UtkarshTheDev) | Twitter: [@UtkarshTheDev](https://twitter.com/UtkarshTheDev) | LinkedIn: [utkarshthedev](https://linkedin.com/in/utkarshthedev)

@@ -233,7 +233,9 @@ class LocalLabClient:
         max_length: Optional[int] = None,
         temperature: float = 0.7,
         top_p: float = 0.9,
-        timeout: float = 60.0  # Add timeout parameter with a default of 60 seconds
+        timeout: float = 180.0,  # Increased timeout for more complete responses (3 minutes)
+        repetition_penalty: float = 1.15,  # Added repetition penalty for better quality
+        top_k: int = 80  # Added top_k parameter for better quality
     ) -> str:
         """Generate text using the model with improved error handling"""
         # Update activity timestamp
@@ -245,11 +247,22 @@ class LocalLabClient:
             "stream": stream,
             "max_length": max_length,
             "temperature": temperature,
-            "top_p": top_p
+            "top_p": top_p,
+            "repetition_penalty": repetition_penalty,
+            "top_k": top_k
         }
 
         if stream:
-            return self.stream_generate(prompt, model_id, max_length, temperature, top_p, timeout)
+            return self.stream_generate(
+                prompt=prompt,
+                model_id=model_id,
+                max_length=max_length,
+                temperature=temperature,
+                top_p=top_p,
+                timeout=timeout,
+                repetition_penalty=repetition_penalty,
+                top_k=top_k
+            )
 
         # Create a timeout for this specific request
         request_timeout = aiohttp.ClientTimeout(total=timeout)
@@ -293,9 +306,26 @@ class LocalLabClient:
         top_p: float = 0.9,
         timeout: float = 300.0,  # Increased timeout for more complete responses (5 minutes)
         retry_count: int = 3,    # Increased retry count for better reliability
-        repetition_penalty: float = 1.15  # Increased repetition penalty for better quality
+        repetition_penalty: float = 1.15,  # Increased repetition penalty for better quality
+        top_k: int = 80  # Added top_k parameter for better quality
     ) -> AsyncGenerator[str, None]:
-        """Stream text generation with token-level streaming and robust error handling"""
+        """
+        Stream text generation with token-level streaming and robust error handling.
+
+        Args:
+            prompt: The prompt to generate text from
+            model_id: Optional model ID to use
+            max_length: Maximum length of the generated text (defaults to 8192 if None)
+            temperature: Temperature for sampling
+            top_p: Top-p for nucleus sampling
+            timeout: Request timeout in seconds
+            retry_count: Number of retries for network errors
+            repetition_penalty: Penalty for repetition (higher values = less repetition)
+            top_k: Top-k for sampling (higher values = more diverse vocabulary)
+
+        Returns:
+            A generator that yields chunks of text as they are generated.
+        """
         # Update activity timestamp
         self._update_activity()
 
@@ -310,8 +340,8 @@ class LocalLabClient:
             "max_length": max_length,
             "temperature": temperature,
             "top_p": top_p,
-            # Add repetition_penalty for better quality
-            "repetition_penalty": 1.15
+            "repetition_penalty": repetition_penalty,
+            "top_k": top_k
         }
 
         # Create a timeout for this specific request
@@ -436,7 +466,9 @@ class LocalLabClient:
         max_length: Optional[int] = None,
         temperature: float = 0.7,
         top_p: float = 0.9,
-        timeout: float = 60.0  # Add timeout parameter with a default of 60 seconds
+        timeout: float = 180.0,  # Increased timeout for more complete responses (3 minutes)
+        repetition_penalty: float = 1.15,  # Added repetition penalty for better quality
+        top_k: int = 80  # Added top_k parameter for better quality
     ) -> Dict[str, Any]:
         """Chat completion endpoint with improved error handling"""
         # Update activity timestamp
@@ -448,11 +480,22 @@ class LocalLabClient:
             "stream": stream,
             "max_length": max_length,
             "temperature": temperature,
-            "top_p": top_p
+            "top_p": top_p,
+            "repetition_penalty": repetition_penalty,
+            "top_k": top_k
         }
 
         if stream:
-            return self.stream_chat(messages, model_id, max_length, temperature, top_p, timeout)
+            return self.stream_chat(
+                messages=messages,
+                model_id=model_id,
+                max_length=max_length,
+                temperature=temperature,
+                top_p=top_p,
+                timeout=timeout,
+                repetition_penalty=repetition_penalty,
+                top_k=top_k
+            )
 
         # Create a timeout for this specific request
         request_timeout = aiohttp.ClientTimeout(total=timeout)
@@ -487,8 +530,10 @@ class LocalLabClient:
         max_length: Optional[int] = None,
         temperature: float = 0.7,
         top_p: float = 0.9,
-        timeout: float = 120.0,  # Increased timeout for low-resource CPUs
-        retry_count: int = 2     # Add retry count for reliability
+        timeout: float = 300.0,  # Increased timeout for more complete responses (5 minutes)
+        retry_count: int = 3,    # Increased retry count for better reliability
+        repetition_penalty: float = 1.15,  # Added repetition penalty for better quality
+        top_k: int = 80  # Added top_k parameter for better quality
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream chat completion with robust error handling"""
         # Update activity timestamp
@@ -500,7 +545,9 @@ class LocalLabClient:
             "stream": True,
             "max_length": max_length,
             "temperature": temperature,
-            "top_p": top_p
+            "top_p": top_p,
+            "repetition_penalty": repetition_penalty,
+            "top_k": top_k
         }
 
         # Create a timeout for this specific request
@@ -607,7 +654,9 @@ class LocalLabClient:
         max_length: Optional[int] = None,
         temperature: float = 0.7,
         top_p: float = 0.9,
-        timeout: float = 120.0  # Add timeout parameter with a default of 120 seconds for batch operations
+        timeout: float = 300.0,  # Increased timeout for more complete responses (5 minutes)
+        repetition_penalty: float = 1.15,  # Added repetition penalty for better quality
+        top_k: int = 80  # Added top_k parameter for better quality
     ) -> Dict[str, List[str]]:
         """Generate text for multiple prompts in parallel with improved error handling"""
         # Update activity timestamp
@@ -618,7 +667,9 @@ class LocalLabClient:
             "model_id": model_id,
             "max_length": max_length,
             "temperature": temperature,
-            "top_p": top_p
+            "top_p": top_p,
+            "repetition_penalty": repetition_penalty,
+            "top_k": top_k
         }
 
         # Create a timeout for this specific request

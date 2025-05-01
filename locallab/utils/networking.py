@@ -53,27 +53,27 @@ def setup_ngrok(port: int) -> Optional[str]:
         url_length = len(public_url)
         banner_width = max(80, url_length + 30)  # Add padding for aesthetics
 
-        # Create modern box-style banner with rounded corners
-        box_top = f"{Fore.CYAN}╭{'─' * (banner_width - 2)}╮{Style.RESET_ALL}"
-        box_bottom = f"{Fore.CYAN}╰{'─' * (banner_width - 2)}╯{Style.RESET_ALL}"
+        # Create modern box-style banner with only top and bottom borders
+        box_top = f"{Fore.CYAN}{'═' * banner_width}{Style.RESET_ALL}"
+        box_bottom = f"{Fore.CYAN}{'═' * banner_width}{Style.RESET_ALL}"
 
         # Create empty line for spacing
-        empty_line = f"{Fore.CYAN}│{' ' * (banner_width - 2)}│{Style.RESET_ALL}"
+        empty_line = ""
 
         # Create centered title with sparkles
         title = "✨ NGROK TUNNEL ACTIVE ✨"
         title_padding = (banner_width - len(title)) // 2
-        title_line = f"{Fore.CYAN}│{' ' * title_padding}{Fore.MAGENTA}{title}{Fore.CYAN}{' ' * (banner_width - 2 - len(title) - title_padding)}│{Style.RESET_ALL}"
+        title_line = f"{Fore.MAGENTA}{' ' * title_padding}{title}{Style.RESET_ALL}"
 
         # Create URL line with proper padding
         url_label = "Public URL: "
         url_padding_left = 4  # Left padding for aesthetics
-        url_line = f"{Fore.CYAN}│{' ' * url_padding_left}{Fore.GREEN}{url_label}{Fore.YELLOW}{public_url}{' ' * (banner_width - 2 - len(url_label) - len(public_url) - url_padding_left)}{Fore.CYAN}│{Style.RESET_ALL}"
+        url_line = f"{' ' * url_padding_left}{Fore.GREEN}{url_label}{Fore.YELLOW}{public_url}{Style.RESET_ALL}"
 
         # Create note line
         note = "🔗 Your server is now accessible from anywhere via this URL"
         note_padding = (banner_width - len(note)) // 2
-        note_line = f"{Fore.CYAN}│{' ' * note_padding}{Fore.WHITE}{note}{Fore.CYAN}{' ' * (banner_width - 2 - len(note) - note_padding)}│{Style.RESET_ALL}"
+        note_line = f"{Fore.WHITE}{' ' * note_padding}{note}{Style.RESET_ALL}"
 
         # Display modern box-style banner
         logger.info(f"""

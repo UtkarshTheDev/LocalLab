@@ -28,14 +28,14 @@ def print_initializing_banner(version: str = "0.4.25"):
   ███████╗╚██████╔╝╚██████╗██║  ██║███████╗███████╗██║  ██║██████╔╝
   ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝ {Style.RESET_ALL}"""
 
-    # Create status box with modern styling
-    status_box_top = f"{Fore.YELLOW}┏{'━' * (banner_width - 2)}┓{Style.RESET_ALL}"
-    status_title = f"{Fore.YELLOW}┃{' ' * ((banner_width - 20) // 2)}⚠️  INITIALIZING  ⚠️{' ' * ((banner_width - 20) // 2 + (banner_width - 20) % 2)}┃{Style.RESET_ALL}"
-    status_empty = f"{Fore.YELLOW}┃{' ' * (banner_width - 2)}┃{Style.RESET_ALL}"
-    status_bullet1 = f"{Fore.YELLOW}┃  • {Fore.WHITE}Server is starting up - please wait{' ' * (banner_width - 41)}┃{Style.RESET_ALL}"
-    status_bullet2 = f"{Fore.YELLOW}┃  • {Fore.WHITE}Do not make API requests yet{' ' * (banner_width - 36)}┃{Style.RESET_ALL}"
-    status_bullet3 = f"{Fore.YELLOW}┃  • {Fore.WHITE}Wait for the \"RUNNING\" banner to appear{' ' * (banner_width - 48)}┃{Style.RESET_ALL}"
-    status_box_bottom = f"{Fore.YELLOW}┗{'━' * (banner_width - 2)}┛{Style.RESET_ALL}"
+    # Create status box with modern styling (only top and bottom borders)
+    status_box_top = f"{Fore.YELLOW}{'━' * banner_width}{Style.RESET_ALL}"
+    status_title = f"{Fore.YELLOW}{' ' * ((banner_width - 20) // 2)}⚠️  INITIALIZING  ⚠️{Style.RESET_ALL}"
+    status_empty = f""
+    status_bullet1 = f"{Fore.YELLOW}  • {Fore.WHITE}Server is starting up - please wait{Style.RESET_ALL}"
+    status_bullet2 = f"{Fore.YELLOW}  • {Fore.WHITE}Do not make API requests yet{Style.RESET_ALL}"
+    status_bullet3 = f"{Fore.YELLOW}  • {Fore.WHITE}Wait for the \"RUNNING\" banner to appear{Style.RESET_ALL}"
+    status_box_bottom = f"{Fore.YELLOW}{'━' * banner_width}{Style.RESET_ALL}"
 
     # Create status indicator with modern styling
     status_indicator = f"⏳ Status: {Fore.YELLOW}INITIALIZING{Style.RESET_ALL}"
@@ -89,15 +89,15 @@ def print_running_banner(version: str):
   ███████╗╚██████╔╝╚██████╗██║  ██║███████╗███████╗██║  ██║██████╔╝
   ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝ {Style.RESET_ALL}"""
 
-        # Create status box with modern styling
-        status_box_top = f"{Fore.GREEN}┏{'━' * (banner_width - 2)}┓{Style.RESET_ALL}"
-        status_title = f"{Fore.GREEN}┃{' ' * ((banner_width - 16) // 2)}✅  RUNNING  ✅{' ' * ((banner_width - 16) // 2 + (banner_width - 16) % 2)}┃{Style.RESET_ALL}"
-        status_empty = f"{Fore.GREEN}┃{' ' * (banner_width - 2)}┃{Style.RESET_ALL}"
-        status_bullet1 = f"{Fore.GREEN}┃  • {Fore.WHITE}Server is ready - you can now make API requests{' ' * (banner_width - 53)}┃{Style.RESET_ALL}"
-        status_bullet2 = f"{Fore.GREEN}┃  • {Fore.WHITE}Prefer to use the client packages for easier interaction{' ' * (banner_width - 65)}┃{Style.RESET_ALL}"
-        status_bullet3 = f"{Fore.GREEN}┃  • {Fore.WHITE}Model loading will continue in the background{' ' * (banner_width - 52)}┃{Style.RESET_ALL}"
-        status_bullet4 = f"{Fore.GREEN}┃  • {Fore.WHITE}API documentation is available below{' ' * (banner_width - 45)}┃{Style.RESET_ALL}"
-        status_box_bottom = f"{Fore.GREEN}┗{'━' * (banner_width - 2)}┛{Style.RESET_ALL}"
+        # Create status box with modern styling (only top and bottom borders)
+        status_box_top = f"{Fore.GREEN}{'━' * banner_width}{Style.RESET_ALL}"
+        status_title = f"{Fore.GREEN}{' ' * ((banner_width - 16) // 2)}✅  RUNNING  ✅{Style.RESET_ALL}"
+        status_empty = f""
+        status_bullet1 = f"{Fore.GREEN}  • {Fore.WHITE}Server is ready - you can now make API requests{Style.RESET_ALL}"
+        status_bullet2 = f"{Fore.GREEN}  • {Fore.WHITE}Prefer to use the client packages for easier interaction{Style.RESET_ALL}"
+        status_bullet3 = f"{Fore.GREEN}  • {Fore.WHITE}Model loading will continue in the background{Style.RESET_ALL}"
+        status_bullet4 = f"{Fore.GREEN}  • {Fore.WHITE}API documentation is available below{Style.RESET_ALL}"
+        status_box_bottom = f"{Fore.GREEN}{'━' * banner_width}{Style.RESET_ALL}"
 
         # Create status indicator with modern styling
         status_indicator = f"🚀 Status: {Fore.GREEN}RUNNING{Style.RESET_ALL}"

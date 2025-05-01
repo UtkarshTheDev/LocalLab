@@ -2,7 +2,27 @@
 
 All notable changes to LocalLab will be documented in this file.
 
-## [0.5.8] - 2024-05-02
+## [0.5.9] - 2024-05-01
+
+### Fixed
+
+- Fixed error in client package when using repetition_penalty parameter
+- Fixed missing top_k parameter in async client methods
+- Fixed parameter mismatch between sync and async client implementations
+- Updated client package version to 1.0.8 to reflect these fixes
+- Ensured consistent parameter handling across all client methods
+- Fixed docstrings to accurately reflect all available parameters
+
+### Improved
+
+- Redesigned UI banners to remove side borders for better alignment and aesthetics
+- Improved INITIALIZING banner with cleaner layout and better spacing
+- Enhanced RUNNING banner with more modern design and better readability
+- Redesigned ngrok tunnel banner with improved layout for better URL display
+- Maintained top and bottom borders for visual separation while removing side borders
+- Enhanced overall visual consistency across all banners
+
+## [0.5.8] - 2024-05-01
 
 ### Added
 
