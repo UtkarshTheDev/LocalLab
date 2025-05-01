@@ -13,6 +13,7 @@ from .config import (
 )
 from .logger.logger import logger, log_model_loaded, log_model_unloaded
 from .utils import check_resource_availability, get_device, format_model_size
+from .utils.progress import configure_hf_hub_progress
 import gc
 from colorama import Fore, Style
 import asyncio
@@ -20,6 +21,9 @@ import re
 import zipfile
 import tempfile
 import json
+
+# Configure HuggingFace Hub progress bars
+configure_hf_hub_progress()
 
 QUANTIZATION_SETTINGS = {
     "fp16": {
@@ -257,24 +261,33 @@ class ModelManager:
             # Apply quantization settings
             quant_config = self._get_quantization_config()
 
+            # Log model loading start
+            logger.info(f"Starting download and loading of model: {model_id}")
+
             # Load tokenizer first
+            logger.info(f"Loading tokenizer for {model_id}...")
             self.tokenizer = AutoTokenizer.from_pretrained(
                 model_id,
                 token=hf_token if hf_token else None
             )
+            logger.info(f"Tokenizer loaded successfully")
 
             # Load model with optimizations
+            logger.info(f"Loading model weights for {model_id}...")
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_id,
                 token=hf_token if hf_token else None,
                 **quant_config
             )
+            logger.info(f"Model weights loaded successfully")
 
             # Apply additional optimizations
+            logger.info(f"Applying optimizations to model...")
             self.model = self._apply_optimizations(self.model)
 
             # Set model to evaluation mode
             self.model.eval()
+            logger.info(f"Model ready for inference")
 
             return self.model
 
@@ -347,7 +360,7 @@ class ModelManager:
 
         if not self.model or not self.tokenizer:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail="No model is currently loaded. Please load a model first using the /models/load endpoint."
             )
 
@@ -969,13 +982,20 @@ class ModelManager:
                 llm_int8_threshold=6.0
             )
 
+            # Load tokenizer first
+            logger.info(f"Loading tokenizer for custom model {model_name}...")
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+            logger.info(f"Tokenizer loaded successfully")
+
+            # Load model with optimizations
+            logger.info(f"Loading model weights for custom model {model_name}...")
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
                 torch_dtype=torch.float16,
                 device_map="auto",
                 quantization_config=quant_config
             )
+            logger.info(f"Model weights loaded successfully")
 
             self.model = self._apply_optimizations(self.model)
 

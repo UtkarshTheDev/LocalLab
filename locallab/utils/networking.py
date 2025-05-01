@@ -51,26 +51,41 @@ def setup_ngrok(port: int) -> Optional[str]:
 
         # Calculate banner width based on URL length (minimum 80 characters)
         url_length = len(public_url)
-        banner_width = max(80, url_length + 20)  # Add padding for aesthetics
+        banner_width = max(80, url_length + 30)  # Add padding for aesthetics
 
-        # Create dynamic width horizontal lines with thicker borders
-        h_line_top = "▄" * banner_width
-        h_line_bottom = "▀" * banner_width
+        # Create modern box-style banner with rounded corners
+        box_top = f"{Fore.CYAN}╭{'─' * (banner_width - 2)}╮{Style.RESET_ALL}"
+        box_bottom = f"{Fore.CYAN}╰{'─' * (banner_width - 2)}╯{Style.RESET_ALL}"
 
-        # Create centered title
+        # Create empty line for spacing
+        empty_line = f"{Fore.CYAN}│{' ' * (banner_width - 2)}│{Style.RESET_ALL}"
+
+        # Create centered title with sparkles
         title = "✨ NGROK TUNNEL ACTIVE ✨"
         title_padding = (banner_width - len(title)) // 2
-        padded_title = " " * title_padding + title + " " * title_padding
-        # Adjust if odd number
-        if len(padded_title) < banner_width:
-            padded_title += " "
+        title_line = f"{Fore.CYAN}│{' ' * title_padding}{Fore.MAGENTA}{title}{Fore.CYAN}{' ' * (banner_width - 2 - len(title) - title_padding)}│{Style.RESET_ALL}"
 
-        # Display banner with no side borders and prominent top/bottom borders
+        # Create URL line with proper padding
+        url_label = "Public URL: "
+        url_padding_left = 4  # Left padding for aesthetics
+        url_line = f"{Fore.CYAN}│{' ' * url_padding_left}{Fore.GREEN}{url_label}{Fore.YELLOW}{public_url}{' ' * (banner_width - 2 - len(url_label) - len(public_url) - url_padding_left)}{Fore.CYAN}│{Style.RESET_ALL}"
+
+        # Create note line
+        note = "🔗 Your server is now accessible from anywhere via this URL"
+        note_padding = (banner_width - len(note)) // 2
+        note_line = f"{Fore.CYAN}│{' ' * note_padding}{Fore.WHITE}{note}{Fore.CYAN}{' ' * (banner_width - 2 - len(note) - note_padding)}│{Style.RESET_ALL}"
+
+        # Display modern box-style banner
         logger.info(f"""
-{Fore.CYAN}{h_line_top}{Style.RESET_ALL}
-{Fore.CYAN}{padded_title}{Style.RESET_ALL}
-{Fore.GREEN}Public URL: {Fore.YELLOW}{public_url}{Style.RESET_ALL}
-{Fore.CYAN}{h_line_bottom}{Style.RESET_ALL}
+{box_top}
+{empty_line}
+{title_line}
+{empty_line}
+{url_line}
+{empty_line}
+{note_line}
+{empty_line}
+{box_bottom}
 """)
         return public_url
 

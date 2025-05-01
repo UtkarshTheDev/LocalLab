@@ -13,34 +13,56 @@ def print_initializing_banner(version: str = "0.4.25"):
     Print the initializing banner with clear visual indication
     that the server is starting up and not ready for requests
     """
-    startup_banner = f"""
-{Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
+    # Calculate banner width
+    banner_width = 80
 
-{Fore.GREEN}LocalLab Server v{version}{Style.RESET_ALL}
-{Fore.CYAN}Your lightweight AI inference server for running LLMs locally{Style.RESET_ALL}
+    # Create horizontal lines with modern styling
+    h_line = f"{Fore.CYAN}{'═' * banner_width}{Style.RESET_ALL}"
 
-{Fore.BLUE}
+    # Create the LocalLab ASCII art with improved spacing and color
+    locallab_ascii = f"""{Fore.BLUE}
   ██╗      ██████╗  ██████╗ █████╗ ██╗     ██╗      █████╗ ██████╗
   ██║     ██╔═══██╗██╔════╝██╔══██╗██║     ██║     ██╔══██╗██╔══██╗
   ██║     ██║   ██║██║     ███████║██║     ██║     ███████║██████╔╝
   ██║     ██║   ██║██║     ██╔══██║██║     ██║     ██╔══██║██╔══██╗
   ███████╗╚██████╔╝╚██████╗██║  ██║███████╗███████╗██║  ██║██████╔╝
-  ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝
-{Style.RESET_ALL}
+  ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝ {Style.RESET_ALL}"""
 
-{Fore.YELLOW}▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-                      ⚠️  INITIALIZING  ⚠️
+    # Create status box with modern styling
+    status_box_top = f"{Fore.YELLOW}┏{'━' * (banner_width - 2)}┓{Style.RESET_ALL}"
+    status_title = f"{Fore.YELLOW}┃{' ' * ((banner_width - 20) // 2)}⚠️  INITIALIZING  ⚠️{' ' * ((banner_width - 20) // 2 + (banner_width - 20) % 2)}┃{Style.RESET_ALL}"
+    status_empty = f"{Fore.YELLOW}┃{' ' * (banner_width - 2)}┃{Style.RESET_ALL}"
+    status_bullet1 = f"{Fore.YELLOW}┃  • {Fore.WHITE}Server is starting up - please wait{' ' * (banner_width - 41)}┃{Style.RESET_ALL}"
+    status_bullet2 = f"{Fore.YELLOW}┃  • {Fore.WHITE}Do not make API requests yet{' ' * (banner_width - 36)}┃{Style.RESET_ALL}"
+    status_bullet3 = f"{Fore.YELLOW}┃  • {Fore.WHITE}Wait for the \"RUNNING\" banner to appear{' ' * (banner_width - 48)}┃{Style.RESET_ALL}"
+    status_box_bottom = f"{Fore.YELLOW}┗{'━' * (banner_width - 2)}┛{Style.RESET_ALL}"
 
-  • Server is starting up - please wait
-  • Do not make API requests yet
-  • Wait for the "RUNNING" banner to appear
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-{Style.RESET_ALL}
+    # Create status indicator with modern styling
+    status_indicator = f"⏳ Status: {Fore.YELLOW}INITIALIZING{Style.RESET_ALL}"
+    loading_indicator = f"🔄 Loading components and checking environment..."
 
-{Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
+    # Assemble the complete banner
+    startup_banner = f"""
+{h_line}
 
-⏳ Status: {Fore.YELLOW}INITIALIZING{Style.RESET_ALL}
-🔄 Loading components and checking environment...
+{Fore.GREEN}LocalLab Server v{version}{Style.RESET_ALL}
+{Fore.CYAN}Your lightweight AI inference server for running LLMs locally{Style.RESET_ALL}
+
+{locallab_ascii}
+
+{status_box_top}
+{status_title}
+{status_empty}
+{status_bullet1}
+{status_bullet2}
+{status_bullet3}
+{status_empty}
+{status_box_bottom}
+
+{h_line}
+
+{status_indicator}
+{loading_indicator}
 
 """
     print(startup_banner, flush=True)
@@ -52,33 +74,60 @@ def print_running_banner(version: str):
     that the server is now ready to accept API requests
     """
     try:
-        running_banner = f"""
-{Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
+        # Calculate banner width
+        banner_width = 80
 
-{Fore.GREEN}LocalLab Server v{version}{Style.RESET_ALL} - {Fore.YELLOW}READY FOR REQUESTS{Style.RESET_ALL}
-{Fore.CYAN}Your AI model is now running and ready to process requests{Style.RESET_ALL}
+        # Create horizontal lines with modern styling
+        h_line = f"{Fore.CYAN}{'═' * banner_width}{Style.RESET_ALL}"
 
-{Fore.GREEN}
+        # Create the LocalLab ASCII art with improved spacing and color
+        locallab_ascii = f"""{Fore.GREEN}
   ██╗      ██████╗  ██████╗ █████╗ ██╗     ██╗      █████╗ ██████╗
   ██║     ██╔═══██╗██╔════╝██╔══██╗██║     ██║     ██╔══██╗██╔══██╗
   ██║     ██║   ██║██║     ███████║██║     ██║     ███████║██████╔╝
   ██║     ██║   ██║██║     ██╔══██║██║     ██║     ██╔══██║██╔══██╗
   ███████╗╚██████╔╝╚██████╗██║  ██║███████╗███████╗██║  ██║██████╔╝
-  ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝
-{Style.RESET_ALL}
-{Fore.GREEN}▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-                        ✅  RUNNING  ✅
+  ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝ {Style.RESET_ALL}"""
 
-  • Server is ready - you can now make API requests
-  • Prefer to use the client packages for easier interaction
-  • Model loading will continue in the background
-  • API documentation is available below
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-{Style.RESET_ALL}
+        # Create status box with modern styling
+        status_box_top = f"{Fore.GREEN}┏{'━' * (banner_width - 2)}┓{Style.RESET_ALL}"
+        status_title = f"{Fore.GREEN}┃{' ' * ((banner_width - 16) // 2)}✅  RUNNING  ✅{' ' * ((banner_width - 16) // 2 + (banner_width - 16) % 2)}┃{Style.RESET_ALL}"
+        status_empty = f"{Fore.GREEN}┃{' ' * (banner_width - 2)}┃{Style.RESET_ALL}"
+        status_bullet1 = f"{Fore.GREEN}┃  • {Fore.WHITE}Server is ready - you can now make API requests{' ' * (banner_width - 53)}┃{Style.RESET_ALL}"
+        status_bullet2 = f"{Fore.GREEN}┃  • {Fore.WHITE}Prefer to use the client packages for easier interaction{' ' * (banner_width - 65)}┃{Style.RESET_ALL}"
+        status_bullet3 = f"{Fore.GREEN}┃  • {Fore.WHITE}Model loading will continue in the background{' ' * (banner_width - 52)}┃{Style.RESET_ALL}"
+        status_bullet4 = f"{Fore.GREEN}┃  • {Fore.WHITE}API documentation is available below{' ' * (banner_width - 45)}┃{Style.RESET_ALL}"
+        status_box_bottom = f"{Fore.GREEN}┗{'━' * (banner_width - 2)}┛{Style.RESET_ALL}"
 
-{Fore.CYAN}════════════════════════════════════════════════════════════════════════{Style.RESET_ALL}
+        # Create status indicator with modern styling
+        status_indicator = f"🚀 Status: {Fore.GREEN}RUNNING{Style.RESET_ALL}"
+        ready_indicator = f"✨ Your AI model is now running and ready to process requests"
+
+        # Assemble the complete banner
+        running_banner = f"""
+{h_line}
+
+{Fore.GREEN}LocalLab Server v{version}{Style.RESET_ALL} - {Fore.YELLOW}READY FOR REQUESTS{Style.RESET_ALL}
+{Fore.CYAN}Your AI model is now running and ready to process requests{Style.RESET_ALL}
+
+{locallab_ascii}
+
+{status_box_top}
+{status_title}
+{status_empty}
+{status_bullet1}
+{status_bullet2}
+{status_bullet3}
+{status_bullet4}
+{status_empty}
+{status_box_bottom}
+
+{h_line}
+
+{status_indicator}
+{ready_indicator}
+
 """
-
         # Make sure we flush the output to ensure it appears
         print(running_banner, flush=True)
 

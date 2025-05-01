@@ -2,6 +2,27 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.5.7] - 2024-05-01
+
+### Improved
+
+- Redesigned all UI banners with modern, aesthetic styling
+- Enhanced INITIALIZING and RUNNING banners with box-style borders and improved spacing
+- Redesigned ngrok tunnel banner with a modern box layout and better visual hierarchy
+- Added informative notes to the ngrok banner for better user guidance
+- Improved overall visual consistency and readability across all UI elements
+- Enhanced color scheme for better visual appeal and readability
+
+## [0.5.6] - 2024-05-01
+
+### Fixed
+
+- Fixed model download progress bars to display sequentially instead of interleaved
+- Implemented custom progress bar handler for HuggingFace Hub downloads
+- Added proper synchronization for multiple concurrent download progress bars
+- Enhanced logging during model downloads for better readability
+- Improved visual clarity of download progress information
+
 ## [0.5.5] - 2024-04-30
 
 ### Fixed
