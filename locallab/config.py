@@ -96,10 +96,13 @@ CORS_ORIGINS = get_env_var("CORS_ORIGINS", default="*").split(",")
 # Model settings
 DEFAULT_MODEL = get_env_var("DEFAULT_MODEL", default="microsoft/phi-2")
 DEFAULT_MAX_LENGTH = get_env_var(
-    "DEFAULT_MAX_LENGTH", default=2048, var_type=int)
+    "DEFAULT_MAX_LENGTH", default=8192, var_type=int)  # Increased from 4096 to 8192 for more complete responses
 DEFAULT_TEMPERATURE = get_env_var(
     "DEFAULT_TEMPERATURE", default=0.7, var_type=float)
 DEFAULT_TOP_P = get_env_var("DEFAULT_TOP_P", default=0.9, var_type=float)
+DEFAULT_TOP_K = get_env_var("DEFAULT_TOP_K", default=80, var_type=int)  # Increased from 50 to 80 for better quality
+DEFAULT_REPETITION_PENALTY = get_env_var("DEFAULT_REPETITION_PENALTY", default=1.15, var_type=float)  # Increased from 1.1 to 1.15
+DEFAULT_MAX_TIME = get_env_var("DEFAULT_MAX_TIME", default=120.0, var_type=float)  # Added default max_time of 120 seconds
 
 # Optimization settings
 ENABLE_QUANTIZATION = get_env_var(
@@ -463,19 +466,24 @@ DEFAULT_SYSTEM_INSTRUCTIONS = """"You are a helpful virtual assistant. Your resp
 def get_model_generation_params(model_id: Optional[str] = None) -> dict:
     """Get model generation parameters, optionally specific to a model.
 
+    This function prioritizes quality and completeness of responses by using
+    higher max_length and appropriate repetition_penalty values.
+
     Args:
         model_id: Optional model ID to get specific parameters for
 
     Returns:
-        Dictionary of generation parameters
+        Dictionary of generation parameters optimized for complete responses
     """
-    # Base parameters (defaults)
+    # Base parameters (defaults) - optimized for quality and completeness
     params = {
         "max_length": get_env_var("LOCALLAB_MODEL_MAX_LENGTH", default=DEFAULT_MAX_LENGTH, var_type=int),
         "temperature": get_env_var("LOCALLAB_MODEL_TEMPERATURE", default=DEFAULT_TEMPERATURE, var_type=float),
         "top_p": get_env_var("LOCALLAB_MODEL_TOP_P", default=DEFAULT_TOP_P, var_type=float),
         "top_k": get_env_var("LOCALLAB_TOP_K", default=DEFAULT_TOP_K, var_type=int),
         "repetition_penalty": get_env_var("LOCALLAB_REPETITION_PENALTY", default=DEFAULT_REPETITION_PENALTY, var_type=float),
+        # Add do_sample parameter to ensure proper sampling
+        "do_sample": True
     }
 
     # If model_id is provided and exists in MODEL_REGISTRY, use model-specific parameters
@@ -483,12 +491,23 @@ def get_model_generation_params(model_id: Optional[str] = None) -> dict:
         model_config = MODEL_REGISTRY[model_id]
         # Override with model-specific parameters if available
         if "max_length" in model_config:
-            params["max_length"] = model_config["max_length"]
+            # Ensure max_length is at least 1024 for complete responses
+            params["max_length"] = max(model_config["max_length"], 1024)
+        else:
+            # If no model-specific max_length, use a reasonable default
+            params["max_length"] = max(DEFAULT_MAX_LENGTH, 1024)
 
         # Add any other model-specific parameters from the registry
         for param in ["temperature", "top_p", "top_k", "repetition_penalty"]:
             if param in model_config:
                 params[param] = model_config[param]
+
+    # Ensure repetition_penalty is at least 1.05 to avoid repetition issues
+    params["repetition_penalty"] = max(params.get("repetition_penalty", 1.0), 1.05)
+
+    # Ensure max_length is reasonable (not too small, not too large)
+    # Increased upper limit to 16384 to allow for very long responses
+    params["max_length"] = min(max(params["max_length"], 2048), 16384)
 
     return params
 

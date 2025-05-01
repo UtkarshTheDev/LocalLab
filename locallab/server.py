@@ -1084,8 +1084,14 @@ def cli():
     @click.option('--attention-slicing', is_flag=True, help='Enable attention slicing')
     @click.option('--flash-attention', is_flag=True, help='Enable flash attention')
     @click.option('--better-transformer', is_flag=True, help='Enable BetterTransformer')
+    @click.option('--max-length', type=int, help='Maximum generation length in tokens')
+    @click.option('--temperature', type=float, help='Temperature for generation (0.1-1.0)')
+    @click.option('--top-p', type=float, help='Top-p for nucleus sampling (0.1-1.0)')
+    @click.option('--top-k', type=int, help='Top-k for sampling (1-100)')
+    @click.option('--repetition-penalty', type=float, help='Repetition penalty (1.0-2.0)')
     def start(use_ngrok, port, ngrok_auth_token, model, quantize, quantize_type,
-              attention_slicing, flash_attention, better_transformer):
+              attention_slicing, flash_attention, better_transformer,
+              max_length, temperature, top_p, top_k, repetition_penalty):
         """Start the LocalLab server"""
         from .cli.config import set_config_value
 
@@ -1106,6 +1112,27 @@ def cli():
 
         if better_transformer:
             set_config_value('enable_better_transformer', 'true')
+
+        # Set generation parameters if provided
+        if max_length:
+            set_config_value('max_length', str(max_length))
+            os.environ["DEFAULT_MAX_LENGTH"] = str(max_length)
+
+        if temperature:
+            set_config_value('temperature', str(temperature))
+            os.environ["DEFAULT_TEMPERATURE"] = str(temperature)
+
+        if top_p:
+            set_config_value('top_p', str(top_p))
+            os.environ["DEFAULT_TOP_P"] = str(top_p)
+
+        if top_k:
+            set_config_value('top_k', str(top_k))
+            os.environ["DEFAULT_TOP_K"] = str(top_k)
+
+        if repetition_penalty:
+            set_config_value('repetition_penalty', str(repetition_penalty))
+            os.environ["DEFAULT_REPETITION_PENALTY"] = str(repetition_penalty)
 
         # Start the server
         start_server(use_ngrok=use_ngrok, port=port, ngrok_auth_token=ngrok_auth_token)

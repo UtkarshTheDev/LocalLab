@@ -32,6 +32,8 @@ class GenerationRequest(BaseModel):
     max_tokens: int = Field(default=DEFAULT_MAX_LENGTH, ge=1, le=32000)
     temperature: float = Field(default=DEFAULT_TEMPERATURE, ge=0.0, le=2.0)
     top_p: float = Field(default=DEFAULT_TOP_P, ge=0.0, le=1.0)
+    top_k: int = Field(default=80, ge=1, le=1000)  # Added top_k parameter
+    repetition_penalty: float = Field(default=1.15, ge=1.0, le=2.0)  # Added repetition_penalty parameter
     system_prompt: Optional[str] = Field(default=DEFAULT_SYSTEM_INSTRUCTIONS)
     stream: bool = Field(default=False)
 
@@ -42,6 +44,8 @@ class BatchGenerationRequest(BaseModel):
     max_tokens: int = Field(default=DEFAULT_MAX_LENGTH, ge=1, le=32000)
     temperature: float = Field(default=DEFAULT_TEMPERATURE, ge=0.0, le=2.0)
     top_p: float = Field(default=DEFAULT_TOP_P, ge=0.0, le=1.0)
+    top_k: int = Field(default=80, ge=1, le=1000)  # Added top_k parameter
+    repetition_penalty: float = Field(default=1.15, ge=1.0, le=2.0)  # Added repetition_penalty parameter
     system_prompt: Optional[str] = Field(default=DEFAULT_SYSTEM_INSTRUCTIONS)
 
 
@@ -57,6 +61,8 @@ class ChatRequest(BaseModel):
     max_tokens: int = Field(default=DEFAULT_MAX_LENGTH, ge=1, le=32000)
     temperature: float = Field(default=DEFAULT_TEMPERATURE, ge=0.0, le=2.0)
     top_p: float = Field(default=DEFAULT_TOP_P, ge=0.0, le=1.0)
+    top_k: int = Field(default=80, ge=1, le=1000)  # Added top_k parameter
+    repetition_penalty: float = Field(default=1.15, ge=1.0, le=2.0)  # Added repetition_penalty parameter
     stream: bool = Field(default=False)
 
 
@@ -114,7 +120,7 @@ async def generate_text(request: GenerationRequest) -> GenerationResponse:
     # Check if model is loaded
     if not model_manager.current_model or not model_manager.model:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail="No model is currently loaded. Please load a model first using POST /models/load."
         )
 
@@ -135,6 +141,8 @@ async def generate_text(request: GenerationRequest) -> GenerationResponse:
             "max_new_tokens": request.max_tokens,
             "temperature": request.temperature,
             "top_p": request.top_p,
+            "top_k": request.top_k,
+            "repetition_penalty": request.repetition_penalty,
         }
 
         # Merge model-specific params with request params
@@ -182,7 +190,9 @@ async def chat_completion(request: ChatRequest) -> ChatResponse:
         generation_params = {
             "max_new_tokens": request.max_tokens,
             "temperature": request.temperature,
-            "top_p": request.top_p
+            "top_p": request.top_p,
+            "top_k": request.top_k,
+            "repetition_penalty": request.repetition_penalty
         }
 
         # Merge model-specific params with request params
@@ -229,6 +239,8 @@ async def generate_stream(
             "max_new_tokens": max_tokens,
             "temperature": temperature,
             "top_p": top_p,
+            "top_k": 80,  # Default top_k for streaming
+            "repetition_penalty": 1.15,  # Default repetition_penalty for streaming
         }
 
         # Merge model-specific params with request params
@@ -271,7 +283,9 @@ async def stream_chat(
         generation_params = {
             "max_new_tokens": max_tokens,
             "temperature": temperature,
-            "top_p": top_p
+            "top_p": top_p,
+            "top_k": 80,  # Default top_k for streaming
+            "repetition_penalty": 1.15  # Default repetition_penalty for streaming
         }
 
         # Merge model-specific params with request params
@@ -309,6 +323,8 @@ async def batch_generate(request: BatchGenerationRequest) -> BatchGenerationResp
             "max_new_tokens": request.max_tokens,
             "temperature": request.temperature,
             "top_p": request.top_p,
+            "top_k": request.top_k,
+            "repetition_penalty": request.repetition_penalty,
         }
 
         # Merge model-specific params with request params

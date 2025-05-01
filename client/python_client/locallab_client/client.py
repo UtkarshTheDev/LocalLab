@@ -143,7 +143,7 @@ class LocalLabConfig:
 
 class LocalLabClient:
     """Asynchronous client for the LocalLab API with improved error handling."""
-    
+
     # Class-level attribute for activity tracking
     _last_activity_times = {}
 
@@ -152,7 +152,7 @@ class LocalLabClient:
             config = LocalLabConfig(base_url=config)
         elif isinstance(config, dict):
             config = LocalLabConfig(**config)
-        
+
         self.config = config
         self._session: Optional[aiohttp.ClientSession] = None
         self.ws: Optional[websockets.WebSocketClientProtocol] = None
@@ -167,7 +167,7 @@ class LocalLabClient:
         """Initialize HTTP session with improved error handling."""
         if self._closed:
             raise RuntimeError("Client is closed")
-            
+
         if not self._session:
             try:
                 headers = {
@@ -176,7 +176,7 @@ class LocalLabClient:
                 }
                 if self.config.api_key:
                     headers["Authorization"] = f"Bearer {self.config.api_key}"
-                
+
                 self._session = aiohttp.ClientSession(
                     headers=headers,
                     timeout=aiohttp.ClientTimeout(total=self.config.timeout),
@@ -291,12 +291,17 @@ class LocalLabClient:
         max_length: Optional[int] = None,
         temperature: float = 0.7,
         top_p: float = 0.9,
-        timeout: float = 120.0,  # Increased timeout for low-resource CPUs
-        retry_count: int = 2     # Add retry count for reliability
+        timeout: float = 300.0,  # Increased timeout for more complete responses (5 minutes)
+        retry_count: int = 3,    # Increased retry count for better reliability
+        repetition_penalty: float = 1.15  # Increased repetition penalty for better quality
     ) -> AsyncGenerator[str, None]:
         """Stream text generation with token-level streaming and robust error handling"""
         # Update activity timestamp
         self._update_activity()
+
+        # Use a higher max_length by default to ensure complete responses
+        if max_length is None:
+            max_length = 4096  # Default to 4096 tokens for more complete responses
 
         payload = {
             "prompt": prompt,
@@ -304,7 +309,9 @@ class LocalLabClient:
             "stream": True,
             "max_length": max_length,
             "temperature": temperature,
-            "top_p": top_p
+            "top_p": top_p,
+            # Add repetition_penalty for better quality
+            "repetition_penalty": 1.1
         }
 
         # Create a timeout for this specific request
@@ -313,6 +320,7 @@ class LocalLabClient:
         # Track retries
         retries = 0
         last_error = None
+        accumulated_text = ""  # Track accumulated text for error recovery
 
         while retries <= retry_count:
             try:
@@ -329,12 +337,15 @@ class LocalLabClient:
                     # Track if we've seen any data to detect early disconnections
                     received_data = False
                     # Buffer for accumulating partial responses if needed
+                    token_buffer = ""
+                    last_token_time = time.time()
 
                     try:
                         # Process the streaming response
                         async for line in response.content:
                             if line:
                                 received_data = True
+                                current_time = time.time()
                                 text = line.decode("utf-8").strip()
 
                                 # Skip empty lines
@@ -347,6 +358,9 @@ class LocalLabClient:
 
                                 # Check for end of stream marker
                                 if text == "[DONE]":
+                                    # If we have any buffered text, yield it before ending
+                                    if token_buffer:
+                                        yield token_buffer
                                     break
 
                                 # Check for error messages
@@ -354,11 +368,20 @@ class LocalLabClient:
                                     error_msg = text.replace("\nError: ", "").replace("Error: ", "")
                                     raise Exception(error_msg)
 
+                                # Add to accumulated text for error recovery
+                                accumulated_text += text
+
+                                # Reset the last token time
+                                last_token_time = current_time
+
+                                # Yield the token directly for immediate feedback
                                 yield text
 
                         # If we didn't receive any data, the stream might have ended unexpectedly
                         if not received_data:
-                            yield "\nError: Stream ended unexpectedly without returning any data"
+                            # If we have accumulated text from previous attempts, don't report an error
+                            if not accumulated_text:
+                                yield "\nError: Stream ended unexpectedly without returning any data"
 
                         # Successful completion, break the retry loop
                         break

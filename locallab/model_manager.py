@@ -387,18 +387,19 @@ class ModelManager:
             from .config import get_model_generation_params
             gen_params = get_model_generation_params(self.current_model)
 
-            # Set optimized defaults for faster generation
+            # Set balanced defaults for quality and speed
             if not max_length and not max_new_tokens:
-                # Use a smaller default max_length for faster generation
-                gen_params["max_length"] = min(gen_params.get("max_length", DEFAULT_MAX_LENGTH), 512)
+                # Use a reasonable default max_length that balances quality and speed
+                # Don't limit it too much to ensure complete responses
+                gen_params["max_length"] = min(gen_params.get("max_length", DEFAULT_MAX_LENGTH), 1024)
 
             if not temperature:
-                # Slightly lower temperature for faster and more focused generation
-                gen_params["temperature"] = min(gen_params.get("temperature", DEFAULT_TEMPERATURE), 0.7)
+                # Use a balanced temperature for good quality responses
+                gen_params["temperature"] = gen_params.get("temperature", DEFAULT_TEMPERATURE)
 
             if not top_k:
-                # Add top_k for faster sampling
-                gen_params["top_k"] = 40
+                # Add top_k for better quality sampling
+                gen_params["top_k"] = 50
 
             # Handle max_new_tokens parameter (map to max_length)
             if max_new_tokens is not None:
@@ -463,7 +464,9 @@ class ModelManager:
                         "do_sample": True,
                         "pad_token_id": self.tokenizer.eos_token_id,
                         # Fix the early stopping warning by setting num_beams explicitly
-                        "num_beams": 1
+                        "num_beams": 1,
+                        # Add repetition penalty by default for better quality
+                        "repetition_penalty": 1.1
                     }
 
                     # Add optional parameters if present in gen_params
@@ -473,8 +476,10 @@ class ModelManager:
                         generate_params["repetition_penalty"] = gen_params["repetition_penalty"]
 
                     # Set a reasonable max time for generation to prevent hanging
+                    # Use the DEFAULT_MAX_TIME from config (120 seconds)
                     if "max_time" not in generate_params and not stream:
-                        generate_params["max_time"] = 30.0  # 30 seconds max for generation
+                        from .config import DEFAULT_MAX_TIME
+                        generate_params["max_time"] = DEFAULT_MAX_TIME  # Use the default max time from config
 
                     # Use efficient attention implementation if available
                     if hasattr(self.model.config, "attn_implementation"):
@@ -542,16 +547,17 @@ class ModelManager:
                 repetition_penalty = gen_params.get("repetition_penalty", 1.1)
             else:
                 # Use provided individual parameters or defaults
-                max_length = max_length or min(DEFAULT_MAX_LENGTH, 256)  # More conservative limit for low-resource computers
+                max_length = max_length or DEFAULT_MAX_LENGTH  # Use the full default max length
                 temperature = temperature or 0.7  # Use same temperature as non-streaming
                 top_p = top_p or DEFAULT_TOP_P
                 top_k = 40  # Default to 40 for better quality
                 repetition_penalty = 1.1
 
-            # For low-resource computers, limit max_length to prevent OOM
-            if max_length > 256:
-                logger.info(f"Limiting max_length from {max_length} to 256 for better performance on low-resource computers")
-                max_length = 256
+            # For low-resource computers, we'll use a reasonable max_length
+            # but not limit it too much to ensure complete responses
+            if max_length > 1024:
+                logger.info(f"Limiting max_length from {max_length} to 1024 for better performance")
+                max_length = 1024
 
             # Get the actual device of the model
             model_device = next(self.model.parameters()).device
@@ -561,19 +567,21 @@ class ModelManager:
                 if inputs[key].device != model_device:
                     inputs[key] = inputs[key].to(model_device)
 
-            # For low-resource computers, generate one token at a time
+            # For low-resource computers, generate tokens in small batches
             # This is more memory-efficient and prevents OOM errors
-            tokens_to_generate_per_step = 1
+            # but still allows for faster generation than one token at a time
+            tokens_to_generate_per_step = 4  # Generate 4 tokens at a time for better efficiency
 
             # Track generated text for quality control
             generated_text = ""
 
-            # Define stop sequences for proper termination
-            stop_sequences = ["</s>", "<|endoftext|>", "<|im_end|>", "<|assistant|>", "<|user|>"]
+            # Define stop sequences for proper termination - only use definitive end markers
+            # Removed <|assistant|> and <|user|> as they might appear in valid responses
+            stop_sequences = ["</s>", "<|endoftext|>", "<|im_end|>"]
 
             # Memory monitoring variables
             last_memory_check = time.time()
-            memory_check_interval = 2.0  # Check memory every 2 seconds
+            memory_check_interval = 5.0  # Check memory less frequently (every 5 seconds)
 
             # Get input IDs and attention mask
             input_ids = inputs["input_ids"]
@@ -588,7 +596,7 @@ class ModelManager:
                         if torch.cuda.is_available():
                             current_mem = torch.cuda.memory_allocated() / (1024 * 1024 * 1024)  # GB
                             total_mem = torch.cuda.get_device_properties(0).total_memory / (1024 * 1024 * 1024)  # GB
-                            if current_mem > 0.7 * total_mem:  # If using >70% of GPU memory
+                            if current_mem > 0.85 * total_mem:  # Only clear if using >85% of GPU memory
                                 torch.cuda.empty_cache()
                                 logger.info("Cleared CUDA cache during streaming to prevent OOM")
 
@@ -627,24 +635,26 @@ class ModelManager:
                         # Add to generated text for quality control
                         generated_text += new_text
 
-                        # Check for stop sequences
+                        # Check for stop sequences - only check for definitive end markers
                         should_stop = False
                         for stop_seq in stop_sequences:
-                            if stop_seq in generated_text:
+                            if stop_seq in new_text:  # Only check in the new text, not the entire generated text
                                 # We've reached a stop sequence, stop generation
+                                logger.info(f"Stop sequence '{stop_seq}' detected, stopping generation")
                                 should_stop = True
                                 break
 
-                        # Check for repetition (a sign of poor quality)
-                        if len(generated_text) > 50:
-                            # Check for repeating patterns of 5+ characters
-                            last_50_chars = generated_text[-50:]
-                            for pattern_len in range(5, 15):
-                                if pattern_len < len(last_50_chars) // 2:
-                                    pattern = last_50_chars[-pattern_len:]
-                                    if pattern in last_50_chars[:-pattern_len]:
-                                        # Detected repetition, stop generation
-                                        logger.warning("Detected repetition in streaming generation, stopping")
+                        # Modified repetition detection - only stop for extreme repetition
+                        # This allows for legitimate repetition in responses
+                        if len(generated_text) > 100:
+                            # Check for repeating patterns of 10+ characters that repeat 3+ times
+                            last_100_chars = generated_text[-100:]
+                            for pattern_len in range(10, 20):
+                                if pattern_len < len(last_100_chars) // 3:
+                                    pattern = last_100_chars[-pattern_len:]
+                                    # Check if pattern appears 3 or more times
+                                    if last_100_chars.count(pattern) >= 3:
+                                        logger.warning("Detected extreme repetition in streaming generation, stopping")
                                         should_stop = True
                                         break
 
@@ -678,11 +688,11 @@ class ModelManager:
                             time.sleep(0.5)
 
                             try:
-                                # Try again with minimal parameters
+                                # Try again with minimal parameters but still generate tokens
                                 minimal_params = {
                                     "input_ids": input_ids,
                                     "attention_mask": attention_mask,
-                                    "max_new_tokens": 1,
+                                    "max_new_tokens": 1,  # Generate just one token
                                     "do_sample": False,  # Turn off sampling to save memory
                                     "pad_token_id": self.tokenizer.eos_token_id,
                                     "num_beams": 1
@@ -699,10 +709,33 @@ class ModelManager:
 
                                     input_ids = outputs
                                     attention_mask = torch.ones_like(input_ids)
+
+                                    # Reduce tokens_to_generate_per_step to prevent future OOM
+                                    tokens_to_generate_per_step = 1
+                                    logger.info("Reduced generation batch size to 1 token at a time after OOM recovery")
                                 else:
-                                    # If recovery didn't produce valid text, stop generation
-                                    logger.warning("Recovery attempt didn't produce valid text, stopping generation")
-                                    break
+                                    # If recovery didn't produce valid text, try one more time with different settings
+                                    logger.warning("First recovery attempt didn't produce valid text, trying again with different settings")
+
+                                    # Try with different temperature
+                                    minimal_params["temperature"] = 0.9
+                                    minimal_params["do_sample"] = True
+                                    outputs = self.model.generate(**minimal_params)
+
+                                    new_tokens = outputs[0][len(input_ids[0]):]
+                                    new_text = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
+
+                                    if new_text and not new_text.isspace():
+                                        generated_text += new_text
+                                        yield new_text
+
+                                        input_ids = outputs
+                                        attention_mask = torch.ones_like(input_ids)
+                                        tokens_to_generate_per_step = 1
+                                    else:
+                                        # If still no valid text, stop generation
+                                        logger.warning("Recovery attempts failed to produce valid text, stopping generation")
+                                        break
                             except Exception as recovery_error:
                                 # If recovery fails, yield an error message and stop
                                 logger.error(f"Recovery failed: {str(recovery_error)}")
@@ -784,8 +817,9 @@ class ModelManager:
 
         # Create a token-level streaming generator optimized for low-resource computers
         async def token_level_stream_generator():
-            # Define stop sequences for proper termination
-            stop_sequences = ["</s>", "<|endoftext|>", "<|im_end|>", "<|assistant|>", "<|user|>"]
+            # Define stop sequences for proper termination - only use definitive end markers
+            # Removed <|assistant|> and <|user|> as they might appear in valid responses
+            stop_sequences = ["</s>", "<|endoftext|>", "<|im_end|>"]
             accumulated_text = ""
             token_buffer = ""
             last_yield_time = time.time()
@@ -809,13 +843,13 @@ class ModelManager:
                     token_buffer += token
                     accumulated_text += token
 
-                    # Check for stop sequences
+                    # Check for stop sequences - only in the new token, not the entire accumulated text
                     should_stop = False
                     for stop_seq in stop_sequences:
-                        if stop_seq in accumulated_text:
-                            # Truncate at stop sequence
-                            accumulated_text = accumulated_text.split(stop_seq)[0]
-                            token_buffer = ""
+                        if stop_seq in token:
+                            # Log the stop sequence detection
+                            logger.info(f"Stop sequence '{stop_seq}' detected in async streaming, stopping")
+                            # Don't truncate the text - just stop generating more
                             should_stop = True
                             break
 
@@ -826,13 +860,13 @@ class ModelManager:
                     # Yield in these cases:
                     # 1. Buffer contains complete word (ends with space)
                     # 2. Buffer contains punctuation
-                    # 3. It's been more than 100ms since last yield
-                    # 4. Buffer is getting large (>10 chars)
+                    # 3. It's been more than 50ms since last yield
+                    # 4. Buffer is getting large (>5 chars)
                     should_yield = (
                         token.endswith(" ") or
                         any(p in token for p in ".,!?;:") or
-                        time_since_last_yield > 0.1 or
-                        len(token_buffer) > 10
+                        time_since_last_yield > 0.05 or  # Reduced from 0.1 to 0.05 for smoother streaming
+                        len(token_buffer) > 5  # Reduced from 10 to 5 for more frequent updates
                     )
 
                     if should_yield and token_buffer:
@@ -845,9 +879,11 @@ class ModelManager:
                     if should_stop:
                         break
 
-                    # Also stop if we've generated too much text
-                    if len(accumulated_text) > gen_params.get("max_length", 256) * 4:
-                        logger.warning("Stream generation exceeded maximum length - stopping")
+                    # Increase the maximum length limit to ensure complete responses
+                    # Only stop if we've generated an extremely long response
+                    max_length_multiplier = 8  # Increased from 4 to 8
+                    if len(accumulated_text) > gen_params.get("max_length", 512) * max_length_multiplier:
+                        logger.warning(f"Stream generation exceeded maximum length ({gen_params.get('max_length', 512) * max_length_multiplier} chars) - stopping")
                         break
 
                     # Yield control to allow other async tasks to run

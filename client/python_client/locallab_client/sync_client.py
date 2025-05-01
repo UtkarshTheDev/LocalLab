@@ -73,7 +73,7 @@ class SyncLocalLabClient:
     def _run_coroutine(self, coro, timeout: Optional[float] = None):
         """Run a coroutine in the event loop thread with timeout and error handling."""
         self._ensure_connection()
-        
+
         try:
             future = asyncio.run_coroutine_threadsafe(coro, self._loop)
             return future.result(timeout=timeout)
@@ -123,10 +123,10 @@ class SyncLocalLabClient:
                     # Clean up
                     self._loop = None
                     self._thread = None
-                    
+
                     # Shutdown executor
                     self._executor.shutdown(wait=False)
-                    
+
                 except Exception as e:
                     logger.error(f"Error during client cleanup: {str(e)}")
                 finally:
@@ -139,25 +139,40 @@ class SyncLocalLabClient:
         stream: bool = False,
         max_length: Optional[int] = None,
         temperature: float = 0.7,
-        top_p: float = 0.9
+        top_p: float = 0.9,
+        repetition_penalty: float = 1.15,  # Increased repetition penalty for better quality
+        top_k: int = 80  # Added top_k parameter for better quality
     ) -> Union[str, Generator[str, None, None]]:
         """
-        Generate text using the model.
+        Generate text using the model with improved quality settings.
 
         Args:
             prompt: The prompt to generate text from
             model_id: Optional model ID to use
             stream: Whether to stream the response
-            max_length: Maximum length of the generated text
+            max_length: Maximum length of the generated text (defaults to 1024 if None)
             temperature: Temperature for sampling
             top_p: Top-p for nucleus sampling
+            repetition_penalty: Penalty for repetition (higher values = less repetition)
 
         Returns:
             If stream=False, returns the generated text as a string.
             If stream=True, returns a generator that yields chunks of text.
         """
+        # Use a higher max_length by default to ensure complete responses
+        if max_length is None:
+            max_length = 4096  # Default to 4096 tokens for more complete responses
+
         if stream:
-            return self.stream_generate(prompt, model_id, max_length, temperature, top_p)
+            return self.stream_generate(
+                prompt=prompt,
+                model_id=model_id,
+                max_length=max_length,
+                temperature=temperature,
+                top_p=top_p,
+                repetition_penalty=repetition_penalty,
+                top_k=top_k
+            )
 
         return self._run_coroutine(
             self._async_client.generate(
@@ -166,7 +181,10 @@ class SyncLocalLabClient:
                 stream=False,
                 max_length=max_length,
                 temperature=temperature,
-                top_p=top_p
+                top_p=top_p,
+                repetition_penalty=repetition_penalty,
+                top_k=top_k,
+                timeout=180.0  # Increased timeout for more complete responses (3 minutes)
             )
         )
 
@@ -177,22 +195,29 @@ class SyncLocalLabClient:
         max_length: Optional[int] = None,
         temperature: float = 0.7,
         top_p: float = 0.9,
-        timeout: float = 60.0
+        timeout: float = 300.0,  # Increased timeout for more complete responses (5 minutes)
+        repetition_penalty: float = 1.15,  # Increased repetition penalty for better quality
+        top_k: int = 80  # Added top_k parameter for better quality
     ) -> Generator[str, None, None]:
         """
-        Stream text generation.
+        Stream text generation with improved quality and reliability.
 
         Args:
             prompt: The prompt to generate text from
             model_id: Optional model ID to use
-            max_length: Maximum length of the generated text
+            max_length: Maximum length of the generated text (defaults to 1024 if None)
             temperature: Temperature for sampling
             top_p: Top-p for nucleus sampling
             timeout: Request timeout in seconds
+            repetition_penalty: Penalty for repetition (higher values = less repetition)
 
         Returns:
             A generator that yields chunks of text as they are generated.
         """
+        # Use a higher max_length by default to ensure complete responses
+        if max_length is None:
+            max_length = 4096  # Default to 4096 tokens for more complete responses
+
         # Create a queue to pass data between the async and sync worlds
         queue = asyncio.Queue()
         stop_event = threading.Event()
@@ -206,7 +231,10 @@ class SyncLocalLabClient:
                     max_length=max_length,
                     temperature=temperature,
                     top_p=top_p,
-                    timeout=timeout
+                    timeout=timeout,
+                    retry_count=3,  # Increased retry count for better reliability
+                    repetition_penalty=repetition_penalty,  # Pass the repetition penalty parameter
+                    top_k=top_k  # Pass the top_k parameter
                 ):
                     await queue.put(chunk)
 
@@ -250,25 +278,41 @@ class SyncLocalLabClient:
         stream: bool = False,
         max_length: Optional[int] = None,
         temperature: float = 0.7,
-        top_p: float = 0.9
+        top_p: float = 0.9,
+        repetition_penalty: float = 1.15,  # Increased repetition penalty for better quality
+        top_k: int = 80  # Added top_k parameter for better quality
     ) -> Union[Dict[str, Any], Generator[Dict[str, Any], None, None]]:
         """
-        Chat completion.
+        Chat completion with improved quality settings.
 
         Args:
             messages: List of message dictionaries with 'role' and 'content' keys
             model_id: Optional model ID to use
             stream: Whether to stream the response
-            max_length: Maximum length of the generated text
+            max_length: Maximum length of the generated text (defaults to 1024 if None)
             temperature: Temperature for sampling
             top_p: Top-p for nucleus sampling
+            repetition_penalty: Penalty for repetition (higher values = less repetition)
 
         Returns:
             If stream=False, returns the chat completion response.
             If stream=True, returns a generator that yields chunks of the response.
         """
+        # Use a higher max_length by default to ensure complete responses
+        if max_length is None:
+            max_length = 4096  # Default to 4096 tokens for more complete responses
+
         if stream:
-            return self.stream_chat(messages, model_id, max_length, temperature, top_p)
+            return self.stream_chat(
+                messages=messages,
+                model_id=model_id,
+                max_length=max_length,
+                temperature=temperature,
+                top_p=top_p,
+                timeout=300.0,  # Increased timeout for more complete responses (5 minutes)
+                repetition_penalty=repetition_penalty,
+                top_k=top_k
+            )
 
         return self._run_coroutine(
             self._async_client.chat(
@@ -277,7 +321,10 @@ class SyncLocalLabClient:
                 stream=False,
                 max_length=max_length,
                 temperature=temperature,
-                top_p=top_p
+                top_p=top_p,
+                timeout=180.0,  # Increased timeout for more complete responses (3 minutes)
+                repetition_penalty=repetition_penalty,
+                top_k=top_k
             )
         )
 
@@ -287,21 +334,29 @@ class SyncLocalLabClient:
         model_id: Optional[str] = None,
         max_length: Optional[int] = None,
         temperature: float = 0.7,
-        top_p: float = 0.9
+        top_p: float = 0.9,
+        timeout: float = 300.0,  # Increased timeout for more complete responses (5 minutes)
+        repetition_penalty: float = 1.15,  # Added repetition penalty for better quality
+        top_k: int = 80  # Added top_k parameter for better quality
     ) -> Generator[Dict[str, Any], None, None]:
         """
-        Stream chat completion.
+        Stream chat completion with improved quality and reliability.
 
         Args:
             messages: List of message dictionaries with 'role' and 'content' keys
             model_id: Optional model ID to use
-            max_length: Maximum length of the generated text
+            max_length: Maximum length of the generated text (defaults to 1024 if None)
             temperature: Temperature for sampling
             top_p: Top-p for nucleus sampling
+            timeout: Request timeout in seconds
 
         Returns:
             A generator that yields chunks of the chat completion response.
         """
+        # Use a higher max_length by default to ensure complete responses
+        if max_length is None:
+            max_length = 4096  # Default to 4096 tokens for more complete responses
+
         # Create a queue to pass data between the async and sync worlds
         queue = asyncio.Queue()
         stop_event = threading.Event()
@@ -314,7 +369,11 @@ class SyncLocalLabClient:
                     model_id=model_id,
                     max_length=max_length,
                     temperature=temperature,
-                    top_p=top_p
+                    top_p=top_p,
+                    timeout=timeout,
+                    retry_count=3,  # Increased retry count for better reliability
+                    repetition_penalty=repetition_penalty,
+                    top_k=top_k
                 ):
                     await queue.put(chunk)
 
@@ -357,28 +416,39 @@ class SyncLocalLabClient:
         model_id: Optional[str] = None,
         max_length: Optional[int] = None,
         temperature: float = 0.7,
-        top_p: float = 0.9
+        top_p: float = 0.9,
+        repetition_penalty: float = 1.15,  # Increased repetition penalty for better quality
+        top_k: int = 80,  # Added top_k parameter for better quality
+        timeout: float = 300.0  # Added timeout parameter (5 minutes)
     ) -> Dict[str, List[str]]:
         """
-        Generate text for multiple prompts in parallel.
+        Generate text for multiple prompts in parallel with improved quality settings.
 
         Args:
             prompts: List of prompts to generate text from
             model_id: Optional model ID to use
-            max_length: Maximum length of the generated text
+            max_length: Maximum length of the generated text (defaults to 1024 if None)
             temperature: Temperature for sampling
             top_p: Top-p for nucleus sampling
+            repetition_penalty: Penalty for repetition (higher values = less repetition)
 
         Returns:
             Dictionary with the generated responses.
         """
+        # Use a higher max_length by default to ensure complete responses
+        if max_length is None:
+            max_length = 4096  # Default to 4096 tokens for more complete responses
+
         return self._run_coroutine(
             self._async_client.batch_generate(
                 prompts=prompts,
                 model_id=model_id,
                 max_length=max_length,
                 temperature=temperature,
-                top_p=top_p
+                top_p=top_p,
+                repetition_penalty=repetition_penalty,
+                top_k=top_k,
+                timeout=timeout  # Use the provided timeout parameter
             )
         )
 
