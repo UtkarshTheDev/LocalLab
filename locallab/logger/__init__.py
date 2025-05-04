@@ -109,6 +109,18 @@ class SubduedColoredFormatter(logging.Formatter):
     """Formatter that adds subdued colors to regular logs and bright colors to important logs"""
 
     def format(self, record):
+        # Check if we're currently downloading a model
+        try:
+            from ..utils.progress import is_model_downloading
+            if is_model_downloading():
+                # During model download, only show critical logs
+                if record.levelno < logging.ERROR:
+                    # Skip non-critical logs during model download
+                    return ""
+        except (ImportError, AttributeError):
+            # If we can't import the function, continue as normal
+            pass
+
         # Check if this is an important message that should stand out
         is_important = False
 

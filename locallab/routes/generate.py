@@ -143,6 +143,7 @@ async def generate_text(request: GenerationRequest) -> GenerationResponse:
             "top_p": request.top_p,
             "top_k": request.top_k,
             "repetition_penalty": request.repetition_penalty,
+            "do_sample": model_params.get("do_sample", True)  # Pass do_sample from model params
         }
 
         # Merge model-specific params with request params
@@ -192,7 +193,8 @@ async def chat_completion(request: ChatRequest) -> ChatResponse:
             "temperature": request.temperature,
             "top_p": request.top_p,
             "top_k": request.top_k,
-            "repetition_penalty": request.repetition_penalty
+            "repetition_penalty": request.repetition_penalty,
+            "do_sample": model_params.get("do_sample", True)  # Pass do_sample from model params
         }
 
         # Merge model-specific params with request params
@@ -241,6 +243,7 @@ async def generate_stream(
             "top_p": top_p,
             "top_k": 80,  # Default top_k for streaming
             "repetition_penalty": 1.15,  # Default repetition_penalty for streaming
+            "do_sample": model_params.get("do_sample", True)  # Pass do_sample from model params
         }
 
         # Merge model-specific params with request params
@@ -285,7 +288,8 @@ async def stream_chat(
             "temperature": temperature,
             "top_p": top_p,
             "top_k": 80,  # Default top_k for streaming
-            "repetition_penalty": 1.15  # Default repetition_penalty for streaming
+            "repetition_penalty": 1.15,  # Default repetition_penalty for streaming
+            "do_sample": model_params.get("do_sample", True)  # Pass do_sample from model params
         }
 
         # Merge model-specific params with request params
@@ -325,6 +329,7 @@ async def batch_generate(request: BatchGenerationRequest) -> BatchGenerationResp
             "top_p": request.top_p,
             "top_k": request.top_k,
             "repetition_penalty": request.repetition_penalty,
+            "do_sample": model_params.get("do_sample", True)  # Pass do_sample from model params
         }
 
         # Merge model-specific params with request params

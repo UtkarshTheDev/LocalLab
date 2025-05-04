@@ -151,10 +151,22 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
             default=config.get("enable_flash_attention", ENABLE_FLASH_ATTENTION)
         )
 
-        config["enable_better_transformer"] = click.confirm(
+        config["enable_bettertransformer"] = click.confirm(
             "Enable better transformer?",
             default=config.get("enable_bettertransformer", ENABLE_BETTERTRANSFORMER)
         )
+
+        # Set environment variables for optimization settings
+        os.environ["LOCALLAB_ENABLE_QUANTIZATION"] = str(config["enable_quantization"]).lower()
+        os.environ["LOCALLAB_QUANTIZATION_TYPE"] = str(config["quantization_type"]) if config["enable_quantization"] else ""
+        os.environ["LOCALLAB_ENABLE_CPU_OFFLOADING"] = str(config["enable_cpu_offloading"]).lower()
+        os.environ["LOCALLAB_ENABLE_ATTENTION_SLICING"] = str(config["enable_attention_slicing"]).lower()
+        os.environ["LOCALLAB_ENABLE_FLASH_ATTENTION"] = str(config["enable_flash_attention"]).lower()
+        os.environ["LOCALLAB_ENABLE_BETTERTRANSFORMER"] = str(config["enable_bettertransformer"]).lower()
+
+        # Save the optimization settings to config file
+        from .config import save_config
+        save_config(config)
 
         click.echo("\n✅ Optimization settings updated!")
     else:
@@ -171,6 +183,18 @@ def prompt_for_config(use_ngrok: bool = None, port: int = None, ngrok_auth_token
             config["enable_flash_attention"] = ENABLE_FLASH_ATTENTION
         if 'enable_bettertransformer' not in config:
             config["enable_bettertransformer"] = ENABLE_BETTERTRANSFORMER
+
+        # Set environment variables for optimization settings
+        os.environ["LOCALLAB_ENABLE_QUANTIZATION"] = str(config["enable_quantization"]).lower()
+        os.environ["LOCALLAB_QUANTIZATION_TYPE"] = str(config["quantization_type"]) if config["enable_quantization"] else ""
+        os.environ["LOCALLAB_ENABLE_CPU_OFFLOADING"] = str(config["enable_cpu_offloading"]).lower()
+        os.environ["LOCALLAB_ENABLE_ATTENTION_SLICING"] = str(config["enable_attention_slicing"]).lower()
+        os.environ["LOCALLAB_ENABLE_FLASH_ATTENTION"] = str(config["enable_flash_attention"]).lower()
+        os.environ["LOCALLAB_ENABLE_BETTERTRANSFORMER"] = str(config["enable_bettertransformer"]).lower()
+
+        # Save the optimization settings to config file
+        from .config import save_config
+        save_config(config)
 
         click.echo("\nUsing current optimization settings.")
 

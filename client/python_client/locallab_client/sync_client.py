@@ -141,7 +141,8 @@ class SyncLocalLabClient:
         temperature: float = 0.7,
         top_p: float = 0.9,
         repetition_penalty: float = 1.15,  # Increased repetition penalty for better quality
-        top_k: int = 80  # Added top_k parameter for better quality
+        top_k: int = 80,  # Added top_k parameter for better quality
+        do_sample: bool = True  # Added do_sample parameter
     ) -> Union[str, Generator[str, None, None]]:
         """
         Generate text using the model with improved quality settings.
@@ -171,7 +172,8 @@ class SyncLocalLabClient:
                 temperature=temperature,
                 top_p=top_p,
                 repetition_penalty=repetition_penalty,
-                top_k=top_k
+                top_k=top_k,
+                do_sample=do_sample
             )
 
         return self._run_coroutine(
@@ -184,6 +186,7 @@ class SyncLocalLabClient:
                 top_p=top_p,
                 repetition_penalty=repetition_penalty,
                 top_k=top_k,
+                do_sample=do_sample,
                 timeout=180.0  # Increased timeout for more complete responses (3 minutes)
             )
         )
@@ -197,7 +200,8 @@ class SyncLocalLabClient:
         top_p: float = 0.9,
         timeout: float = 300.0,  # Increased timeout for more complete responses (5 minutes)
         repetition_penalty: float = 1.15,  # Increased repetition penalty for better quality
-        top_k: int = 80  # Added top_k parameter for better quality
+        top_k: int = 80,  # Added top_k parameter for better quality
+        do_sample: bool = True  # Added do_sample parameter
     ) -> Generator[str, None, None]:
         """
         Stream text generation with improved quality and reliability.
@@ -234,7 +238,8 @@ class SyncLocalLabClient:
                     timeout=timeout,
                     retry_count=3,  # Increased retry count for better reliability
                     repetition_penalty=repetition_penalty,  # Pass the repetition penalty parameter
-                    top_k=top_k  # Pass the top_k parameter
+                    top_k=top_k,  # Pass the top_k parameter
+                    do_sample=do_sample  # Pass the do_sample parameter
                 ):
                     await queue.put(chunk)
 

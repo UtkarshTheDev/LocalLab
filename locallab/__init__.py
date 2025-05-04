@@ -2,7 +2,7 @@
 LocalLab - A lightweight AI inference server for running LLMs locally
 """
 
-__version__ = "0.5.9"  # Updated to match setup.py
+__version__ = "0.6.1"  # Updated to fix CLI config environment variable issue
 
 # Only import what's necessary initially, lazy-load the rest
 from .logger import get_logger

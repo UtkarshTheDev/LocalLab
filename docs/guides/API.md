@@ -36,7 +36,8 @@ Generate text using the loaded model.
   "temperature": "float",
   "top_p": "float",
   "top_k": "integer",
-  "repetition_penalty": "float"
+  "repetition_penalty": "float",
+  "do_sample": "boolean"
 }
 ```
 
@@ -49,6 +50,7 @@ Generate text using the loaded model.
 | `top_p`              | 0.9     | Nucleus sampling parameter (higher = more diverse responses)         |
 | `top_k`              | 80      | Limits vocabulary to top K tokens (higher = more diverse vocabulary) |
 | `repetition_penalty` | 1.15    | Penalizes repetition (higher = less repetition)                      |
+| `do_sample`          | true    | Whether to use sampling; if false, uses greedy decoding              |
 
 > **Note**: All parameters are optional. If not provided, the server will use the default values shown above.
 
@@ -86,7 +88,8 @@ curl -X POST "${BASE_URL}/generate" \
     "temperature": 0.7,
     "top_p": 0.9,
     "top_k": 80,
-    "repetition_penalty": 1.15
+    "repetition_penalty": 1.15,
+    "do_sample": true
   }'
 
 # Streaming generation
@@ -127,7 +130,8 @@ Chat completion endpoint similar to OpenAI's API.
   "temperature": "float",
   "top_p": "float",
   "top_k": "integer",
-  "repetition_penalty": "float"
+  "repetition_penalty": "float",
+  "do_sample": "boolean"
 }
 ```
 
@@ -181,7 +185,8 @@ curl -X POST "${BASE_URL}/chat" \
     "temperature": 0.7,
     "top_p": 0.9,
     "top_k": 80,
-    "repetition_penalty": 1.15
+    "repetition_penalty": 1.15,
+    "do_sample": true
   }'
 
 # Streaming chat
@@ -212,7 +217,8 @@ Generate text for multiple prompts in parallel.
   "temperature": "float",
   "top_p": "float",
   "top_k": "integer",
-  "repetition_penalty": "float"
+  "repetition_penalty": "float",
+  "do_sample": "boolean"
 }
 ```
 
@@ -259,7 +265,8 @@ curl -X POST "${BASE_URL}/generate/batch" \
     "temperature": 0.7,
     "top_p": 0.9,
     "top_k": 80,
-    "repetition_penalty": 1.15
+    "repetition_penalty": 1.15,
+    "do_sample": true
   }'
 ```
 
@@ -378,6 +385,7 @@ All generation endpoints have sensible defaults for the response quality paramet
 - `top_p`: 0.9
 - `top_k`: 80
 - `repetition_penalty`: 1.15
+- `do_sample`: true
 
 You can omit any or all of these parameters in your requests, and the server will use these defaults.
 

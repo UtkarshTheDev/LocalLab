@@ -263,6 +263,8 @@ class ModelManager:
 
             # Log model loading start
             logger.info(f"Starting download and loading of model: {model_id}")
+            print(f"\n{Fore.GREEN}Downloading model: {model_id}{Style.RESET_ALL}")
+            print(f"{Fore.CYAN}This may take a while depending on your internet speed...{Style.RESET_ALL}\n")
 
             # Load tokenizer first
             logger.info(f"Loading tokenizer for {model_id}...")
@@ -279,6 +281,7 @@ class ModelManager:
                 token=hf_token if hf_token else None,
                 **quant_config
             )
+            print(f"\n{Fore.GREEN}Model {model_id} downloaded successfully!{Style.RESET_ALL}")
             logger.info(f"Model weights loaded successfully")
 
             # Apply additional optimizations
@@ -352,7 +355,8 @@ class ModelManager:
         top_p: Optional[float] = None,
         top_k: Optional[int] = None,
         repetition_penalty: Optional[float] = None,
-        system_instructions: Optional[str] = None
+        system_instructions: Optional[str] = None,
+        do_sample: bool = True
     ) -> str:
         """Generate text from the model"""
         # Check model timeout
@@ -461,7 +465,7 @@ class ModelManager:
                         "max_new_tokens": gen_params["max_length"],
                         "temperature": gen_params["temperature"],
                         "top_p": gen_params["top_p"],
-                        "do_sample": True,
+                        "do_sample": gen_params.get("do_sample", True),
                         "pad_token_id": self.tokenizer.eos_token_id,
                         # Fix the early stopping warning by setting num_beams explicitly
                         "num_beams": 1,
@@ -608,7 +612,7 @@ class ModelManager:
                         "temperature": temperature,
                         "top_p": top_p,
                         "top_k": top_k,
-                        "do_sample": True,
+                        "do_sample": gen_params.get("do_sample", True) if gen_params else True,
                         "pad_token_id": self.tokenizer.eos_token_id,
                         "repetition_penalty": repetition_penalty,
                         "num_beams": 1  # Explicitly set to 1 to avoid warnings
@@ -924,13 +928,33 @@ class ModelManager:
         vram_required = self.model_config.get("vram", "Unknown") if isinstance(
             self.model_config, dict) else "Unknown"
 
-        # Check environment variables for optimization settings
-        enable_quantization = os.environ.get('LOCALLAB_ENABLE_QUANTIZATION', '').lower() not in ('false', '0', 'none', '')
-        quantization_type = os.environ.get('LOCALLAB_QUANTIZATION_TYPE', '') if enable_quantization else "None"
+        # Get optimization settings from config
+        from .cli.config import get_config_value
+        from .config import ENABLE_QUANTIZATION, QUANTIZATION_TYPE, ENABLE_ATTENTION_SLICING, ENABLE_FLASH_ATTENTION, ENABLE_BETTERTRANSFORMER
+
+        # Get values from config with defaults from constants
+        enable_quantization = get_config_value('enable_quantization', ENABLE_QUANTIZATION)
+        if isinstance(enable_quantization, str):
+            enable_quantization = enable_quantization.lower() not in ('false', '0', 'none', '')
+
+        quantization_type = get_config_value('quantization_type', QUANTIZATION_TYPE) if enable_quantization else "None"
 
         # If quantization is disabled or type is empty, set to "None"
         if not enable_quantization or not quantization_type or quantization_type.lower() in ('none', ''):
             quantization_type = "None"
+
+        # Get other optimization settings
+        enable_attention_slicing = get_config_value('enable_attention_slicing', ENABLE_ATTENTION_SLICING)
+        if isinstance(enable_attention_slicing, str):
+            enable_attention_slicing = enable_attention_slicing.lower() not in ('false', '0', 'none', '')
+
+        enable_flash_attention = get_config_value('enable_flash_attention', ENABLE_FLASH_ATTENTION)
+        if isinstance(enable_flash_attention, str):
+            enable_flash_attention = enable_flash_attention.lower() not in ('false', '0', 'none', '')
+
+        enable_bettertransformer = get_config_value('enable_bettertransformer', ENABLE_BETTERTRANSFORMER)
+        if isinstance(enable_bettertransformer, str):
+            enable_bettertransformer = enable_bettertransformer.lower() not in ('false', '0', 'none', '')
 
         model_info = {
             "model_id": self.current_model,
@@ -944,9 +968,9 @@ class ModelManager:
             "memory_used": f"{memory_used / (1024 * 1024):.2f} MB",
             "quantization": quantization_type,
             "optimizations": {
-                "attention_slicing": os.environ.get('LOCALLAB_ENABLE_ATTENTION_SLICING', '').lower() not in ('false', '0', 'none', ''),
-                "flash_attention": os.environ.get('LOCALLAB_ENABLE_FLASH_ATTENTION', '').lower() not in ('false', '0', 'none', ''),
-                "better_transformer": os.environ.get('LOCALLAB_ENABLE_BETTERTRANSFORMER', '').lower() not in ('false', '0', 'none', '')
+                "attention_slicing": enable_attention_slicing,
+                "flash_attention": enable_flash_attention,
+                "better_transformer": enable_bettertransformer
             }
         }
 
@@ -1020,6 +1044,9 @@ class ModelManager:
 
             # Load tokenizer first
             logger.info(f"Loading tokenizer for custom model {model_name}...")
+            print(f"\n{Fore.GREEN}Downloading custom model: {model_name}{Style.RESET_ALL}")
+            print(f"{Fore.CYAN}This may take a while depending on your internet speed...{Style.RESET_ALL}\n")
+
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
             logger.info(f"Tokenizer loaded successfully")
 
@@ -1031,6 +1058,7 @@ class ModelManager:
                 device_map="auto",
                 quantization_config=quant_config
             )
+            print(f"\n{Fore.GREEN}Custom model {model_name} downloaded successfully!{Style.RESET_ALL}")
             logger.info(f"Model weights loaded successfully")
 
             self.model = self._apply_optimizations(self.model)

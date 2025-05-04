@@ -35,40 +35,37 @@ graph TD
 
 ### Part 1: Setting Up the Server
 
-1. **Get Required Tokens**
+1.  **Get Required Tokens**
 
-   ```python
-   # Get these ready:
-   NGROK_TOKEN = "..."  # from ngrok.com (for remote access)
-   HF_TOKEN = "..."     # from huggingface.co (optional)
-   ```
+    ```python
+    # Get these ready:
+    NGROK_TOKEN = "..."  # from ngrok.com (for remote access)
+    HF_TOKEN = "..."     # from huggingface.co (optional)
+    ```
 
-2. **Install LocalLab Server Package**
+2.  **Install LocalLab Server Package**
 
-   ```python
-   !pip install locallab
-   ```
+    ```python
+    !pip install locallab
+    ```
 
-3. **Configure Environment**
+3.  **Configure Environment**
 
-   ```python
+    #### Method 1: Using CLI (recommended)
 
-   ```
+    ```python
+    !locallab config  # Enable Ngrok and Hugging face and provide tokens.
+    ```
 
-# Method 1: Using CLI (recommended)
+    #### OR Method 2: Using Environment Variables
 
-!locallab config
-// Enable Ngrok and Hugging face and provide tokens.
+    ```python
+    import os
+    os.environ["NGROK_AUTH_TOKEN"] = NGROK_TOKEN
+    os.environ["HUGGINGFACE_TOKEN"] = HF_TOKEN # Optional
+    ```
 
-# OR Method 2: Using Environment Variables
-
-import os
-os.environ["NGROK_AUTH_TOKEN"] = NGROK_TOKEN
-os.environ["HUGGINGFACE_TOKEN"] = HF_TOKEN # Optional
-
-````
-
-4. **Start Server with Ngrok for Remote Access**
+4.  **Start Server with Ngrok for Remote Access**
 
 ```python
 # Method 1: Using CLI (recommended)
@@ -81,7 +78,7 @@ start_server(use_ngrok=True)
 # The server will display a public URL like:
 # 🚀 Ngrok Public URL: https://abc123.ngrok.app
 # COPY THIS URL - you'll need it to connect!
-````
+```
 
 ### Part 2: Connecting with the Client
 

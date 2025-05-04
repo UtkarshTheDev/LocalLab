@@ -235,7 +235,8 @@ class LocalLabClient:
         top_p: float = 0.9,
         timeout: float = 180.0,  # Increased timeout for more complete responses (3 minutes)
         repetition_penalty: float = 1.15,  # Added repetition penalty for better quality
-        top_k: int = 80  # Added top_k parameter for better quality
+        top_k: int = 80,  # Added top_k parameter for better quality
+        do_sample: bool = True  # Added do_sample parameter
     ) -> str:
         """Generate text using the model with improved error handling"""
         # Update activity timestamp
@@ -249,7 +250,8 @@ class LocalLabClient:
             "temperature": temperature,
             "top_p": top_p,
             "repetition_penalty": repetition_penalty,
-            "top_k": top_k
+            "top_k": top_k,
+            "do_sample": do_sample
         }
 
         if stream:
@@ -261,7 +263,8 @@ class LocalLabClient:
                 top_p=top_p,
                 timeout=timeout,
                 repetition_penalty=repetition_penalty,
-                top_k=top_k
+                top_k=top_k,
+                do_sample=do_sample
             )
 
         # Create a timeout for this specific request
@@ -307,7 +310,8 @@ class LocalLabClient:
         timeout: float = 300.0,  # Increased timeout for more complete responses (5 minutes)
         retry_count: int = 3,    # Increased retry count for better reliability
         repetition_penalty: float = 1.15,  # Increased repetition penalty for better quality
-        top_k: int = 80  # Added top_k parameter for better quality
+        top_k: int = 80,  # Added top_k parameter for better quality
+        do_sample: bool = True  # Added do_sample parameter
     ) -> AsyncGenerator[str, None]:
         """
         Stream text generation with token-level streaming and robust error handling.
@@ -341,7 +345,8 @@ class LocalLabClient:
             "temperature": temperature,
             "top_p": top_p,
             "repetition_penalty": repetition_penalty,
-            "top_k": top_k
+            "top_k": top_k,
+            "do_sample": do_sample
         }
 
         # Create a timeout for this specific request

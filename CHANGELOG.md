@@ -2,6 +2,23 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.6.0] - 2024-05-02
+
+### Added
+
+- Added `do_sample` parameter to all generation endpoints in the API
+- Updated API documentation to include the `do_sample` parameter with description and examples
+- Added clear messages before and after model downloads for better user experience
+
+### Fixed
+
+- Fixed model downloading logs to display properly without interleaving
+- Implemented a custom progress bar system for Hugging Face downloads
+- Suppressed regular logs during model downloads to avoid interference with progress bars
+- Enhanced progress bar display with better formatting and descriptions
+- Fixed client error with `do_sample` parameter by adding it to all client methods
+- Updated client package version to 1.0.9 to reflect these fixes
+
 ## [0.5.9] - 2024-05-01
 
 ### Fixed
