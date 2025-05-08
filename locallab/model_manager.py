@@ -264,7 +264,19 @@ class ModelManager:
             # Log model loading start
             logger.info(f"Starting download and loading of model: {model_id}")
             print(f"\n{Fore.GREEN}Downloading model: {model_id}{Style.RESET_ALL}")
-            print(f"{Fore.CYAN}This may take a while depending on your internet speed...{Style.RESET_ALL}\n")
+            print(f"{Fore.CYAN}This may take a while depending on your internet speed...{Style.RESET_ALL}")
+            # Add an empty line to separate from HuggingFace progress bars
+            print("")
+
+            # Set a flag to indicate we're downloading a model
+            # This will help our logger know to let HuggingFace's progress bars through
+            try:
+                # Access the module's global variable
+                import locallab.utils.progress
+                locallab.utils.progress.is_downloading = True
+            except:
+                # Fallback if import fails
+                pass
 
             # Load tokenizer first
             logger.info(f"Loading tokenizer for {model_id}...")
@@ -281,7 +293,19 @@ class ModelManager:
                 token=hf_token if hf_token else None,
                 **quant_config
             )
-            print(f"\n{Fore.GREEN}Model {model_id} downloaded successfully!{Style.RESET_ALL}")
+            # Reset the downloading flag
+            try:
+                # Access the module's global variable
+                import locallab.utils.progress
+                locallab.utils.progress.is_downloading = False
+            except:
+                # Fallback if import fails
+                pass
+
+            # Add an empty line and a clear success message
+            print(f"\n{Fore.GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}✅ Model {model_id} downloaded successfully!{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Style.RESET_ALL}")
             logger.info(f"Model weights loaded successfully")
 
             # Apply additional optimizations
@@ -1045,7 +1069,18 @@ class ModelManager:
             # Load tokenizer first
             logger.info(f"Loading tokenizer for custom model {model_name}...")
             print(f"\n{Fore.GREEN}Downloading custom model: {model_name}{Style.RESET_ALL}")
-            print(f"{Fore.CYAN}This may take a while depending on your internet speed...{Style.RESET_ALL}\n")
+            print(f"{Fore.CYAN}This may take a while depending on your internet speed...{Style.RESET_ALL}")
+            # Add an empty line to separate from HuggingFace progress bars
+            print("")
+
+            # Set a flag to indicate we're downloading a model
+            try:
+                # Access the module's global variable
+                import locallab.utils.progress
+                locallab.utils.progress.is_downloading = True
+            except:
+                # Fallback if import fails
+                pass
 
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
             logger.info(f"Tokenizer loaded successfully")
@@ -1058,7 +1093,19 @@ class ModelManager:
                 device_map="auto",
                 quantization_config=quant_config
             )
-            print(f"\n{Fore.GREEN}Custom model {model_name} downloaded successfully!{Style.RESET_ALL}")
+            # Reset the downloading flag
+            try:
+                # Access the module's global variable
+                import locallab.utils.progress
+                locallab.utils.progress.is_downloading = False
+            except:
+                # Fallback if import fails
+                pass
+
+            # Add an empty line and a clear success message
+            print(f"\n{Fore.GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}✅ Custom model {model_name} downloaded successfully!{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Style.RESET_ALL}")
             logger.info(f"Model weights loaded successfully")
 
             self.model = self._apply_optimizations(self.model)

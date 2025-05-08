@@ -2,14 +2,19 @@
 
 All notable changes to LocalLab will be documented in this file.
 
-## [0.6.2] - 2024-05-03
+## [0.6.2] - 2024-05-04
+
+### Improved
+
+- Improved model downloading experience by using HuggingFace's native progress bars
+- Fixed interleaved progress bars issue during model downloads
+- Added clear success messages after model downloads
 
 ### Fixed
 
 - Fixed CLI configuration issue where optimization settings shown as enabled by default weren't being properly saved
-- Updated default values for all optimization settings (quantization, flash attention, CPU offloading, better transformer) to be enabled by default
+- Updated default values for all optimization settings to be enabled by default
 - Ensured consistency between displayed optimization settings and saved configuration
-- Fixed resource check functions to use correct default values for optimization settings
 
 ## [0.6.1] - 2024-05-02
 

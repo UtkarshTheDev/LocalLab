@@ -109,13 +109,37 @@ class SubduedColoredFormatter(logging.Formatter):
     """Formatter that adds subdued colors to regular logs and bright colors to important logs"""
 
     def format(self, record):
+        # Check if this is a HuggingFace Hub progress bar log
+        # HuggingFace progress bars use tqdm which writes directly to stdout/stderr
+        # We need to completely bypass our logger for these messages
+
         # Check if we're currently downloading a model
         try:
             from ..utils.progress import is_model_downloading
-            if is_model_downloading():
-                # During model download, only show critical logs
-                if record.levelno < logging.ERROR:
-                    # Skip non-critical logs during model download
+
+            # Check if this is a HuggingFace progress bar log
+            is_hf_progress_log = False
+            if hasattr(record, 'name') and isinstance(record.name, str):
+                # HuggingFace Hub logs typically come from these modules
+                hf_modules = ['huggingface_hub', 'filelock', 'transformers', 'tqdm']
+                is_hf_progress_log = any(module in record.name for module in hf_modules)
+
+            # If we're downloading a model and this is a HuggingFace log, skip our formatting
+            if is_model_downloading() and is_hf_progress_log:
+                # Return empty string to skip this log in our logger
+                # HuggingFace will handle displaying its own progress bars
+                return ""
+
+            # For non-HuggingFace logs during model download, only show critical and model-related logs
+            elif is_model_downloading() and record.levelno < logging.ERROR:
+                # Check if this is a model-related log that should be shown
+                is_model_log = False
+                if hasattr(record, 'msg') and isinstance(record.msg, str):
+                    model_patterns = ['model', 'download', 'tokenizer', 'weight']
+                    is_model_log = any(pattern in record.msg.lower() for pattern in model_patterns)
+
+                # Skip non-critical and non-model logs during model download
+                if not is_model_log:
                     return ""
         except (ImportError, AttributeError):
             # If we can't import the function, continue as normal

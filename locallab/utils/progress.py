@@ -155,32 +155,61 @@ def custom_progress_callback(
         pbar.close()
 
 def configure_hf_hub_progress():
-    """Configure HuggingFace Hub to use our custom progress callback"""
+    """
+    Configure HuggingFace Hub to use its native progress bars for model downloads.
+    This completely bypasses our custom logger for HuggingFace download progress.
+    """
     try:
+        # 1. Enable HuggingFace's native progress bars
+        from huggingface_hub.utils import logging as hf_logging
+        hf_logging.enable_progress_bars()
+
+        # 2. Enable HF Transfer for better download experience
         from huggingface_hub import constants
+        constants.HF_HUB_ENABLE_HF_TRANSFER = True
 
-        # Disable HF Transfer (which uses a different progress reporting mechanism)
-        constants.HF_HUB_ENABLE_HF_TRANSFER = False
-
-        # Configure the download progress callback
+        # 3. Make sure we're NOT overriding HuggingFace's progress callback
+        # This is critical - we want to use their native implementation
         from huggingface_hub import file_download
-        file_download._tqdm_callback = custom_progress_callback
+        if hasattr(file_download, "_tqdm_callback") and file_download._tqdm_callback == custom_progress_callback:
+            # Reset to default if we previously set it to our custom callback
+            file_download._tqdm_callback = None
 
-        # Disable default progress bars
-        try:
-            # Try to disable the default tqdm in huggingface_hub
-            from huggingface_hub.utils import logging as hf_logging
-            hf_logging.disable_progress_bars()
-        except:
-            pass
+        # 4. Set a flag to indicate we're using HuggingFace's native progress bars
+        global is_downloading
+        is_downloading = True
 
-        logger.debug("Configured HuggingFace Hub to use custom progress callback")
+        logger.debug("Configured HuggingFace Hub to use its native progress bars")
     except ImportError:
-        logger.warning("Failed to configure HuggingFace Hub progress callback")
+        logger.warning("Failed to configure HuggingFace Hub progress bars")
     except Exception as e:
-        logger.warning(f"Error configuring HuggingFace Hub progress callback: {str(e)}")
+        logger.warning(f"Error configuring HuggingFace Hub progress: {str(e)}")
 
 # Function to check if we're currently downloading
 def is_model_downloading():
-    """Check if a model is currently being downloaded"""
-    return is_downloading
+    """
+    Check if a model is currently being downloaded.
+
+    This function now checks for active HuggingFace downloads by looking
+    for tqdm progress bars in sys.stdout that contain model file patterns.
+    """
+    # First check our global flag
+    if is_downloading:
+        return True
+
+    # Also check if there are any active HuggingFace downloads
+    # by looking for specific patterns in the output
+    try:
+        # Check if there are any tqdm instances in sys.stdout
+        if hasattr(sys.stdout, '_instances') and sys.stdout._instances:
+            for instance in sys.stdout._instances:
+                if hasattr(instance, 'desc') and isinstance(instance.desc, str):
+                    # Look for common model file patterns in the description
+                    if any(pattern in instance.desc.lower() for pattern in
+                          ['model', 'weight', 'safetensors', 'bin', 'pytorch_model']):
+                        return True
+    except:
+        # If anything goes wrong with the check, default to False
+        pass
+
+    return False
