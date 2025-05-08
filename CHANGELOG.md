@@ -2,6 +2,21 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.6.2] - 2024-05-03
+
+### Fixed
+
+- Fixed CLI configuration issue where optimization settings shown as enabled by default weren't being properly saved
+- Updated default values for all optimization settings (quantization, flash attention, CPU offloading, better transformer) to be enabled by default
+- Ensured consistency between displayed optimization settings and saved configuration
+- Fixed resource check functions to use correct default values for optimization settings
+
+## [0.6.1] - 2024-05-02
+
+### Fixed
+
+- Fixed CLI config environment variable issue
+
 ## [0.6.0] - 2024-05-02
 
 ### Added

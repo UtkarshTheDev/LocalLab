@@ -209,12 +209,12 @@ def print_model_info():
                 model_id = get_env_var("HUGGINGFACE_MODEL") or get_env_var("LOCALLAB_MODEL_ID") or "microsoft/phi-2"
 
             # Get optimization settings
-            enable_quantization = get_env_var("LOCALLAB_ENABLE_QUANTIZATION", default="false").lower() == "true"
+            enable_quantization = get_env_var("LOCALLAB_ENABLE_QUANTIZATION", default="true").lower() == "true"
             quantization_type = get_env_var("LOCALLAB_QUANTIZATION_TYPE", default="int8")
-            enable_attention_slicing = get_env_var("LOCALLAB_ENABLE_ATTENTION_SLICING", default="false").lower() == "true"
-            enable_flash_attention = get_env_var("LOCALLAB_ENABLE_FLASH_ATTENTION", default="false").lower() == "true"
-            enable_better_transformer = get_env_var("LOCALLAB_ENABLE_BETTERTRANSFORMER", default="false").lower() == "true"
-            enable_cpu_offloading = get_env_var("LOCALLAB_ENABLE_CPU_OFFLOADING", default="false").lower() == "true"
+            enable_attention_slicing = get_env_var("LOCALLAB_ENABLE_ATTENTION_SLICING", default="true").lower() == "true"
+            enable_flash_attention = get_env_var("LOCALLAB_ENABLE_FLASH_ATTENTION", default="true").lower() == "true"
+            enable_better_transformer = get_env_var("LOCALLAB_ENABLE_BETTERTRANSFORMER", default="true").lower() == "true"
+            enable_cpu_offloading = get_env_var("LOCALLAB_ENABLE_CPU_OFFLOADING", default="true").lower() == "true"
 
             # Format model information
             model_info = f"""

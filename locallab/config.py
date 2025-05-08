@@ -106,16 +106,16 @@ DEFAULT_MAX_TIME = get_env_var("DEFAULT_MAX_TIME", default=120.0, var_type=float
 
 # Optimization settings
 ENABLE_QUANTIZATION = get_env_var(
-    "ENABLE_QUANTIZATION", default="false", var_type=bool)
+    "ENABLE_QUANTIZATION", default="true", var_type=bool)
 QUANTIZATION_TYPE = get_env_var("QUANTIZATION_TYPE", default="int8")
 ENABLE_FLASH_ATTENTION = get_env_var(
-    "ENABLE_FLASH_ATTENTION", default="false", var_type=bool)
+    "ENABLE_FLASH_ATTENTION", default="true", var_type=bool)
 ENABLE_ATTENTION_SLICING = get_env_var(
     "ENABLE_ATTENTION_SLICING", default="true", var_type=bool)
 ENABLE_CPU_OFFLOADING = get_env_var(
-    "ENABLE_CPU_OFFLOADING", default="false", var_type=bool)
+    "ENABLE_CPU_OFFLOADING", default="true", var_type=bool)
 ENABLE_BETTERTRANSFORMER = get_env_var(
-    "ENABLE_BETTERTRANSFORMER", default="false", var_type=bool)
+    "ENABLE_BETTERTRANSFORMER", default="true", var_type=bool)
 
 # Resource management
 UNLOAD_UNUSED_MODELS = get_env_var(
@@ -164,13 +164,13 @@ def can_run_model(model_id: str) -> bool:
     available_ram = (psutil.virtual_memory().available / (1024 ** 3)) * 0.8  # 80% of available RAM in GB
 
     # Adjust requirements based on optimizations
-    if get_env_var("LOCALLAB_ENABLE_QUANTIZATION", default=False, var_type=bool):
+    if get_env_var("LOCALLAB_ENABLE_QUANTIZATION", default=True, var_type=bool):
         # Quantization reduces memory usage
         requirements["min_ram"] *= 0.5
         if "min_vram" in requirements:
             requirements["min_vram"] *= 0.5
 
-    if get_env_var("LOCALLAB_ENABLE_CPU_OFFLOADING", default=False, var_type=bool):
+    if get_env_var("LOCALLAB_ENABLE_CPU_OFFLOADING", default=True, var_type=bool):
         # CPU offloading allows running with less RAM
         requirements["min_ram"] *= 0.7
 
