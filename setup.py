@@ -47,7 +47,7 @@ else:
 
 setup(
     name="locallab",
-    version="0.6.5",
+    version="0.6.6",
     packages=find_packages(include=["locallab", "locallab.*"]),
     install_requires=install_requires,
     extras_require={

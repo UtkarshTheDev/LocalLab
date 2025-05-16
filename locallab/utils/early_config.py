@@ -87,9 +87,24 @@ def enable_hf_progress_bars():
     # Configure huggingface_hub
     try:
         import huggingface_hub
-        # The correct way to enable progress bars in huggingface_hub
-        from huggingface_hub.utils import logging as hf_logging
-        hf_logging.enable_progress_bars()
+
+        # Different versions of huggingface_hub have different ways to enable progress bars
+        # Try multiple approaches to ensure compatibility
+
+        # Method 1: Try direct module function (newer versions)
+        if hasattr(huggingface_hub, "enable_progress_bars"):
+            huggingface_hub.enable_progress_bars()
+
+        # Method 2: Try through utils.logging (some versions)
+        try:
+            from huggingface_hub.utils import logging as hf_logging
+            if hasattr(hf_logging, "enable_progress_bars"):
+                hf_logging.enable_progress_bars()
+        except (ImportError, AttributeError):
+            pass
+
+        # Method 3: Set environment variable (works for all versions)
+        os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "0"
 
         # Also enable HF Transfer for better download experience
         if hasattr(huggingface_hub, "constants"):
@@ -100,13 +115,57 @@ def enable_hf_progress_bars():
     # Configure transformers
     try:
         import transformers
-        transformers.utils.logging.enable_progress_bar()
-        transformers.logging.set_verbosity_warning()
+
+        # Different versions of transformers have different ways to enable progress bars
+        # Try multiple approaches to ensure compatibility
+
+        # Method 1: Try through utils.logging (newer versions)
+        try:
+            if hasattr(transformers.utils.logging, "enable_progress_bar"):
+                transformers.utils.logging.enable_progress_bar()
+        except (ImportError, AttributeError):
+            pass
+
+        # Method 2: Try direct module function (some versions)
+        if hasattr(transformers, "enable_progress_bars"):
+            transformers.enable_progress_bars()
+
+        # Method 3: Set environment variable (works for all versions)
+        os.environ["TRANSFORMERS_VERBOSITY"] = "warning"
+        os.environ["TRANSFORMERS_NO_PROGRESS_BAR"] = "0"
+
+        # Set verbosity level if available
+        if hasattr(transformers, "logging") and hasattr(transformers.logging, "set_verbosity_warning"):
+            transformers.logging.set_verbosity_warning()
     except ImportError:
         pass
 
 # Alias for backward compatibility
 configure_hf_progress_bars = enable_hf_progress_bars
 
-# Export the configure_hf_logging function for use in __init__.py
+# Function to configure Hugging Face logging
+def configure_hf_logging():
+    """
+    Configure Hugging Face logging.
+    This function is called from __init__.py to set up logging early.
+    """
+    # Configure logging for Hugging Face libraries
+    for logger_name in ["transformers", "huggingface_hub", "accelerate", "tqdm", "filelock"]:
+        hf_logger = logging.getLogger(logger_name)
+        hf_logger.setLevel(logging.WARNING)  # Only show warnings and errors
+        hf_logger.propagate = False  # Don't propagate to parent loggers
+
+        # Remove any existing handlers
+        for handler in hf_logger.handlers[:]:
+            hf_logger.removeHandler(handler)
+
+        # Add a null handler to prevent warnings about no handlers
+        hf_logger.addHandler(logging.NullHandler())
+
+    # Set environment variables for better compatibility
+    os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "0"  # Enable progress bars
+    os.environ["TRANSFORMERS_VERBOSITY"] = "warning"  # Set verbosity level
+    os.environ["TRANSFORMERS_NO_PROGRESS_BAR"] = "0"  # Enable progress bars
+
+# Export functions for use in other modules
 __all__ = ["enable_hf_progress_bars", "configure_hf_progress_bars", "configure_hf_logging", "StdoutRedirector"]

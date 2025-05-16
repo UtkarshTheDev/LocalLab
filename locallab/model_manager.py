@@ -278,6 +278,9 @@ class ModelManager:
             print(f"\n{Fore.CYAN}Starting model download - native progress bars will appear below{Style.RESET_ALL}\n")
 
             # Enable Hugging Face progress bars again to ensure they're properly configured
+            # Set environment variables directly for maximum compatibility
+            os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "0"
+            os.environ["TRANSFORMERS_NO_PROGRESS_BAR"] = "0"
             configure_hf_progress_bars()
 
             # Use a context manager to ensure proper display of Hugging Face progress bars
@@ -1093,6 +1096,9 @@ class ModelManager:
             print(f"\n{Fore.CYAN}Starting custom model download - native progress bars will appear below{Style.RESET_ALL}\n")
 
             # Enable Hugging Face progress bars again to ensure they're properly configured
+            # Set environment variables directly for maximum compatibility
+            os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "0"
+            os.environ["TRANSFORMERS_NO_PROGRESS_BAR"] = "0"
             configure_hf_progress_bars()
 
             # Use a context manager to ensure proper display of Hugging Face progress bars
