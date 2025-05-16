@@ -2,6 +2,39 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.7.0] - 2025-05-16
+
+### Improved
+
+- Significantly enhanced stream generation quality with comprehensive improvements:
+
+  - Improved token generation parameters for higher quality responses
+  - Enhanced stop sequence detection with better conversation markers handling
+  - Implemented more intelligent repetition detection to prevent loops
+  - Optimized token buffering and yielding logic for smoother streaming
+  - Added better error handling and recovery in streaming responses
+
+- Improved non-streaming generation quality across all endpoints:
+
+  - Enhanced generate, chat, and batch generation methods with optimized parameters
+  - Implemented repetition detection to prevent the model from getting stuck
+  - Added comprehensive special token handling and cleanup
+  - Improved conversation marker detection for better response termination
+  - Balanced parameters between quality and speed for optimal performance
+
+- Optimized memory management:
+  - Reduced frequency of memory checks to avoid interrupting generation
+  - Implemented smarter memory threshold for cache clearing
+  - Added better error recovery for out-of-memory situations
+
+### Changed
+
+- Increased default max_length from 2048 to 4096 for non-streaming generation
+- Increased token generation batch size from 4 to 8 for better efficiency
+- Adjusted top_k (80), top_p (0.92), and repetition_penalty (1.15) for better quality
+- Increased max_time parameter to 180 seconds for more complete responses
+- Enhanced all generation endpoints with consistent high-quality parameters
+
 ## [0.6.6] - 2025-05-16
 
 ### Fixed
