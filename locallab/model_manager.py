@@ -1,8 +1,11 @@
+# Import early configuration module first to set up logging and environment variables
+# This ensures Hugging Face's progress bars are displayed correctly
+from .utils.early_config import enable_hf_progress_bars, StdoutRedirector
+
 from .config import HF_TOKEN_ENV, get_env_var, set_env_var
 import os
 import logging
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from typing import Optional, Generator, Dict, Any, List, Union, Callable, AsyncGenerator
 from fastapi import HTTPException
 import time
@@ -13,7 +16,6 @@ from .config import (
 )
 from .logger.logger import logger, log_model_loaded, log_model_unloaded
 from .utils import check_resource_availability, get_device, format_model_size
-from .utils.progress import configure_hf_hub_progress
 import gc
 from colorama import Fore, Style
 import asyncio
@@ -22,20 +24,12 @@ import zipfile
 import tempfile
 import json
 
-# Configure HuggingFace Hub progress bars to use native display
+# Enable Hugging Face progress bars with native display
 # This ensures we see the visually appealing progress bars from HuggingFace
-configure_hf_hub_progress()
+enable_hf_progress_bars()
 
-# Also configure transformers to use HuggingFace Hub's progress bars
-try:
-    import transformers
-    transformers.utils.logging.enable_progress_bar()
-    # Set transformers logging to only show warnings and errors
-    transformers.logging.set_verbosity_warning()
-except ImportError:
-    logger.debug("Could not configure transformers progress bars")
-except Exception as e:
-    logger.debug(f"Error configuring transformers progress bars: {str(e)}")
+# Import transformers after configuring logging to ensure proper display
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 
 QUANTIZATION_SETTINGS = {
     "fp16": {
@@ -280,52 +274,41 @@ class ModelManager:
             # Add an empty line to separate from HuggingFace progress bars
             print("")
 
-            # Set a flag to indicate we're downloading a model
-            # This will help our logger know to let HuggingFace's progress bars through
-            try:
-                # Access the module's global variable
-                import locallab.utils.progress
-                locallab.utils.progress.is_downloading = True
-
-                # Ensure HuggingFace Hub's progress bars are enabled
-                from huggingface_hub.utils import logging as hf_logging
-                hf_logging.enable_progress_bars()
-
-                # Configure transformers to use progress bars
-                import transformers
-                transformers.utils.logging.enable_progress_bar()
-
-                # Also ensure tqdm is properly configured for nice display
-                import tqdm
-                tqdm.tqdm.monitor_interval = 0  # Disable monitor thread which can cause issues
-
-                # Temporarily disable our custom logger for HuggingFace logs
-                import logging
-                for logger_name in ['tqdm', 'huggingface_hub', 'transformers', 'filelock']:
-                    logging.getLogger(logger_name).handlers = []  # Remove any handlers
-                    logging.getLogger(logger_name).propagate = False  # Don't propagate to parent loggers
-            except:
-                # Fallback if import fails
-                pass
-
             # Add an empty line before progress bars start
-            print("\n")
+            print(f"\n{Fore.CYAN}Starting model download - native progress bars will appear below{Style.RESET_ALL}\n")
 
-            # Load tokenizer first
-            logger.info(f"Loading tokenizer for {model_id}...")
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                model_id,
-                token=hf_token if hf_token else None
-            )
-            logger.info(f"Tokenizer loaded successfully")
+            # Enable Hugging Face progress bars again to ensure they're properly configured
+            enable_hf_progress_bars()
 
-            # Load model with optimizations
-            logger.info(f"Loading model weights for {model_id}...")
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_id,
-                token=hf_token if hf_token else None,
-                **quant_config
-            )
+            # Use a context manager to ensure proper display of Hugging Face progress bars
+            with StdoutRedirector(disable_logging=True):
+                # Load tokenizer first
+                logger.info(f"Loading tokenizer for {model_id}...")
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    model_id,
+                    token=hf_token if hf_token else None
+                )
+                logger.info(f"Tokenizer loaded successfully")
+
+                # Load model with optimizations
+                logger.info(f"Loading model weights for {model_id}...")
+
+                # This is the critical part where we want to see nice progress bars
+                # We'll temporarily disable our logger's handlers to prevent interference
+                root_logger = logging.getLogger()
+                original_handlers = root_logger.handlers.copy()
+                root_logger.handlers = []
+
+                try:
+                    # Load the model with Hugging Face's native progress bars
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        model_id,
+                        token=hf_token if hf_token else None,
+                        **quant_config
+                    )
+                finally:
+                    # Restore our logger's handlers
+                    root_logger.handlers = original_handlers
             # Reset the downloading flag
             try:
                 # Access the module's global variable
@@ -1106,47 +1089,41 @@ class ModelManager:
             # Add an empty line to separate from HuggingFace progress bars
             print("")
 
-            # Set a flag to indicate we're downloading a model
-            try:
-                # Access the module's global variable
-                import locallab.utils.progress
-                locallab.utils.progress.is_downloading = True
-
-                # Ensure HuggingFace Hub's progress bars are enabled
-                from huggingface_hub.utils import logging as hf_logging
-                hf_logging.enable_progress_bars()
-
-                # Configure transformers to use progress bars
-                import transformers
-                transformers.utils.logging.enable_progress_bar()
-
-                # Also ensure tqdm is properly configured for nice display
-                import tqdm
-                tqdm.tqdm.monitor_interval = 0  # Disable monitor thread which can cause issues
-
-                # Temporarily disable our custom logger for HuggingFace logs
-                import logging
-                for logger_name in ['tqdm', 'huggingface_hub', 'transformers', 'filelock']:
-                    logging.getLogger(logger_name).handlers = []  # Remove any handlers
-                    logging.getLogger(logger_name).propagate = False  # Don't propagate to parent loggers
-            except:
-                # Fallback if import fails
-                pass
-
             # Add an empty line before progress bars start
-            print("\n")
+            print(f"\n{Fore.CYAN}Starting custom model download - native progress bars will appear below{Style.RESET_ALL}\n")
 
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            logger.info(f"Tokenizer loaded successfully")
+            # Enable Hugging Face progress bars again to ensure they're properly configured
+            enable_hf_progress_bars()
 
-            # Load model with optimizations
-            logger.info(f"Loading model weights for custom model {model_name}...")
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_name,
-                torch_dtype=torch.float16,
-                device_map="auto",
-                quantization_config=quant_config
-            )
+            # Use a context manager to ensure proper display of Hugging Face progress bars
+            with StdoutRedirector(disable_logging=True):
+                # Load tokenizer first
+                logger.info(f"Loading tokenizer for custom model {model_name}...")
+
+                # This is the critical part where we want to see nice progress bars
+                # We'll temporarily disable our logger's handlers to prevent interference
+                root_logger = logging.getLogger()
+                original_handlers = root_logger.handlers.copy()
+                root_logger.handlers = []
+
+                try:
+                    # Load tokenizer with Hugging Face's native progress bars
+                    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                    logger.info(f"Tokenizer loaded successfully")
+
+                    # Load model with optimizations
+                    logger.info(f"Loading model weights for custom model {model_name}...")
+
+                    # Load the model with Hugging Face's native progress bars
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        model_name,
+                        torch_dtype=torch.float16,
+                        device_map="auto",
+                        quantization_config=quant_config
+                    )
+                finally:
+                    # Restore our logger's handlers
+                    root_logger.handlers = original_handlers
             # Reset the downloading flag
             try:
                 # Access the module's global variable

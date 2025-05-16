@@ -2,6 +2,20 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.6.4] - 2025-05-16
+
+### Improved
+
+- Completely redesigned model downloading experience with proper native Hugging Face progress bars
+- Created new early configuration system to set up logging before any Hugging Face libraries are imported
+- Implemented StdoutRedirector to ensure proper display of progress bars during model downloads
+- Temporarily disabled all logging handlers during model downloads to prevent interference
+- Added clear visual separation between LocalLab logs and Hugging Face progress bars
+- Set environment variables to optimize Hugging Face download experience
+- Configured transformers library to use native progress bars for model downloads
+- Added informative messages before and after model downloads for better user experience
+- Ensured consistent progress bar display across different model types and sizes
+
 ## [0.6.3] - 2025-05-16
 
 ### Improved
@@ -12,9 +26,6 @@ All notable changes to LocalLab will be documented in this file.
 - Improved configuration of Hugging Face Hub progress bars for better visual experience
 - Completely bypassed custom logging for Hugging Face download-related logs
 - Configured transformers library to use native progress bars for model downloads
-- Disabled logger propagation for HuggingFace-related modules during downloads
-- Added proper spacing before and after progress bars for better readability
-- Enhanced progress bar detection to catch all download-related progress indicators
 
 ## [0.6.2] - 2025-05-04
 
