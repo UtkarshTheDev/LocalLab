@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Dict, List, Any, Optional, Generator, Tuple, AsyncGenerator
 import json
+import re
 
 from ..logger import get_logger
 from ..logger.logger import get_request_count
@@ -156,8 +157,23 @@ async def generate_text(request: GenerationRequest) -> GenerationResponse:
             **generation_params
         )
 
+        # Additional cleanup for any special tokens that might have slipped through
+        import re
+        special_token_pattern = r'<\|[a-zA-Z0-9_]+\|>'
+        cleaned_text = re.sub(special_token_pattern, '', generated_text)
+
+        # Check for conversation markers and truncate if found
+        conversation_end_markers = ["</|assistant|>", "<|user|>", "<|human|>", "<|reserved_special_token"]
+        for end_marker in conversation_end_markers:
+            if end_marker in cleaned_text:
+                # Remove the end marker and everything after it
+                marker_pos = cleaned_text.find(end_marker)
+                if marker_pos > 0:
+                    cleaned_text = cleaned_text[:marker_pos]
+                break
+
         return GenerationResponse(
-            text=generated_text,
+            text=cleaned_text,
             model=model_manager.current_model
         )
     except Exception as e:
@@ -206,12 +222,27 @@ async def chat_completion(request: ChatRequest) -> ChatResponse:
             **generation_params
         )
 
-        # Format response
+        # Additional cleanup for any special tokens that might have slipped through
+        import re
+        special_token_pattern = r'<\|[a-zA-Z0-9_]+\|>'
+        cleaned_text = re.sub(special_token_pattern, '', generated_text)
+
+        # Check for conversation markers and truncate if found
+        conversation_end_markers = ["</|assistant|>", "<|user|>", "<|human|>", "<|reserved_special_token"]
+        for end_marker in conversation_end_markers:
+            if end_marker in cleaned_text:
+                # Remove the end marker and everything after it
+                marker_pos = cleaned_text.find(end_marker)
+                if marker_pos > 0:
+                    cleaned_text = cleaned_text[:marker_pos]
+                break
+
+        # Format response with cleaned text
         return ChatResponse(
             choices=[{
                 "message": {
                     "role": "assistant",
-                    "content": generated_text
+                    "content": cleaned_text
                 },
                 "index": 0,
                 "finish_reason": "stop"
@@ -231,35 +262,58 @@ async def generate_stream(
 ) -> AsyncGenerator[str, None]:
     """
     Generate text in a streaming fashion and return as server-sent events
+    with optimized parameters for high-quality responses
     """
     try:
         # Get model-specific generation parameters
         model_params = get_model_generation_params(model_manager.current_model)
 
-        # Update with request parameters
+        # Update with request parameters and optimized defaults for high-quality streaming
         generation_params = {
             "max_new_tokens": max_tokens,
             "temperature": temperature,
             "top_p": top_p,
-            "top_k": 80,  # Default top_k for streaming
-            "repetition_penalty": 1.15,  # Default repetition_penalty for streaming
+            "top_k": 80,  # Optimized top_k for high-quality streaming
+            "repetition_penalty": 1.15,  # Optimized repetition_penalty for high-quality streaming
             "do_sample": model_params.get("do_sample", True)  # Pass do_sample from model params
         }
 
         # Merge model-specific params with request params
+        # This ensures we get the best of both worlds - model-specific optimizations
+        # and our high-quality streaming parameters
         generation_params.update(model_params)
 
-        # Get the stream generator
+        # Get the stream generator with optimized parameters
         stream_generator = model_manager.generate_stream(
             prompt=prompt,
             system_prompt=system_prompt,
             **generation_params
         )
 
-        # Stream tokens
+        # Stream tokens with proper SSE formatting and special token handling
         async for token in stream_generator:
+            # Check for error messages
+            if token.startswith("\nError:"):
+                # Format error as SSE event
+                error_msg = token.replace("\n", "\\n")
+                yield f"data: [ERROR] {error_msg}\n\n"
+                break
+
+            # Clean any special tokens that might have slipped through
+            cleaned_token = token
+
+            # Remove any special tokens using regex pattern
+            special_token_pattern = r'<\|[a-zA-Z0-9_]+\|>'
+            import re
+            cleaned_token = re.sub(special_token_pattern, '', cleaned_token)
+
+            # Skip if token is empty after cleaning
+            if not cleaned_token or cleaned_token.isspace():
+                continue
+
             # Format as server-sent event
-            data = token.replace("\n", "\\n")
+            # Replace newlines with escaped newlines for proper SSE format
+            data = cleaned_token.replace("\n", "\\n")
             yield f"data: {data}\n\n"
 
         # End of stream
@@ -277,33 +331,54 @@ async def stream_chat(
 ) -> AsyncGenerator[str, None]:
     """
     Stream chat completion responses as server-sent events
+    with optimized parameters for high-quality responses
     """
     try:
         # Get model-specific generation parameters
         model_params = get_model_generation_params(model_manager.current_model)
 
-        # Update with request parameters
+        # Update with request parameters and optimized defaults for high-quality streaming
         generation_params = {
             "max_new_tokens": max_tokens,
             "temperature": temperature,
             "top_p": top_p,
-            "top_k": 80,  # Default top_k for streaming
-            "repetition_penalty": 1.15,  # Default repetition_penalty for streaming
+            "top_k": 80,  # Optimized top_k for high-quality streaming
+            "repetition_penalty": 1.15,  # Optimized repetition_penalty for high-quality streaming
             "do_sample": model_params.get("do_sample", True)  # Pass do_sample from model params
         }
 
         # Merge model-specific params with request params
+        # This ensures we get the best of both worlds - model-specific optimizations
+        # and our high-quality streaming parameters
         generation_params.update(model_params)
 
-        # Generate streaming tokens - properly await the async generator
+        # Generate streaming tokens with optimized parameters
         stream_generator = model_manager.generate_stream(
             prompt=formatted_prompt,
             **generation_params
         )
 
-        # Stream raw tokens without any formatting
+        # Stream tokens with special token handling
         async for token in stream_generator:
-            yield token
+            # Check for error messages and pass them through
+            if token.startswith("\nError:"):
+                yield token
+                break
+
+            # Clean any special tokens that might have slipped through
+            cleaned_token = token
+
+            # Remove any special tokens using regex pattern
+            special_token_pattern = r'<\|[a-zA-Z0-9_]+\|>'
+            import re
+            cleaned_token = re.sub(special_token_pattern, '', cleaned_token)
+
+            # Skip if token is empty after cleaning
+            if not cleaned_token or cleaned_token.isspace():
+                continue
+
+            # Stream cleaned tokens
+            yield cleaned_token
     except Exception as e:
         logger.error(f"Streaming generation failed: {str(e)}")
         # Return error as plain text
@@ -342,7 +417,23 @@ async def batch_generate(request: BatchGenerationRequest) -> BatchGenerationResp
                 system_prompt=request.system_prompt,
                 **generation_params
             )
-            responses.append(generated_text)
+
+            # Additional cleanup for any special tokens that might have slipped through
+            import re
+            special_token_pattern = r'<\|[a-zA-Z0-9_]+\|>'
+            cleaned_text = re.sub(special_token_pattern, '', generated_text)
+
+            # Check for conversation markers and truncate if found
+            conversation_end_markers = ["</|assistant|>", "<|user|>", "<|human|>", "<|reserved_special_token"]
+            for end_marker in conversation_end_markers:
+                if end_marker in cleaned_text:
+                    # Remove the end marker and everything after it
+                    marker_pos = cleaned_text.find(end_marker)
+                    if marker_pos > 0:
+                        cleaned_text = cleaned_text[:marker_pos]
+                    break
+
+            responses.append(cleaned_text)
 
         return BatchGenerationResponse(responses=responses)
     except Exception as e:

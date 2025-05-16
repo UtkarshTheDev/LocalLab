@@ -557,7 +557,29 @@ class ModelManager:
             response = self.tokenizer.decode(
                 outputs[0][len(inputs["input_ids"][0]):], skip_special_tokens=True)
 
-            # Cache the response if we have a cache key
+            # Clean up response by removing conversation markers and everything after them
+            conversation_end_markers = ["</|assistant|>", "<|user|>", "<|human|>", "<|reserved_special_token"]
+            for end_marker in conversation_end_markers:
+                if end_marker in response:
+                    logger.info(f"Conversation end marker '{end_marker}' detected in response, truncating")
+                    # Remove the end marker and everything after it
+                    marker_pos = response.find(end_marker)
+                    if marker_pos > 0:
+                        response = response[:marker_pos]
+                    break
+
+            # Additional cleanup for any remaining special tokens
+            special_tokens = ["<|", "|>"]
+            for token in special_tokens:
+                if token in response:
+                    # Check if it's part of a special token pattern
+                    pattern = r'<\|[a-zA-Z0-9_]+\|>'
+                    matches = re.finditer(pattern, response)
+                    for match in matches:
+                        # Replace the special token with empty string
+                        response = response.replace(match.group(0), "")
+
+            # Cache the cleaned response if we have a cache key
             if cache_key:
                 self.response_cache[cache_key] = response
                 # Limit cache size to prevent memory issues
@@ -582,7 +604,7 @@ class ModelManager:
         top_p: float = None,
         gen_params: Optional[Dict[str, Any]] = None
     ) -> Generator[str, None, None]:
-        """Stream generate text from the model with optimizations for low-resource computers"""
+        """Stream generate text from the model with optimizations for high-quality responses"""
         try:
             # If gen_params is provided, use it instead of individual parameters
             if gen_params is not None:
@@ -590,21 +612,21 @@ class ModelManager:
                 temperature = gen_params.get(
                     "temperature", DEFAULT_TEMPERATURE)
                 top_p = gen_params.get("top_p", DEFAULT_TOP_P)
-                top_k = gen_params.get("top_k", 40)  # Default to 40 for better quality
-                repetition_penalty = gen_params.get("repetition_penalty", 1.1)
+                top_k = gen_params.get("top_k", 80)  # Increased from 40 to 80 for better quality
+                repetition_penalty = gen_params.get("repetition_penalty", 1.15)  # Increased from 1.1 to 1.15
             else:
                 # Use provided individual parameters or defaults
                 max_length = max_length or DEFAULT_MAX_LENGTH  # Use the full default max length
                 temperature = temperature or 0.7  # Use same temperature as non-streaming
                 top_p = top_p or DEFAULT_TOP_P
-                top_k = 40  # Default to 40 for better quality
-                repetition_penalty = 1.1
+                top_k = 80  # Increased from 40 to 80 for better quality
+                repetition_penalty = 1.15  # Increased from 1.1 to 1.15
 
-            # For low-resource computers, we'll use a reasonable max_length
+            # For balanced performance and quality, use a reasonable max_length
             # but not limit it too much to ensure complete responses
-            if max_length > 1024:
-                logger.info(f"Limiting max_length from {max_length} to 1024 for better performance")
-                max_length = 1024
+            if max_length > 2048:
+                logger.info(f"Limiting max_length from {max_length} to 2048 for better performance while maintaining quality")
+                max_length = 2048
 
             # Get the actual device of the model
             model_device = next(self.model.parameters()).device
@@ -614,21 +636,24 @@ class ModelManager:
                 if inputs[key].device != model_device:
                     inputs[key] = inputs[key].to(model_device)
 
-            # For low-resource computers, generate tokens in small batches
-            # This is more memory-efficient and prevents OOM errors
-            # but still allows for faster generation than one token at a time
-            tokens_to_generate_per_step = 4  # Generate 4 tokens at a time for better efficiency
+            # Generate tokens in larger batches for better quality and efficiency
+            # This balances memory usage with generation quality
+            tokens_to_generate_per_step = 8  # Increased from 4 to 8 for better quality and efficiency
 
             # Track generated text for quality control
             generated_text = ""
 
-            # Define stop sequences for proper termination - only use definitive end markers
-            # Removed <|assistant|> and <|user|> as they might appear in valid responses
-            stop_sequences = ["</s>", "<|endoftext|>", "<|im_end|>"]
+            # Define comprehensive stop sequences for proper termination
+            # Include all common end markers used by different models
+            stop_sequences = [
+                "</s>", "<|endoftext|>", "<|im_end|>",
+                "<eos>", "<end>", "<|end|>", "<|EOS|>",
+                "###", "Assistant:", "Human:", "User:"
+            ]
 
-            # Memory monitoring variables
+            # Memory monitoring variables - reduced frequency to avoid interrupting generation
             last_memory_check = time.time()
-            memory_check_interval = 5.0  # Check memory less frequently (every 5 seconds)
+            memory_check_interval = 10.0  # Increased from 5.0 to 10.0 seconds to reduce interruptions
 
             # Get input IDs and attention mask
             input_ids = inputs["input_ids"]
@@ -643,11 +668,11 @@ class ModelManager:
                         if torch.cuda.is_available():
                             current_mem = torch.cuda.memory_allocated() / (1024 * 1024 * 1024)  # GB
                             total_mem = torch.cuda.get_device_properties(0).total_memory / (1024 * 1024 * 1024)  # GB
-                            if current_mem > 0.85 * total_mem:  # Only clear if using >85% of GPU memory
+                            if current_mem > 0.9 * total_mem:  # Only clear if using >90% of GPU memory (increased from 85%)
                                 torch.cuda.empty_cache()
                                 logger.info("Cleared CUDA cache during streaming to prevent OOM")
 
-                    # Generate parameters - optimized for low-resource computers
+                    # Generate parameters - optimized for high-quality responses
                     generate_params = {
                         "input_ids": input_ids,
                         "attention_mask": attention_mask,
@@ -682,8 +707,10 @@ class ModelManager:
                         # Add to generated text for quality control
                         generated_text += new_text
 
-                        # Check for stop sequences - only check for definitive end markers
+                        # Enhanced stop sequence detection - check for both definitive end markers and conversation markers
                         should_stop = False
+
+                        # Definitive end markers
                         for stop_seq in stop_sequences:
                             if stop_seq in new_text:  # Only check in the new text, not the entire generated text
                                 # We've reached a stop sequence, stop generation
@@ -691,16 +718,29 @@ class ModelManager:
                                 should_stop = True
                                 break
 
+                        # Check for conversation markers that indicate the end of assistant's response
+                        conversation_end_markers = ["</|assistant|>", "<|user|>", "<|human|>", "<|reserved_special_token"]
+                        for end_marker in conversation_end_markers:
+                            if end_marker in new_text:
+                                logger.info(f"Conversation end marker '{end_marker}' detected, stopping generation")
+                                # Remove the end marker and everything after it from the generated text
+                                marker_pos = new_text.find(end_marker)
+                                if marker_pos > 0:
+                                    new_text = new_text[:marker_pos]
+                                should_stop = True
+                                break
+
                         # Modified repetition detection - only stop for extreme repetition
                         # This allows for legitimate repetition in responses
-                        if len(generated_text) > 100:
-                            # Check for repeating patterns of 10+ characters that repeat 3+ times
-                            last_100_chars = generated_text[-100:]
-                            for pattern_len in range(10, 20):
-                                if pattern_len < len(last_100_chars) // 3:
-                                    pattern = last_100_chars[-pattern_len:]
-                                    # Check if pattern appears 3 or more times
-                                    if last_100_chars.count(pattern) >= 3:
+                        if len(generated_text) > 150:  # Increased from 100 to 150 to allow more context
+                            # Check for repeating patterns of 15+ characters that repeat 4+ times
+                            # Increased thresholds to be less aggressive in stopping generation
+                            last_150_chars = generated_text[-150:]
+                            for pattern_len in range(15, 25):  # Increased from 10-20 to 15-25
+                                if pattern_len < len(last_150_chars) // 4:  # Increased from 3 to 4
+                                    pattern = last_150_chars[-pattern_len:]
+                                    # Check if pattern appears 4 or more times (increased from 3)
+                                    if last_150_chars.count(pattern) >= 4:
                                         logger.warning("Detected extreme repetition in streaming generation, stopping")
                                         should_stop = True
                                         break
@@ -740,7 +780,9 @@ class ModelManager:
                                     "input_ids": input_ids,
                                     "attention_mask": attention_mask,
                                     "max_new_tokens": 1,  # Generate just one token
-                                    "do_sample": False,  # Turn off sampling to save memory
+                                    "do_sample": True,  # Keep sampling on for better quality
+                                    "temperature": 0.7,  # Use a balanced temperature
+                                    "top_k": 40,  # Use a reasonable top_k
                                     "pad_token_id": self.tokenizer.eos_token_id,
                                     "num_beams": 1
                                 }
@@ -758,15 +800,15 @@ class ModelManager:
                                     attention_mask = torch.ones_like(input_ids)
 
                                     # Reduce tokens_to_generate_per_step to prevent future OOM
-                                    tokens_to_generate_per_step = 1
-                                    logger.info("Reduced generation batch size to 1 token at a time after OOM recovery")
+                                    tokens_to_generate_per_step = 2  # Increased from 1 to 2 for better quality
+                                    logger.info("Reduced generation batch size to 2 tokens at a time after OOM recovery")
                                 else:
                                     # If recovery didn't produce valid text, try one more time with different settings
                                     logger.warning("First recovery attempt didn't produce valid text, trying again with different settings")
 
                                     # Try with different temperature
                                     minimal_params["temperature"] = 0.9
-                                    minimal_params["do_sample"] = True
+                                    minimal_params["top_p"] = 0.95  # Increase top_p for more diversity
                                     outputs = self.model.generate(**minimal_params)
 
                                     new_tokens = outputs[0][len(input_ids[0]):]
@@ -778,7 +820,7 @@ class ModelManager:
 
                                         input_ids = outputs
                                         attention_mask = torch.ones_like(input_ids)
-                                        tokens_to_generate_per_step = 1
+                                        tokens_to_generate_per_step = 2  # Use 2 tokens for better quality
                                     else:
                                         # If still no valid text, stop generation
                                         logger.warning("Recovery attempts failed to produce valid text, stopping generation")
@@ -801,7 +843,7 @@ class ModelManager:
             yield f"\nError: {str(e)}"
 
     async def async_stream_generate(self, inputs: Dict[str, torch.Tensor] = None, gen_params: Dict[str, Any] = None, prompt: str = None, system_prompt: Optional[str] = None, **kwargs):
-        """Convert the synchronous stream generator to an async generator with optimizations for low-resource computers.
+        """Convert the synchronous stream generator to an async generator with optimizations for high-quality responses.
 
         This can be called either with:
         1. inputs and gen_params directly (internal use)
@@ -821,22 +863,22 @@ class ModelManager:
             from .config import get_model_generation_params
             gen_params = get_model_generation_params(self.current_model)
 
-            # Set optimized defaults for streaming on low-resource computers
+            # Set optimized defaults for streaming with high-quality responses
             if not kwargs.get("max_length") and not kwargs.get("max_new_tokens"):
-                # Use a conservative default max_length for low-resource computers
-                gen_params["max_length"] = min(gen_params.get("max_length", DEFAULT_MAX_LENGTH), 256)
+                # Use a balanced default max_length that ensures quality while being efficient
+                gen_params["max_length"] = min(gen_params.get("max_length", DEFAULT_MAX_LENGTH), 2048)
 
             if not kwargs.get("temperature"):
-                # Use a slightly lower temperature for more predictable generation
-                gen_params["temperature"] = min(gen_params.get("temperature", DEFAULT_TEMPERATURE), 0.7)
+                # Use a balanced temperature for quality responses
+                gen_params["temperature"] = gen_params.get("temperature", DEFAULT_TEMPERATURE)
 
             if not kwargs.get("top_k"):
                 # Add top_k for better quality
-                gen_params["top_k"] = 40
+                gen_params["top_k"] = 80  # Increased from 40 to 80 for better quality
 
             if not kwargs.get("repetition_penalty"):
-                # Add repetition penalty to avoid loops
-                gen_params["repetition_penalty"] = 1.1
+                # Add repetition penalty to avoid loops but allow natural repetition
+                gen_params["repetition_penalty"] = 1.15  # Increased from 1.1 to 1.15
 
             # Update with provided kwargs
             for key, value in kwargs.items():
@@ -858,15 +900,22 @@ class ModelManager:
 
         # Check if we need to clear memory before generation
         if torch.cuda.is_available():
-            # Clear CUDA cache before streaming to ensure maximum available memory
-            torch.cuda.empty_cache()
-            logger.info("Cleared CUDA cache before streaming generation to ensure optimal performance")
+            # Only clear cache if memory usage is high to avoid unnecessary interruptions
+            current_mem = torch.cuda.memory_allocated() / (1024 * 1024 * 1024)  # GB
+            total_mem = torch.cuda.get_device_properties(0).total_memory / (1024 * 1024 * 1024)  # GB
+            if current_mem > 0.8 * total_mem:  # Only clear if using >80% of GPU memory
+                torch.cuda.empty_cache()
+                logger.info("Cleared CUDA cache before streaming generation to ensure optimal performance")
 
-        # Create a token-level streaming generator optimized for low-resource computers
+        # Create a token-level streaming generator optimized for high-quality responses
         async def token_level_stream_generator():
-            # Define stop sequences for proper termination - only use definitive end markers
-            # Removed <|assistant|> and <|user|> as they might appear in valid responses
-            stop_sequences = ["</s>", "<|endoftext|>", "<|im_end|>"]
+            # Define comprehensive stop sequences for proper termination
+            # Include all common end markers used by different models
+            stop_sequences = [
+                "</s>", "<|endoftext|>", "<|im_end|>",
+                "<eos>", "<end>", "<|end|>", "<|EOS|>",
+                "###", "Assistant:", "Human:", "User:"
+            ]
             accumulated_text = ""
             token_buffer = ""
             last_yield_time = time.time()
@@ -886,12 +935,23 @@ class ModelManager:
                     if not token or token.isspace():
                         continue
 
-                    # Add token to buffer
-                    token_buffer += token
-                    accumulated_text += token
+                    # Clean token of any special tokens before adding to buffer
+                    cleaned_token = token
 
-                    # Check for stop sequences - only in the new token, not the entire accumulated text
+                    # Check for special tokens and remove them
+                    special_token_pattern = r'<\|[a-zA-Z0-9_]+\|>'
+                    matches = re.finditer(special_token_pattern, cleaned_token)
+                    for match in matches:
+                        cleaned_token = cleaned_token.replace(match.group(0), "")
+
+                    # Add cleaned token to buffer
+                    token_buffer += cleaned_token
+                    accumulated_text += cleaned_token
+
+                    # Enhanced stop sequence detection - check for both definitive end markers and conversation markers
                     should_stop = False
+
+                    # Check for definitive end markers
                     for stop_seq in stop_sequences:
                         if stop_seq in token:
                             # Log the stop sequence detection
@@ -900,20 +960,34 @@ class ModelManager:
                             should_stop = True
                             break
 
+                    # Check for conversation markers that indicate the end of assistant's response
+                    conversation_end_markers = ["</|assistant|>", "<|user|>", "<|human|>", "<|reserved_special_token"]
+                    for end_marker in conversation_end_markers:
+                        if end_marker in token:
+                            logger.info(f"Conversation end marker '{end_marker}' detected in async streaming, stopping")
+                            # Remove the end marker and everything after it from the token
+                            marker_pos = token.find(end_marker)
+                            if marker_pos > 0:
+                                # Update token buffer with truncated token
+                                token_buffer = token_buffer[:-(len(token) - marker_pos)]
+                                token = token[:marker_pos]
+                            should_stop = True
+                            break
+
                     # Determine if we should yield the buffer now
                     current_time = time.time()
                     time_since_last_yield = current_time - last_yield_time
 
-                    # Yield in these cases:
+                    # Enhanced yielding logic for smoother streaming:
                     # 1. Buffer contains complete word (ends with space)
                     # 2. Buffer contains punctuation
-                    # 3. It's been more than 50ms since last yield
-                    # 4. Buffer is getting large (>5 chars)
+                    # 3. It's been more than 30ms since last yield (reduced from 50ms for smoother streaming)
+                    # 4. Buffer is getting large (>4 chars) (reduced from 5 for more frequent updates)
                     should_yield = (
                         token.endswith(" ") or
                         any(p in token for p in ".,!?;:") or
-                        time_since_last_yield > 0.05 or  # Reduced from 0.1 to 0.05 for smoother streaming
-                        len(token_buffer) > 5  # Reduced from 10 to 5 for more frequent updates
+                        time_since_last_yield > 0.03 or  # Reduced from 0.05 to 0.03 for smoother streaming
+                        len(token_buffer) > 4  # Reduced from 5 to 4 for more frequent updates
                     )
 
                     if should_yield and token_buffer:
@@ -928,12 +1002,13 @@ class ModelManager:
 
                     # Increase the maximum length limit to ensure complete responses
                     # Only stop if we've generated an extremely long response
-                    max_length_multiplier = 8  # Increased from 4 to 8
+                    max_length_multiplier = 10  # Increased from 8 to 10 for more complete responses
                     if len(accumulated_text) > gen_params.get("max_length", 512) * max_length_multiplier:
                         logger.warning(f"Stream generation exceeded maximum length ({gen_params.get('max_length', 512) * max_length_multiplier} chars) - stopping")
                         break
 
                     # Yield control to allow other async tasks to run
+                    # Use a shorter sleep time for more responsive streaming
                     await asyncio.sleep(0)
 
                 # Yield any remaining text in the buffer

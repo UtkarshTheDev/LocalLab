@@ -93,16 +93,16 @@ SERVER_PORT = get_env_var("SERVER_PORT", default="8000", var_type=int)
 ENABLE_CORS = get_env_var("ENABLE_CORS", default="true", var_type=bool)
 CORS_ORIGINS = get_env_var("CORS_ORIGINS", default="*").split(",")
 
-# Model settings
+# Model settings - optimized for high-quality responses
 DEFAULT_MODEL = get_env_var("DEFAULT_MODEL", default="microsoft/phi-2")
 DEFAULT_MAX_LENGTH = get_env_var(
-    "DEFAULT_MAX_LENGTH", default=8192, var_type=int)  # Increased from 4096 to 8192 for more complete responses
+    "DEFAULT_MAX_LENGTH", default=8192, var_type=int)  # Using 8192 for complete, high-quality responses
 DEFAULT_TEMPERATURE = get_env_var(
-    "DEFAULT_TEMPERATURE", default=0.7, var_type=float)
-DEFAULT_TOP_P = get_env_var("DEFAULT_TOP_P", default=0.9, var_type=float)
-DEFAULT_TOP_K = get_env_var("DEFAULT_TOP_K", default=80, var_type=int)  # Increased from 50 to 80 for better quality
-DEFAULT_REPETITION_PENALTY = get_env_var("DEFAULT_REPETITION_PENALTY", default=1.15, var_type=float)  # Increased from 1.1 to 1.15
-DEFAULT_MAX_TIME = get_env_var("DEFAULT_MAX_TIME", default=120.0, var_type=float)  # Added default max_time of 120 seconds
+    "DEFAULT_TEMPERATURE", default=0.7, var_type=float)  # Balanced temperature for quality and creativity
+DEFAULT_TOP_P = get_env_var("DEFAULT_TOP_P", default=0.92, var_type=float)  # Increased from 0.9 to 0.92 for better quality
+DEFAULT_TOP_K = get_env_var("DEFAULT_TOP_K", default=80, var_type=int)  # Using 80 for better quality responses
+DEFAULT_REPETITION_PENALTY = get_env_var("DEFAULT_REPETITION_PENALTY", default=1.15, var_type=float)  # Using 1.15 to prevent repetition while allowing natural patterns
+DEFAULT_MAX_TIME = get_env_var("DEFAULT_MAX_TIME", default=180.0, var_type=float)  # Increased from 120 to 180 seconds for more complete responses
 
 # Optimization settings
 ENABLE_QUANTIZATION = get_env_var(
@@ -466,23 +466,26 @@ DEFAULT_SYSTEM_INSTRUCTIONS = """"You are a helpful virtual assistant. Your resp
 def get_model_generation_params(model_id: Optional[str] = None) -> dict:
     """Get model generation parameters, optionally specific to a model.
 
-    This function prioritizes quality and completeness of responses by using
-    higher max_length and appropriate repetition_penalty values.
+    This function prioritizes high-quality, complete responses by using
+    optimized parameters for temperature, top_p, top_k, repetition_penalty,
+    and max_length.
 
     Args:
         model_id: Optional model ID to get specific parameters for
 
     Returns:
-        Dictionary of generation parameters optimized for complete responses
+        Dictionary of generation parameters optimized for high-quality responses
     """
-    # Base parameters (defaults) - optimized for quality and completeness
+    # Base parameters (defaults) - optimized for high-quality responses
     params = {
         "max_length": get_env_var("LOCALLAB_MODEL_MAX_LENGTH", default=DEFAULT_MAX_LENGTH, var_type=int),
         "temperature": get_env_var("LOCALLAB_MODEL_TEMPERATURE", default=DEFAULT_TEMPERATURE, var_type=float),
         "top_p": get_env_var("LOCALLAB_MODEL_TOP_P", default=DEFAULT_TOP_P, var_type=float),
         "top_k": get_env_var("LOCALLAB_TOP_K", default=DEFAULT_TOP_K, var_type=int),
         "repetition_penalty": get_env_var("LOCALLAB_REPETITION_PENALTY", default=DEFAULT_REPETITION_PENALTY, var_type=float),
-        # Add do_sample parameter to ensure proper sampling
+        # Add max_time parameter to ensure responses have enough time to complete
+        "max_time": get_env_var("LOCALLAB_MAX_TIME", default=DEFAULT_MAX_TIME, var_type=float),
+        # Add do_sample parameter to ensure proper sampling for high-quality responses
         "do_sample": True
     }
 
@@ -491,11 +494,12 @@ def get_model_generation_params(model_id: Optional[str] = None) -> dict:
         model_config = MODEL_REGISTRY[model_id]
         # Override with model-specific parameters if available
         if "max_length" in model_config:
-            # Ensure max_length is at least 1024 for complete responses
-            params["max_length"] = max(model_config["max_length"], 1024)
+            # Ensure max_length is at least 2048 for high-quality, complete responses
+            # Increased from 1024 to 2048 for better quality
+            params["max_length"] = max(model_config["max_length"], 2048)
         else:
             # If no model-specific max_length, use a reasonable default
-            params["max_length"] = max(DEFAULT_MAX_LENGTH, 1024)
+            params["max_length"] = max(DEFAULT_MAX_LENGTH, 2048)  # Increased from 1024 to 2048
 
         # Add any other model-specific parameters from the registry
         for param in ["temperature", "top_p", "top_k", "repetition_penalty"]:
