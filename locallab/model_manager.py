@@ -434,19 +434,27 @@ class ModelManager:
             from .config import get_model_generation_params
             gen_params = get_model_generation_params(self.current_model)
 
-            # Set balanced defaults for quality and speed
+            # Set optimized defaults for high-quality responses
             if not max_length and not max_new_tokens:
-                # Use a reasonable default max_length that balances quality and speed
+                # Use a higher default max_length for more complete, high-quality responses
                 # Don't limit it too much to ensure complete responses
-                gen_params["max_length"] = min(gen_params.get("max_length", DEFAULT_MAX_LENGTH), 1024)
+                gen_params["max_length"] = min(gen_params.get("max_length", DEFAULT_MAX_LENGTH), 4096)
 
             if not temperature:
-                # Use a balanced temperature for good quality responses
+                # Use a balanced temperature for high-quality responses
                 gen_params["temperature"] = gen_params.get("temperature", DEFAULT_TEMPERATURE)
 
             if not top_k:
-                # Add top_k for better quality sampling
-                gen_params["top_k"] = 50
+                # Use a higher top_k for better quality sampling
+                gen_params["top_k"] = 80  # Increased from 50 to 80 for better quality
+
+            if not top_p:
+                # Use a higher top_p for better quality
+                gen_params["top_p"] = 0.92  # Increased for better quality
+
+            if not repetition_penalty:
+                # Use a higher repetition_penalty for better quality
+                gen_params["repetition_penalty"] = 1.15  # Increased from 1.1 to 1.15
 
             # Handle max_new_tokens parameter (map to max_length)
             if max_new_tokens is not None:
@@ -503,30 +511,49 @@ class ModelManager:
 
             with torch.no_grad():
                 try:
+                    # Generate parameters optimized for high-quality responses
                     generate_params = {
                         **inputs,
                         "max_new_tokens": gen_params["max_length"],
                         "temperature": gen_params["temperature"],
                         "top_p": gen_params["top_p"],
+                        "top_k": gen_params.get("top_k", 80),  # Default to 80 for better quality
                         "do_sample": gen_params.get("do_sample", True),
                         "pad_token_id": self.tokenizer.eos_token_id,
                         # Fix the early stopping warning by setting num_beams explicitly
                         "num_beams": 1,
-                        # Add repetition penalty by default for better quality
-                        "repetition_penalty": 1.1
+                        # Add repetition penalty for better quality
+                        "repetition_penalty": gen_params.get("repetition_penalty", 1.15)  # Increased from 1.1 to 1.15
                     }
 
-                    # Add optional parameters if present in gen_params
-                    if "top_k" in gen_params:
-                        generate_params["top_k"] = gen_params["top_k"]
-                    if "repetition_penalty" in gen_params:
-                        generate_params["repetition_penalty"] = gen_params["repetition_penalty"]
-
                     # Set a reasonable max time for generation to prevent hanging
-                    # Use the DEFAULT_MAX_TIME from config (120 seconds)
+                    # Use the DEFAULT_MAX_TIME from config (increased to 180 seconds)
                     if "max_time" not in generate_params and not stream:
                         from .config import DEFAULT_MAX_TIME
                         generate_params["max_time"] = DEFAULT_MAX_TIME  # Use the default max time from config
+
+                    # Define comprehensive stop sequences for proper termination
+                    stop_sequences = [
+                        "</s>", "<|endoftext|>", "<|im_end|>",
+                        "<eos>", "<end>", "<|end|>", "<|EOS|>",
+                        "###", "Assistant:", "Human:", "User:"
+                    ]
+
+                    # Add stop sequences to generation parameters if supported by the model
+                    if hasattr(self.model.config, "stop_token_ids") or hasattr(self.model.generation_config, "stopping_criteria"):
+                        # Convert stop sequences to token IDs
+                        stop_token_ids = []
+                        for seq in stop_sequences:
+                            try:
+                                ids = self.tokenizer.encode(seq, add_special_tokens=False)
+                                if ids:
+                                    stop_token_ids.extend(ids)
+                            except:
+                                pass
+
+                        # Add stop token IDs to generation parameters if supported
+                        if hasattr(self.model.config, "stop_token_ids"):
+                            self.model.config.stop_token_ids = stop_token_ids
 
                     # Use efficient attention implementation if available
                     if hasattr(self.model.config, "attn_implementation"):
@@ -568,16 +595,25 @@ class ModelManager:
                         response = response[:marker_pos]
                     break
 
-            # Additional cleanup for any remaining special tokens
-            special_tokens = ["<|", "|>"]
-            for token in special_tokens:
-                if token in response:
-                    # Check if it's part of a special token pattern
-                    pattern = r'<\|[a-zA-Z0-9_]+\|>'
-                    matches = re.finditer(pattern, response)
-                    for match in matches:
-                        # Replace the special token with empty string
-                        response = response.replace(match.group(0), "")
+            # Additional cleanup for any remaining special tokens using regex
+            special_token_pattern = r'<\|[a-zA-Z0-9_]+\|>'
+            response = re.sub(special_token_pattern, '', response)
+
+            # Check for repetition patterns that indicate the model is stuck
+            if len(response) > 200:
+                # Look for repeating patterns of 20+ characters that repeat 3+ times
+                for pattern_len in range(20, 40):
+                    if pattern_len < len(response) // 3:
+                        for i in range(len(response) - pattern_len * 3):
+                            pattern = response[i:i+pattern_len]
+                            if pattern and not pattern.isspace():
+                                if response[i:].count(pattern) >= 3:
+                                    # Found a repeating pattern, truncate at the second occurrence
+                                    second_pos = response.find(pattern, i + pattern_len)
+                                    if second_pos > 0:
+                                        logger.info(f"Detected repetition pattern, truncating response")
+                                        response = response[:second_pos + pattern_len]
+                                        break
 
             # Cache the cleaned response if we have a cache key
             if cache_key:

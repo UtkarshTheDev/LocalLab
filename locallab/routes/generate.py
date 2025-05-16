@@ -137,20 +137,22 @@ async def generate_text(request: GenerationRequest) -> GenerationResponse:
         # Get model-specific generation parameters
         model_params = get_model_generation_params(model_manager.current_model)
 
-        # Update with request parameters
+        # Update with request parameters and optimized defaults for high-quality responses
         generation_params = {
             "max_new_tokens": request.max_tokens,
             "temperature": request.temperature,
-            "top_p": request.top_p,
-            "top_k": request.top_k,
-            "repetition_penalty": request.repetition_penalty,
+            "top_p": request.top_p if request.top_p is not None else 0.92,  # Optimized default
+            "top_k": request.top_k if request.top_k is not None else 80,  # Optimized default
+            "repetition_penalty": request.repetition_penalty if request.repetition_penalty is not None else 1.15,  # Optimized default
             "do_sample": model_params.get("do_sample", True)  # Pass do_sample from model params
         }
 
         # Merge model-specific params with request params
+        # This ensures we get the best of both worlds - model-specific optimizations
+        # and our high-quality parameters
         generation_params.update(model_params)
 
-        # Generate text - properly await the async call
+        # Generate text with optimized parameters - properly await the async call
         generated_text = await model_manager.generate_text(
             prompt=request.prompt,
             system_prompt=request.system_prompt,
@@ -158,7 +160,6 @@ async def generate_text(request: GenerationRequest) -> GenerationResponse:
         )
 
         # Additional cleanup for any special tokens that might have slipped through
-        import re
         special_token_pattern = r'<\|[a-zA-Z0-9_]+\|>'
         cleaned_text = re.sub(special_token_pattern, '', generated_text)
 
@@ -171,6 +172,22 @@ async def generate_text(request: GenerationRequest) -> GenerationResponse:
                 if marker_pos > 0:
                     cleaned_text = cleaned_text[:marker_pos]
                 break
+
+        # Check for repetition patterns that indicate the model is stuck
+        if len(cleaned_text) > 200:
+            # Look for repeating patterns of 20+ characters that repeat 3+ times
+            for pattern_len in range(20, 40):
+                if pattern_len < len(cleaned_text) // 3:
+                    for i in range(len(cleaned_text) - pattern_len * 3):
+                        pattern = cleaned_text[i:i+pattern_len]
+                        if pattern and not pattern.isspace():
+                            if cleaned_text[i:].count(pattern) >= 3:
+                                # Found a repeating pattern, truncate at the second occurrence
+                                second_pos = cleaned_text.find(pattern, i + pattern_len)
+                                if second_pos > 0:
+                                    logger.info(f"Detected repetition pattern in text generation, truncating response")
+                                    cleaned_text = cleaned_text[:second_pos + pattern_len]
+                                    break
 
         return GenerationResponse(
             text=cleaned_text,
@@ -203,27 +220,28 @@ async def chat_completion(request: ChatRequest) -> ChatResponse:
         # Get model-specific generation parameters
         model_params = get_model_generation_params(model_manager.current_model)
 
-        # Prepare generation parameters
+        # Prepare generation parameters with optimized defaults for high-quality responses
         generation_params = {
             "max_new_tokens": request.max_tokens,
             "temperature": request.temperature,
-            "top_p": request.top_p,
-            "top_k": request.top_k,
-            "repetition_penalty": request.repetition_penalty,
+            "top_p": request.top_p if request.top_p is not None else 0.92,  # Optimized default
+            "top_k": request.top_k if request.top_k is not None else 80,  # Optimized default
+            "repetition_penalty": request.repetition_penalty if request.repetition_penalty is not None else 1.15,  # Optimized default
             "do_sample": model_params.get("do_sample", True)  # Pass do_sample from model params
         }
 
         # Merge model-specific params with request params
+        # This ensures we get the best of both worlds - model-specific optimizations
+        # and our high-quality parameters
         generation_params.update(model_params)
 
-        # Generate completion
+        # Generate completion with optimized parameters
         generated_text = await model_manager.generate_text(
             prompt=formatted_prompt,
             **generation_params
         )
 
         # Additional cleanup for any special tokens that might have slipped through
-        import re
         special_token_pattern = r'<\|[a-zA-Z0-9_]+\|>'
         cleaned_text = re.sub(special_token_pattern, '', generated_text)
 
@@ -236,6 +254,22 @@ async def chat_completion(request: ChatRequest) -> ChatResponse:
                 if marker_pos > 0:
                     cleaned_text = cleaned_text[:marker_pos]
                 break
+
+        # Check for repetition patterns that indicate the model is stuck
+        if len(cleaned_text) > 200:
+            # Look for repeating patterns of 20+ characters that repeat 3+ times
+            for pattern_len in range(20, 40):
+                if pattern_len < len(cleaned_text) // 3:
+                    for i in range(len(cleaned_text) - pattern_len * 3):
+                        pattern = cleaned_text[i:i+pattern_len]
+                        if pattern and not pattern.isspace():
+                            if cleaned_text[i:].count(pattern) >= 3:
+                                # Found a repeating pattern, truncate at the second occurrence
+                                second_pos = cleaned_text.find(pattern, i + pattern_len)
+                                if second_pos > 0:
+                                    logger.info(f"Detected repetition pattern in chat completion, truncating response")
+                                    cleaned_text = cleaned_text[:second_pos + pattern_len]
+                                    break
 
         # Format response with cleaned text
         return ChatResponse(
@@ -388,7 +422,7 @@ async def stream_chat(
 @router.post("/generate/batch", response_model=BatchGenerationResponse)
 async def batch_generate(request: BatchGenerationRequest) -> BatchGenerationResponse:
     """
-    Generate text for multiple prompts in a single request
+    Generate high-quality text for multiple prompts in a single request
     """
     if not model_manager.current_model:
         raise HTTPException(status_code=400, detail="No model is currently loaded")
@@ -397,21 +431,24 @@ async def batch_generate(request: BatchGenerationRequest) -> BatchGenerationResp
         # Get model-specific generation parameters
         model_params = get_model_generation_params(model_manager.current_model)
 
-        # Update with request parameters
+        # Update with request parameters and optimized defaults for high-quality responses
         generation_params = {
             "max_new_tokens": request.max_tokens,
             "temperature": request.temperature,
-            "top_p": request.top_p,
-            "top_k": request.top_k,
-            "repetition_penalty": request.repetition_penalty,
+            "top_p": request.top_p if request.top_p is not None else 0.92,  # Optimized default
+            "top_k": request.top_k if request.top_k is not None else 80,  # Optimized default
+            "repetition_penalty": request.repetition_penalty if request.repetition_penalty is not None else 1.15,  # Optimized default
             "do_sample": model_params.get("do_sample", True)  # Pass do_sample from model params
         }
 
         # Merge model-specific params with request params
+        # This ensures we get the best of both worlds - model-specific optimizations
+        # and our high-quality parameters
         generation_params.update(model_params)
 
         responses = []
         for prompt in request.prompts:
+            # Generate text with optimized parameters
             generated_text = await model_manager.generate_text(
                 prompt=prompt,
                 system_prompt=request.system_prompt,
@@ -419,7 +456,6 @@ async def batch_generate(request: BatchGenerationRequest) -> BatchGenerationResp
             )
 
             # Additional cleanup for any special tokens that might have slipped through
-            import re
             special_token_pattern = r'<\|[a-zA-Z0-9_]+\|>'
             cleaned_text = re.sub(special_token_pattern, '', generated_text)
 
@@ -432,6 +468,22 @@ async def batch_generate(request: BatchGenerationRequest) -> BatchGenerationResp
                     if marker_pos > 0:
                         cleaned_text = cleaned_text[:marker_pos]
                     break
+
+            # Check for repetition patterns that indicate the model is stuck
+            if len(cleaned_text) > 200:
+                # Look for repeating patterns of 20+ characters that repeat 3+ times
+                for pattern_len in range(20, 40):
+                    if pattern_len < len(cleaned_text) // 3:
+                        for i in range(len(cleaned_text) - pattern_len * 3):
+                            pattern = cleaned_text[i:i+pattern_len]
+                            if pattern and not pattern.isspace():
+                                if cleaned_text[i:].count(pattern) >= 3:
+                                    # Found a repeating pattern, truncate at the second occurrence
+                                    second_pos = cleaned_text.find(pattern, i + pattern_len)
+                                    if second_pos > 0:
+                                        logger.info(f"Detected repetition pattern in batch generation, truncating response")
+                                        cleaned_text = cleaned_text[:second_pos + pattern_len]
+                                        break
 
             responses.append(cleaned_text)
 
