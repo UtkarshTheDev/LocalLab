@@ -2,6 +2,16 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.6.5] - 2025-05-16
+
+### Fixed
+
+- Fixed critical error with Hugging Face progress bars display
+- Corrected function naming and imports for better compatibility
+- Improved early configuration system to properly set up logging
+- Enhanced error handling during model downloads
+- Fixed AttributeError with huggingface_hub module
+
 ## [0.6.4] - 2025-05-16
 
 ### Improved
@@ -15,16 +25,6 @@ All notable changes to LocalLab will be documented in this file.
 - Configured transformers library to use native progress bars for model downloads
 - Added informative messages before and after model downloads for better user experience
 - Ensured consistent progress bar display across different model types and sizes
-
-## [0.6.4] - 2025-05-16
-
-### Fixed
-
-- Fixed critical error with Hugging Face progress bars display
-- Corrected function naming and imports for better compatibility
-- Improved early configuration system to properly set up logging
-- Enhanced error handling during model downloads
-- Fixed AttributeError with huggingface_hub module
 
 ## [0.6.3] - 2025-05-16
 
