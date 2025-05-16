@@ -113,30 +113,36 @@ class SubduedColoredFormatter(logging.Formatter):
         # HuggingFace progress bars use tqdm which writes directly to stdout/stderr
         # We need to completely bypass our logger for these messages
 
+        # First, check if this is a HuggingFace-related log
+        is_hf_log = False
+        if hasattr(record, 'name') and isinstance(record.name, str):
+            # HuggingFace Hub logs typically come from these modules
+            hf_modules = ['huggingface_hub', 'filelock', 'transformers', 'tqdm', 'accelerate', 'bitsandbytes']
+            is_hf_log = any(module in record.name for module in hf_modules)
+
+        # Also check if the message contains download-related content
+        is_download_log = False
+        if hasattr(record, 'msg') and isinstance(record.msg, str):
+            download_patterns = ['download', 'fetch', 'safetensors', '.bin', '.json', 'model-', 'pytorch_model',
+                               'Fetching', 'files:', 'it/s', 'B/s', '%', 'MB/s', 'GB/s']
+            is_download_log = any(pattern in str(record.msg).lower() for pattern in download_patterns)
+
+        # If this is a HuggingFace download log or tqdm progress bar, skip it completely
+        # This ensures HuggingFace's native progress bars are displayed correctly
+        if is_hf_log or is_download_log or (hasattr(record, 'msg') and '%' in str(record.msg) and ('/' in str(record.msg))):
+            return ""
+
         # Check if we're currently downloading a model
         try:
             from ..utils.progress import is_model_downloading
 
-            # Check if this is a HuggingFace progress bar log
-            is_hf_progress_log = False
-            if hasattr(record, 'name') and isinstance(record.name, str):
-                # HuggingFace Hub logs typically come from these modules
-                hf_modules = ['huggingface_hub', 'filelock', 'transformers', 'tqdm']
-                is_hf_progress_log = any(module in record.name for module in hf_modules)
-
-            # If we're downloading a model and this is a HuggingFace log, skip our formatting
-            if is_model_downloading() and is_hf_progress_log:
-                # Return empty string to skip this log in our logger
-                # HuggingFace will handle displaying its own progress bars
-                return ""
-
-            # For non-HuggingFace logs during model download, only show critical and model-related logs
-            elif is_model_downloading() and record.levelno < logging.ERROR:
+            # During model downloads, only show critical logs and important model-related logs
+            if is_model_downloading() and record.levelno < logging.ERROR:
                 # Check if this is a model-related log that should be shown
                 is_model_log = False
                 if hasattr(record, 'msg') and isinstance(record.msg, str):
-                    model_patterns = ['model', 'download', 'tokenizer', 'weight']
-                    is_model_log = any(pattern in record.msg.lower() for pattern in model_patterns)
+                    model_patterns = ['model loaded', 'tokenizer loaded', 'loading complete']
+                    is_model_log = any(pattern in str(record.msg).lower() for pattern in model_patterns)
 
                 # Skip non-critical and non-model logs during model download
                 if not is_model_log:

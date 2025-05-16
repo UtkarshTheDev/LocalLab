@@ -171,11 +171,27 @@ def configure_hf_hub_progress():
         # 3. Make sure we're NOT overriding HuggingFace's progress callback
         # This is critical - we want to use their native implementation
         from huggingface_hub import file_download
-        if hasattr(file_download, "_tqdm_callback") and file_download._tqdm_callback == custom_progress_callback:
-            # Reset to default if we previously set it to our custom callback
+        if hasattr(file_download, "_tqdm_callback"):
+            # Reset to default - we don't want any custom callback
             file_download._tqdm_callback = None
 
-        # 4. Set a flag to indicate we're using HuggingFace's native progress bars
+        # 4. Ensure HuggingFace Hub's own logging is properly configured
+        # This ensures HF's own progress bars are displayed correctly
+        import huggingface_hub
+        if hasattr(huggingface_hub, "enable_progress_bars"):
+            huggingface_hub.enable_progress_bars()
+
+        # 5. Configure tqdm directly to ensure proper display
+        import tqdm
+        tqdm.tqdm.monitor_interval = 0  # Disable monitor thread which can cause issues
+
+        # 6. Ensure we're not capturing tqdm output in our logger
+        # This is critical for allowing tqdm to directly write to stdout
+        import logging
+        tqdm_logger = logging.getLogger("tqdm")
+        tqdm_logger.setLevel(logging.WARNING)  # Only show warnings and errors from tqdm
+
+        # 7. Set a flag to indicate we're using HuggingFace's native progress bars
         global is_downloading
         is_downloading = True
 

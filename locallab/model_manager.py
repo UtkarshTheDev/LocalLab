@@ -22,8 +22,20 @@ import zipfile
 import tempfile
 import json
 
-# Configure HuggingFace Hub progress bars
+# Configure HuggingFace Hub progress bars to use native display
+# This ensures we see the visually appealing progress bars from HuggingFace
 configure_hf_hub_progress()
+
+# Also configure transformers to use HuggingFace Hub's progress bars
+try:
+    import transformers
+    transformers.utils.logging.enable_progress_bar()
+    # Set transformers logging to only show warnings and errors
+    transformers.logging.set_verbosity_warning()
+except ImportError:
+    logger.debug("Could not configure transformers progress bars")
+except Exception as e:
+    logger.debug(f"Error configuring transformers progress bars: {str(e)}")
 
 QUANTIZATION_SETTINGS = {
     "fp16": {
@@ -274,9 +286,30 @@ class ModelManager:
                 # Access the module's global variable
                 import locallab.utils.progress
                 locallab.utils.progress.is_downloading = True
+
+                # Ensure HuggingFace Hub's progress bars are enabled
+                from huggingface_hub.utils import logging as hf_logging
+                hf_logging.enable_progress_bars()
+
+                # Configure transformers to use progress bars
+                import transformers
+                transformers.utils.logging.enable_progress_bar()
+
+                # Also ensure tqdm is properly configured for nice display
+                import tqdm
+                tqdm.tqdm.monitor_interval = 0  # Disable monitor thread which can cause issues
+
+                # Temporarily disable our custom logger for HuggingFace logs
+                import logging
+                for logger_name in ['tqdm', 'huggingface_hub', 'transformers', 'filelock']:
+                    logging.getLogger(logger_name).handlers = []  # Remove any handlers
+                    logging.getLogger(logger_name).propagate = False  # Don't propagate to parent loggers
             except:
                 # Fallback if import fails
                 pass
+
+            # Add an empty line before progress bars start
+            print("\n")
 
             # Load tokenizer first
             logger.info(f"Loading tokenizer for {model_id}...")
@@ -1078,9 +1111,30 @@ class ModelManager:
                 # Access the module's global variable
                 import locallab.utils.progress
                 locallab.utils.progress.is_downloading = True
+
+                # Ensure HuggingFace Hub's progress bars are enabled
+                from huggingface_hub.utils import logging as hf_logging
+                hf_logging.enable_progress_bars()
+
+                # Configure transformers to use progress bars
+                import transformers
+                transformers.utils.logging.enable_progress_bar()
+
+                # Also ensure tqdm is properly configured for nice display
+                import tqdm
+                tqdm.tqdm.monitor_interval = 0  # Disable monitor thread which can cause issues
+
+                # Temporarily disable our custom logger for HuggingFace logs
+                import logging
+                for logger_name in ['tqdm', 'huggingface_hub', 'transformers', 'filelock']:
+                    logging.getLogger(logger_name).handlers = []  # Remove any handlers
+                    logging.getLogger(logger_name).propagate = False  # Don't propagate to parent loggers
             except:
                 # Fallback if import fails
                 pass
+
+            # Add an empty line before progress bars start
+            print("\n")
 
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
             logger.info(f"Tokenizer loaded successfully")

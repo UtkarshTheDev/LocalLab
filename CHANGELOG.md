@@ -2,7 +2,21 @@
 
 All notable changes to LocalLab will be documented in this file.
 
-## [0.6.2] - 2024-05-04
+## [0.6.3] - 2025-05-16
+
+### Improved
+
+- Enhanced model downloading experience by using HuggingFace's native progress bars instead of custom logger
+- Fixed issue with Hugging Face download logs being intercepted by custom logger
+- Ensured Hugging Face progress bars display in their original, visually appealing format
+- Improved configuration of Hugging Face Hub progress bars for better visual experience
+- Completely bypassed custom logging for Hugging Face download-related logs
+- Configured transformers library to use native progress bars for model downloads
+- Disabled logger propagation for HuggingFace-related modules during downloads
+- Added proper spacing before and after progress bars for better readability
+- Enhanced progress bar detection to catch all download-related progress indicators
+
+## [0.6.2] - 2025-05-04
 
 ### Improved
 
@@ -16,13 +30,13 @@ All notable changes to LocalLab will be documented in this file.
 - Updated default values for all optimization settings to be enabled by default
 - Ensured consistency between displayed optimization settings and saved configuration
 
-## [0.6.1] - 2024-05-02
+## [0.6.1] - 2025-05-02
 
 ### Fixed
 
 - Fixed CLI config environment variable issue
 
-## [0.6.0] - 2024-05-02
+## [0.6.0] - 2025-05-02
 
 ### Added
 
@@ -39,7 +53,7 @@ All notable changes to LocalLab will be documented in this file.
 - Fixed client error with `do_sample` parameter by adding it to all client methods
 - Updated client package version to 1.0.9 to reflect these fixes
 
-## [0.5.9] - 2024-05-01
+## [0.5.9] - 2025-05-01
 
 ### Fixed
 
@@ -59,7 +73,7 @@ All notable changes to LocalLab will be documented in this file.
 - Maintained top and bottom borders for visual separation while removing side borders
 - Enhanced overall visual consistency across all banners
 
-## [0.5.8] - 2024-05-01
+## [0.5.8] - 2025-05-01
 
 ### Added
 
@@ -92,7 +106,7 @@ All notable changes to LocalLab will be documented in this file.
 - Increased retry counts for better reliability
 - Added top_k parameter to all generation methods
 
-## [0.5.7] - 2024-05-01
+## [0.5.7] - 2025-05-01
 
 ### Improved
 
@@ -103,7 +117,7 @@ All notable changes to LocalLab will be documented in this file.
 - Improved overall visual consistency and readability across all UI elements
 - Enhanced color scheme for better visual appeal and readability
 
-## [0.5.6] - 2024-05-01
+## [0.5.6] - 2025-05-01
 
 ### Fixed
 
@@ -113,7 +127,7 @@ All notable changes to LocalLab will be documented in this file.
 - Enhanced logging during model downloads for better readability
 - Improved visual clarity of download progress information
 
-## [0.5.5] - 2024-04-30
+## [0.5.5] - 2025-04-30
 
 ### Fixed
 
@@ -121,7 +135,7 @@ All notable changes to LocalLab will be documented in this file.
 - Improved alignment of INITIALIZING and RUNNING status boxes
 - Enhanced visual consistency across all UI elements
 
-## [0.5.4] - 2024-04-30
+## [0.5.4] - 2025-04-30
 
 ### Improved
 
@@ -131,7 +145,7 @@ All notable changes to LocalLab will be documented in this file.
 - Added automatic width adjustment for banners based on content length
 - Fine-tuned color scheme to ensure all logs remain visible while not competing with important banners
 
-## [0.5.3] - 2024-04-30
+## [0.5.3] - 2025-04-30
 
 ### Improved
 
@@ -149,7 +163,7 @@ All notable changes to LocalLab will be documented in this file.
 - Improved overall visual consistency across all UI elements
 - Made server status much easier to distinguish at a glance
 
-## [0.5.2] - 2024-04-30
+## [0.5.2] - 2025-04-30
 
 ### Fixed
 
@@ -161,7 +175,7 @@ All notable changes to LocalLab will be documented in this file.
 - Added proper cleanup of existing handlers before adding new ones
 - Improved compatibility with different terminal environments
 
-## [0.5.1] - 2024-04-21
+## [0.5.1] - 2025-04-21
 
 ### Added
 
@@ -181,7 +195,7 @@ All notable changes to LocalLab will be documented in this file.
 - Added proper timeout handling in streaming operations
 - Enhanced connection state management
 
-## [0.5.0] - 2024-04-21
+## [0.5.0] - 2025-04-21
 
 ### Fixed
 
@@ -191,7 +205,7 @@ All notable changes to LocalLab will be documented in this file.
 - Improved package import reliability
 - Ensured both LocalLabClient and SyncLocalLabClient are properly exported
 
-## [0.5.01] - 2024-04-21
+## [0.5.01] - 2025-04-21
 
 ### Fixed
 
@@ -199,7 +213,7 @@ All notable changes to LocalLab will be documented in this file.
 - Added proper exports for both LocalLabClient and SyncLocalLabClient in package **init**.py
 - Ensured both sync and async clients are available through the main package import
 
-## [0.4.50] - 2024-04-21
+## [0.4.50] - 2025-04-21
 
 ### Changed
 
@@ -208,7 +222,7 @@ All notable changes to LocalLab will be documented in this file.
 - Changed client package structure to use direct imports instead of nested packages
 - Improved client package documentation with correct import examples
 
-## [0.4.49] - 2024-04-21
+## [0.4.49] - 2025-04-21
 
 ### Fixed
 
@@ -221,7 +235,7 @@ All notable changes to LocalLab will be documented in this file.
 - Improved task cancellation with proper timeout handling
 - Enhanced force exit mechanism to ensure clean termination
 
-## [0.4.48] - 2024-03-15
+## [0.4.48] - 2025-03-15
 
 ### Client Library Changes (v0.2.1)
 
@@ -270,7 +284,7 @@ All notable changes to LocalLab will be documented in this file.
 - Removed text cleaning and formatting from all generation endpoints
 - Improved error handling in streaming responses
 
-## [0.4.47] - 2024-03-15
+## [0.4.47] - 2025-03-15
 
 ### Added
 
@@ -295,7 +309,7 @@ All notable changes to LocalLab will be documented in this file.
 - Enhanced Python client with better error handling for streaming
 - Added proper error message propagation from server to client
 
-## [0.4.46] - 2024-03-14
+## [0.4.46] - 2025-03-14
 
 ### Added
 
@@ -310,7 +324,7 @@ All notable changes to LocalLab will be documented in this file.
 - Improved error handling in streaming generation
 - Enhanced token cleanup for better readability
 
-## [0.4.45] - 2024-03-14
+## [0.4.45] - 2025-03-14
 
 ### Fixed
 
@@ -319,7 +333,7 @@ All notable changes to LocalLab will be documented in this file.
 - Bumped client package version to 1.0.2
 - Updated documentation with correct client initialization examples
 
-## [0.4.31] - 2024-03-14
+## [0.4.31] - 2025-03-14
 
 ### Fixed
 
