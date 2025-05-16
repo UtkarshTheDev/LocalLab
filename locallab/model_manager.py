@@ -1,6 +1,6 @@
 # Import early configuration module first to set up logging and environment variables
 # This ensures Hugging Face's progress bars are displayed correctly
-from .utils.early_config import enable_hf_progress_bars, StdoutRedirector
+from .utils.early_config import configure_hf_progress_bars, StdoutRedirector
 
 from .config import HF_TOKEN_ENV, get_env_var, set_env_var
 import os
@@ -26,7 +26,7 @@ import json
 
 # Enable Hugging Face progress bars with native display
 # This ensures we see the visually appealing progress bars from HuggingFace
-enable_hf_progress_bars()
+configure_hf_progress_bars()
 
 # Import transformers after configuring logging to ensure proper display
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
@@ -278,7 +278,7 @@ class ModelManager:
             print(f"\n{Fore.CYAN}Starting model download - native progress bars will appear below{Style.RESET_ALL}\n")
 
             # Enable Hugging Face progress bars again to ensure they're properly configured
-            enable_hf_progress_bars()
+            configure_hf_progress_bars()
 
             # Use a context manager to ensure proper display of Hugging Face progress bars
             with StdoutRedirector(disable_logging=True):
@@ -1093,7 +1093,7 @@ class ModelManager:
             print(f"\n{Fore.CYAN}Starting custom model download - native progress bars will appear below{Style.RESET_ALL}\n")
 
             # Enable Hugging Face progress bars again to ensure they're properly configured
-            enable_hf_progress_bars()
+            configure_hf_progress_bars()
 
             # Use a context manager to ensure proper display of Hugging Face progress bars
             with StdoutRedirector(disable_logging=True):

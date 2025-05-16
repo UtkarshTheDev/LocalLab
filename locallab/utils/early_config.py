@@ -26,17 +26,17 @@ def configure_hf_logging():
     """
     # Disable all warnings
     warnings.filterwarnings("ignore")
-    
+
     # Configure logging for Hugging Face libraries
     for logger_name in ["transformers", "huggingface_hub", "accelerate", "tqdm", "filelock"]:
         hf_logger = logging.getLogger(logger_name)
         hf_logger.setLevel(logging.WARNING)  # Only show warnings and errors
         hf_logger.propagate = False  # Don't propagate to parent loggers
-        
+
         # Remove any existing handlers
         for handler in hf_logger.handlers[:]:
             hf_logger.removeHandler(handler)
-        
+
         # Add a null handler to prevent warnings about no handlers
         hf_logger.addHandler(logging.NullHandler())
 
@@ -54,7 +54,7 @@ class StdoutRedirector:
         self.original_stdout = sys.stdout
         self.original_stderr = sys.stderr
         self.original_log_levels = {}
-    
+
     def __enter__(self):
         # Store original log levels
         if self.disable_logging:
@@ -62,9 +62,9 @@ class StdoutRedirector:
                 logger = logging.getLogger(logger_name)
                 self.original_log_levels[logger_name] = logger.level
                 logger.setLevel(logging.WARNING)
-        
+
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         # Restore original log levels
         if self.disable_logging:
@@ -83,14 +83,20 @@ def enable_hf_progress_bars():
         tqdm.tqdm.monitor_interval = 0  # Disable monitor thread
     except ImportError:
         pass
-    
+
     # Configure huggingface_hub
     try:
         import huggingface_hub
-        huggingface_hub.enable_progress_bars()
+        # The correct way to enable progress bars in huggingface_hub
+        from huggingface_hub.utils import logging as hf_logging
+        hf_logging.enable_progress_bars()
+
+        # Also enable HF Transfer for better download experience
+        if hasattr(huggingface_hub, "constants"):
+            huggingface_hub.constants.HF_HUB_ENABLE_HF_TRANSFER = True
     except ImportError:
         pass
-    
+
     # Configure transformers
     try:
         import transformers
@@ -98,3 +104,9 @@ def enable_hf_progress_bars():
         transformers.logging.set_verbosity_warning()
     except ImportError:
         pass
+
+# Alias for backward compatibility
+configure_hf_progress_bars = enable_hf_progress_bars
+
+# Export the configure_hf_logging function for use in __init__.py
+__all__ = ["enable_hf_progress_bars", "configure_hf_progress_bars", "configure_hf_logging", "StdoutRedirector"]

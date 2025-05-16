@@ -59,7 +59,7 @@ setup(
     },
     author="Utkarsh Tiwari",
     author_email="utkarshweb2023@gmail.com",
-    description="LocalLab: Run language models locally or in Google Collab with a friendly API",
+    description="LocalLab: A lightweight AI inference server for running LLMs locally or in Google Colab with a friendly API.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/UtkarshTheDev/LocalLab",
