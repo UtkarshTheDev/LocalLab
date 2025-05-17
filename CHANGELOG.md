@@ -2,6 +2,23 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## Client Package [1.1.0] - 2025-05-17
+
+### Added
+
+- Added `max_time` parameter to both async and sync clients to limit generation time on the server side
+- Implemented proper handling of the `max_time` parameter in all generation methods
+- Updated documentation for all client methods to include the new parameter
+- Enhanced error handling for timeout-related issues
+- Made `max_time` parameter optional with a default server-side value of 180 seconds
+
+### Fixed
+
+- Fixed error with `max_time` parameter not being properly handled by the server
+- Improved parameter passing between client and server for better compatibility
+- Updated client to properly handle server-side timeouts
+- Added proper handling for when the `max_time` parameter is not provided
+
 ## [0.7.0] - 2025-05-16
 
 ### Improved

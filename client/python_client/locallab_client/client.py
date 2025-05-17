@@ -236,9 +236,28 @@ class LocalLabClient:
         timeout: float = 180.0,  # Increased timeout for more complete responses (3 minutes)
         repetition_penalty: float = 1.15,  # Added repetition penalty for better quality
         top_k: int = 80,  # Added top_k parameter for better quality
-        do_sample: bool = True  # Added do_sample parameter
+        do_sample: bool = True,  # Added do_sample parameter
+        max_time: Optional[float] = None  # Added max_time parameter to limit generation time
     ) -> str:
-        """Generate text using the model with improved error handling"""
+        """
+        Generate text using the model with improved error handling.
+
+        Args:
+            prompt: The prompt to generate text from
+            model_id: Optional model ID to use
+            stream: Whether to stream the response
+            max_length: Maximum length of the generated text
+            temperature: Temperature for sampling
+            top_p: Top-p for nucleus sampling
+            timeout: Request timeout in seconds
+            repetition_penalty: Penalty for repetition (higher values = less repetition)
+            top_k: Top-k for sampling (higher values = more diverse vocabulary)
+            do_sample: Whether to use sampling instead of greedy decoding
+            max_time: Optional maximum time in seconds to spend generating (server-side timeout, defaults to 180 seconds if not provided)
+
+        Returns:
+            The generated text as a string.
+        """
         # Update activity timestamp
         self._update_activity()
 
@@ -253,6 +272,10 @@ class LocalLabClient:
             "top_k": top_k,
             "do_sample": do_sample
         }
+
+        # Add max_time parameter if provided
+        if max_time is not None:
+            payload["max_time"] = max_time
 
         if stream:
             return self.stream_generate(
@@ -311,7 +334,8 @@ class LocalLabClient:
         retry_count: int = 3,    # Increased retry count for better reliability
         repetition_penalty: float = 1.15,  # Increased repetition penalty for better quality
         top_k: int = 80,  # Added top_k parameter for better quality
-        do_sample: bool = True  # Added do_sample parameter
+        do_sample: bool = True,  # Added do_sample parameter
+        max_time: Optional[float] = None  # Added max_time parameter to limit generation time
     ) -> AsyncGenerator[str, None]:
         """
         Stream text generation with token-level streaming and robust error handling.
@@ -326,6 +350,8 @@ class LocalLabClient:
             retry_count: Number of retries for network errors
             repetition_penalty: Penalty for repetition (higher values = less repetition)
             top_k: Top-k for sampling (higher values = more diverse vocabulary)
+            do_sample: Whether to use sampling instead of greedy decoding
+            max_time: Optional maximum time in seconds to spend generating (server-side timeout, defaults to 180 seconds if not provided)
 
         Returns:
             A generator that yields chunks of text as they are generated.
@@ -348,6 +374,10 @@ class LocalLabClient:
             "top_k": top_k,
             "do_sample": do_sample
         }
+
+        # Add max_time parameter if provided
+        if max_time is not None:
+            payload["max_time"] = max_time
 
         # Create a timeout for this specific request
         request_timeout = aiohttp.ClientTimeout(total=timeout)
@@ -473,9 +503,27 @@ class LocalLabClient:
         top_p: float = 0.9,
         timeout: float = 180.0,  # Increased timeout for more complete responses (3 minutes)
         repetition_penalty: float = 1.15,  # Added repetition penalty for better quality
-        top_k: int = 80  # Added top_k parameter for better quality
+        top_k: int = 80,  # Added top_k parameter for better quality
+        max_time: Optional[float] = None  # Added max_time parameter to limit generation time
     ) -> Dict[str, Any]:
-        """Chat completion endpoint with improved error handling"""
+        """
+        Chat completion endpoint with improved error handling.
+
+        Args:
+            messages: List of message dictionaries with 'role' and 'content' keys
+            model_id: Optional model ID to use
+            stream: Whether to stream the response
+            max_length: Maximum length of the generated text
+            temperature: Temperature for sampling
+            top_p: Top-p for nucleus sampling
+            timeout: Request timeout in seconds
+            repetition_penalty: Penalty for repetition (higher values = less repetition)
+            top_k: Top-k for sampling (higher values = more diverse vocabulary)
+            max_time: Optional maximum time in seconds to spend generating (server-side timeout, defaults to 180 seconds if not provided)
+
+        Returns:
+            The chat completion response as a dictionary.
+        """
         # Update activity timestamp
         self._update_activity()
 
@@ -489,6 +537,10 @@ class LocalLabClient:
             "repetition_penalty": repetition_penalty,
             "top_k": top_k
         }
+
+        # Add max_time parameter if provided
+        if max_time is not None:
+            payload["max_time"] = max_time
 
         if stream:
             return self.stream_chat(
@@ -538,9 +590,27 @@ class LocalLabClient:
         timeout: float = 300.0,  # Increased timeout for more complete responses (5 minutes)
         retry_count: int = 3,    # Increased retry count for better reliability
         repetition_penalty: float = 1.15,  # Added repetition penalty for better quality
-        top_k: int = 80  # Added top_k parameter for better quality
+        top_k: int = 80,  # Added top_k parameter for better quality
+        max_time: Optional[float] = None  # Added max_time parameter to limit generation time
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        """Stream chat completion with robust error handling"""
+        """
+        Stream chat completion with robust error handling.
+
+        Args:
+            messages: List of message dictionaries with 'role' and 'content' keys
+            model_id: Optional model ID to use
+            max_length: Maximum length of the generated text
+            temperature: Temperature for sampling
+            top_p: Top-p for nucleus sampling
+            timeout: Request timeout in seconds
+            retry_count: Number of retries for network errors
+            repetition_penalty: Penalty for repetition (higher values = less repetition)
+            top_k: Top-k for sampling (higher values = more diverse vocabulary)
+            max_time: Optional maximum time in seconds to spend generating (server-side timeout, defaults to 180 seconds if not provided)
+
+        Returns:
+            A generator that yields chunks of the chat completion response.
+        """
         # Update activity timestamp
         self._update_activity()
 
@@ -554,6 +624,10 @@ class LocalLabClient:
             "repetition_penalty": repetition_penalty,
             "top_k": top_k
         }
+
+        # Add max_time parameter if provided
+        if max_time is not None:
+            payload["max_time"] = max_time
 
         # Create a timeout for this specific request
         request_timeout = aiohttp.ClientTimeout(total=timeout)
@@ -661,9 +735,26 @@ class LocalLabClient:
         top_p: float = 0.9,
         timeout: float = 300.0,  # Increased timeout for more complete responses (5 minutes)
         repetition_penalty: float = 1.15,  # Added repetition penalty for better quality
-        top_k: int = 80  # Added top_k parameter for better quality
+        top_k: int = 80,  # Added top_k parameter for better quality
+        max_time: Optional[float] = None  # Added max_time parameter to limit generation time
     ) -> Dict[str, List[str]]:
-        """Generate text for multiple prompts in parallel with improved error handling"""
+        """
+        Generate text for multiple prompts in parallel with improved error handling.
+
+        Args:
+            prompts: List of prompts to generate text from
+            model_id: Optional model ID to use
+            max_length: Maximum length of the generated text
+            temperature: Temperature for sampling
+            top_p: Top-p for nucleus sampling
+            timeout: Request timeout in seconds
+            repetition_penalty: Penalty for repetition (higher values = less repetition)
+            top_k: Top-k for sampling (higher values = more diverse vocabulary)
+            max_time: Optional maximum time in seconds to spend generating (server-side timeout, defaults to 180 seconds if not provided)
+
+        Returns:
+            Dictionary with the generated responses.
+        """
         # Update activity timestamp
         self._update_activity()
 
@@ -676,6 +767,10 @@ class LocalLabClient:
             "repetition_penalty": repetition_penalty,
             "top_k": top_k
         }
+
+        # Add max_time parameter if provided
+        if max_time is not None:
+            payload["max_time"] = max_time
 
         # Create a timeout for this specific request
         request_timeout = aiohttp.ClientTimeout(total=timeout)

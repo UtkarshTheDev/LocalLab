@@ -22,7 +22,7 @@ class SyncLocalLabClient:
     Synchronous client for the LocalLab API.
     """
 
-    def __init__(self, base_url: str, timeout: float = 30.0):
+    def __init__(self, base_url: str = "http://localhost:8000", timeout: float = 30.0):
         """Initialize the synchronous client."""
         self._async_client = LocalLabClient(LocalLabConfig(base_url=base_url, timeout=timeout))
         self._loop = None
@@ -142,7 +142,8 @@ class SyncLocalLabClient:
         top_p: float = 0.9,
         repetition_penalty: float = 1.15,  # Increased repetition penalty for better quality
         top_k: int = 80,  # Added top_k parameter for better quality
-        do_sample: bool = True  # Added do_sample parameter
+        do_sample: bool = True,  # Added do_sample parameter
+        max_time: Optional[float] = None  # Added max_time parameter to limit generation time
     ) -> Union[str, Generator[str, None, None]]:
         """
         Generate text using the model with improved quality settings.
@@ -151,10 +152,13 @@ class SyncLocalLabClient:
             prompt: The prompt to generate text from
             model_id: Optional model ID to use
             stream: Whether to stream the response
-            max_length: Maximum length of the generated text (defaults to 1024 if None)
+            max_length: Maximum length of the generated text (defaults to 4096 if None)
             temperature: Temperature for sampling
             top_p: Top-p for nucleus sampling
             repetition_penalty: Penalty for repetition (higher values = less repetition)
+            top_k: Top-k for sampling (higher values = more diverse vocabulary)
+            do_sample: Whether to use sampling instead of greedy decoding
+            max_time: Optional maximum time in seconds to spend generating (server-side timeout, defaults to 180 seconds if not provided)
 
         Returns:
             If stream=False, returns the generated text as a string.
@@ -173,7 +177,8 @@ class SyncLocalLabClient:
                 top_p=top_p,
                 repetition_penalty=repetition_penalty,
                 top_k=top_k,
-                do_sample=do_sample
+                do_sample=do_sample,
+                max_time=max_time
             )
 
         return self._run_coroutine(
@@ -187,6 +192,7 @@ class SyncLocalLabClient:
                 repetition_penalty=repetition_penalty,
                 top_k=top_k,
                 do_sample=do_sample,
+                max_time=max_time,
                 timeout=180.0  # Increased timeout for more complete responses (3 minutes)
             )
         )
@@ -201,7 +207,8 @@ class SyncLocalLabClient:
         timeout: float = 300.0,  # Increased timeout for more complete responses (5 minutes)
         repetition_penalty: float = 1.15,  # Increased repetition penalty for better quality
         top_k: int = 80,  # Added top_k parameter for better quality
-        do_sample: bool = True  # Added do_sample parameter
+        do_sample: bool = True,  # Added do_sample parameter
+        max_time: Optional[float] = None  # Added max_time parameter to limit generation time
     ) -> Generator[str, None, None]:
         """
         Stream text generation with improved quality and reliability.
@@ -209,11 +216,14 @@ class SyncLocalLabClient:
         Args:
             prompt: The prompt to generate text from
             model_id: Optional model ID to use
-            max_length: Maximum length of the generated text (defaults to 1024 if None)
+            max_length: Maximum length of the generated text (defaults to 4096 if None)
             temperature: Temperature for sampling
             top_p: Top-p for nucleus sampling
             timeout: Request timeout in seconds
             repetition_penalty: Penalty for repetition (higher values = less repetition)
+            top_k: Top-k for sampling (higher values = more diverse vocabulary)
+            do_sample: Whether to use sampling instead of greedy decoding
+            max_time: Optional maximum time in seconds to spend generating (server-side timeout, defaults to 180 seconds if not provided)
 
         Returns:
             A generator that yields chunks of text as they are generated.
@@ -239,7 +249,8 @@ class SyncLocalLabClient:
                     retry_count=3,  # Increased retry count for better reliability
                     repetition_penalty=repetition_penalty,  # Pass the repetition penalty parameter
                     top_k=top_k,  # Pass the top_k parameter
-                    do_sample=do_sample  # Pass the do_sample parameter
+                    do_sample=do_sample,  # Pass the do_sample parameter
+                    max_time=max_time  # Pass the max_time parameter
                 ):
                     await queue.put(chunk)
 
@@ -285,7 +296,8 @@ class SyncLocalLabClient:
         temperature: float = 0.7,
         top_p: float = 0.9,
         repetition_penalty: float = 1.15,  # Increased repetition penalty for better quality
-        top_k: int = 80  # Added top_k parameter for better quality
+        top_k: int = 80,  # Added top_k parameter for better quality
+        max_time: Optional[float] = None  # Added max_time parameter to limit generation time
     ) -> Union[Dict[str, Any], Generator[Dict[str, Any], None, None]]:
         """
         Chat completion with improved quality settings.
@@ -294,10 +306,12 @@ class SyncLocalLabClient:
             messages: List of message dictionaries with 'role' and 'content' keys
             model_id: Optional model ID to use
             stream: Whether to stream the response
-            max_length: Maximum length of the generated text (defaults to 1024 if None)
+            max_length: Maximum length of the generated text (defaults to 4096 if None)
             temperature: Temperature for sampling
             top_p: Top-p for nucleus sampling
             repetition_penalty: Penalty for repetition (higher values = less repetition)
+            top_k: Top-k for sampling (higher values = more diverse vocabulary)
+            max_time: Optional maximum time in seconds to spend generating (server-side timeout, defaults to 180 seconds if not provided)
 
         Returns:
             If stream=False, returns the chat completion response.
@@ -316,7 +330,8 @@ class SyncLocalLabClient:
                 top_p=top_p,
                 timeout=300.0,  # Increased timeout for more complete responses (5 minutes)
                 repetition_penalty=repetition_penalty,
-                top_k=top_k
+                top_k=top_k,
+                max_time=max_time
             )
 
         return self._run_coroutine(
@@ -329,7 +344,8 @@ class SyncLocalLabClient:
                 top_p=top_p,
                 timeout=180.0,  # Increased timeout for more complete responses (3 minutes)
                 repetition_penalty=repetition_penalty,
-                top_k=top_k
+                top_k=top_k,
+                max_time=max_time
             )
         )
 
@@ -342,7 +358,8 @@ class SyncLocalLabClient:
         top_p: float = 0.9,
         timeout: float = 300.0,  # Increased timeout for more complete responses (5 minutes)
         repetition_penalty: float = 1.15,  # Added repetition penalty for better quality
-        top_k: int = 80  # Added top_k parameter for better quality
+        top_k: int = 80,  # Added top_k parameter for better quality
+        max_time: Optional[float] = None  # Added max_time parameter to limit generation time
     ) -> Generator[Dict[str, Any], None, None]:
         """
         Stream chat completion with improved quality and reliability.
@@ -350,10 +367,13 @@ class SyncLocalLabClient:
         Args:
             messages: List of message dictionaries with 'role' and 'content' keys
             model_id: Optional model ID to use
-            max_length: Maximum length of the generated text (defaults to 1024 if None)
+            max_length: Maximum length of the generated text (defaults to 4096 if None)
             temperature: Temperature for sampling
             top_p: Top-p for nucleus sampling
             timeout: Request timeout in seconds
+            repetition_penalty: Penalty for repetition (higher values = less repetition)
+            top_k: Top-k for sampling (higher values = more diverse vocabulary)
+            max_time: Optional maximum time in seconds to spend generating (server-side timeout, defaults to 180 seconds if not provided)
 
         Returns:
             A generator that yields chunks of the chat completion response.
@@ -378,7 +398,8 @@ class SyncLocalLabClient:
                     timeout=timeout,
                     retry_count=3,  # Increased retry count for better reliability
                     repetition_penalty=repetition_penalty,
-                    top_k=top_k
+                    top_k=top_k,
+                    max_time=max_time
                 ):
                     await queue.put(chunk)
 
@@ -424,7 +445,8 @@ class SyncLocalLabClient:
         top_p: float = 0.9,
         repetition_penalty: float = 1.15,  # Increased repetition penalty for better quality
         top_k: int = 80,  # Added top_k parameter for better quality
-        timeout: float = 300.0  # Added timeout parameter (5 minutes)
+        timeout: float = 300.0,  # Added timeout parameter (5 minutes)
+        max_time: Optional[float] = None  # Added max_time parameter to limit generation time
     ) -> Dict[str, List[str]]:
         """
         Generate text for multiple prompts in parallel with improved quality settings.
@@ -436,6 +458,9 @@ class SyncLocalLabClient:
             temperature: Temperature for sampling
             top_p: Top-p for nucleus sampling
             repetition_penalty: Penalty for repetition (higher values = less repetition)
+            top_k: Top-k for sampling (higher values = more diverse vocabulary)
+            timeout: Request timeout in seconds
+            max_time: Optional maximum time in seconds to spend generating (server-side timeout, defaults to 180 seconds if not provided)
 
         Returns:
             Dictionary with the generated responses.
@@ -453,7 +478,8 @@ class SyncLocalLabClient:
                 top_p=top_p,
                 repetition_penalty=repetition_penalty,
                 top_k=top_k,
-                timeout=timeout  # Use the provided timeout parameter
+                timeout=timeout,  # Use the provided timeout parameter
+                max_time=max_time  # Pass the max_time parameter
             )
         )
 
