@@ -399,7 +399,8 @@ class ModelManager:
         top_k: Optional[int] = None,
         repetition_penalty: Optional[float] = None,
         system_instructions: Optional[str] = None,
-        do_sample: bool = True
+        do_sample: bool = True,
+        max_time: Optional[float] = None
     ) -> str:
         """Generate text from the model"""
         # Check model timeout
@@ -527,10 +528,13 @@ class ModelManager:
                     }
 
                     # Set a reasonable max time for generation to prevent hanging
-                    # Use the DEFAULT_MAX_TIME from config (increased to 180 seconds)
-                    if "max_time" not in generate_params and not stream:
-                        from .config import DEFAULT_MAX_TIME
-                        generate_params["max_time"] = DEFAULT_MAX_TIME  # Use the default max time from config
+                    # Use the provided max_time or a default value of 180 seconds
+                    if not stream:
+                        if max_time is not None:
+                            generate_params["max_time"] = max_time
+                        elif "max_time" not in generate_params:
+                            # Default to 180 seconds (3 minutes) if not specified
+                            generate_params["max_time"] = 180.0  # Default max time in seconds
 
                     # Define comprehensive stop sequences for proper termination
                     stop_sequences = [
@@ -918,7 +922,7 @@ class ModelManager:
 
             # Update with provided kwargs
             for key, value in kwargs.items():
-                if key in ["max_length", "temperature", "top_p", "top_k", "repetition_penalty"]:
+                if key in ["max_length", "temperature", "top_p", "top_k", "repetition_penalty", "max_time"]:
                     gen_params[key] = value
                 elif key == "max_new_tokens":
                     # Handle the max_new_tokens parameter by mapping to max_length

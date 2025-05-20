@@ -2,6 +2,18 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.7.1] - 2025-05-18
+
+### Fixed
+
+- Fixed critical error: "ModelManager.generate() got an unexpected keyword argument 'max_time'"
+- Added proper handling of the `max_time` parameter in all generation endpoints
+- Updated `ModelManager.generate()` method to accept the `max_time` parameter
+- Added `max_time` parameter to all request models (GenerationRequest, BatchGenerationRequest, ChatRequest)
+- Ensured consistent parameter passing between client and server
+- Set default max_time to 180 seconds (3 minutes) when not specified
+- Improved error handling for generation timeouts
+
 ## Client Package [1.1.0] - 2025-05-17
 
 ### Added

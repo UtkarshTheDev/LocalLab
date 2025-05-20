@@ -35,6 +35,7 @@ class GenerationRequest(BaseModel):
     top_p: float = Field(default=DEFAULT_TOP_P, ge=0.0, le=1.0)
     top_k: int = Field(default=80, ge=1, le=1000)  # Added top_k parameter
     repetition_penalty: float = Field(default=1.15, ge=1.0, le=2.0)  # Added repetition_penalty parameter
+    max_time: Optional[float] = Field(default=None, ge=0.0, description="Maximum time in seconds for generation")
     system_prompt: Optional[str] = Field(default=DEFAULT_SYSTEM_INSTRUCTIONS)
     stream: bool = Field(default=False)
 
@@ -47,6 +48,7 @@ class BatchGenerationRequest(BaseModel):
     top_p: float = Field(default=DEFAULT_TOP_P, ge=0.0, le=1.0)
     top_k: int = Field(default=80, ge=1, le=1000)  # Added top_k parameter
     repetition_penalty: float = Field(default=1.15, ge=1.0, le=2.0)  # Added repetition_penalty parameter
+    max_time: Optional[float] = Field(default=None, ge=0.0, description="Maximum time in seconds for generation")
     system_prompt: Optional[str] = Field(default=DEFAULT_SYSTEM_INSTRUCTIONS)
 
 
@@ -64,6 +66,7 @@ class ChatRequest(BaseModel):
     top_p: float = Field(default=DEFAULT_TOP_P, ge=0.0, le=1.0)
     top_k: int = Field(default=80, ge=1, le=1000)  # Added top_k parameter
     repetition_penalty: float = Field(default=1.15, ge=1.0, le=2.0)  # Added repetition_penalty parameter
+    max_time: Optional[float] = Field(default=None, ge=0.0, description="Maximum time in seconds for generation")
     stream: bool = Field(default=False)
 
 
@@ -129,7 +132,7 @@ async def generate_text(request: GenerationRequest) -> GenerationResponse:
         # Return a streaming response
         return StreamingResponse(
             generate_stream(request.prompt, request.max_tokens, request.temperature,
-                           request.top_p, request.system_prompt),
+                           request.top_p, request.system_prompt, request.max_time),
             media_type="text/event-stream"
         )
 
@@ -144,7 +147,8 @@ async def generate_text(request: GenerationRequest) -> GenerationResponse:
             "top_p": request.top_p if request.top_p is not None else 0.92,  # Optimized default
             "top_k": request.top_k if request.top_k is not None else 80,  # Optimized default
             "repetition_penalty": request.repetition_penalty if request.repetition_penalty is not None else 1.15,  # Optimized default
-            "do_sample": model_params.get("do_sample", True)  # Pass do_sample from model params
+            "do_sample": model_params.get("do_sample", True),  # Pass do_sample from model params
+            "max_time": request.max_time  # Pass max_time parameter
         }
 
         # Merge model-specific params with request params
@@ -212,7 +216,7 @@ async def chat_completion(request: ChatRequest) -> ChatResponse:
     # If streaming is requested, return a streaming response
     if request.stream:
         return StreamingResponse(
-            stream_chat(formatted_prompt, request.max_tokens, request.temperature, request.top_p),
+            stream_chat(formatted_prompt, request.max_tokens, request.temperature, request.top_p, request.max_time),
             media_type="text/event-stream"
         )
 
@@ -227,7 +231,8 @@ async def chat_completion(request: ChatRequest) -> ChatResponse:
             "top_p": request.top_p if request.top_p is not None else 0.92,  # Optimized default
             "top_k": request.top_k if request.top_k is not None else 80,  # Optimized default
             "repetition_penalty": request.repetition_penalty if request.repetition_penalty is not None else 1.15,  # Optimized default
-            "do_sample": model_params.get("do_sample", True)  # Pass do_sample from model params
+            "do_sample": model_params.get("do_sample", True),  # Pass do_sample from model params
+            "max_time": request.max_time  # Pass max_time parameter
         }
 
         # Merge model-specific params with request params
@@ -292,7 +297,8 @@ async def generate_stream(
     max_tokens: int,
     temperature: float,
     top_p: float,
-    system_prompt: Optional[str]
+    system_prompt: Optional[str],
+    max_time: Optional[float] = None
 ) -> AsyncGenerator[str, None]:
     """
     Generate text in a streaming fashion and return as server-sent events
@@ -309,7 +315,8 @@ async def generate_stream(
             "top_p": top_p,
             "top_k": 80,  # Optimized top_k for high-quality streaming
             "repetition_penalty": 1.15,  # Optimized repetition_penalty for high-quality streaming
-            "do_sample": model_params.get("do_sample", True)  # Pass do_sample from model params
+            "do_sample": model_params.get("do_sample", True),  # Pass do_sample from model params
+            "max_time": max_time  # Pass max_time parameter
         }
 
         # Merge model-specific params with request params
@@ -361,7 +368,8 @@ async def stream_chat(
     formatted_prompt: str,
     max_tokens: int,
     temperature: float,
-    top_p: float
+    top_p: float,
+    max_time: Optional[float] = None
 ) -> AsyncGenerator[str, None]:
     """
     Stream chat completion responses as server-sent events
@@ -378,7 +386,8 @@ async def stream_chat(
             "top_p": top_p,
             "top_k": 80,  # Optimized top_k for high-quality streaming
             "repetition_penalty": 1.15,  # Optimized repetition_penalty for high-quality streaming
-            "do_sample": model_params.get("do_sample", True)  # Pass do_sample from model params
+            "do_sample": model_params.get("do_sample", True),  # Pass do_sample from model params
+            "max_time": max_time  # Pass max_time parameter
         }
 
         # Merge model-specific params with request params
@@ -438,7 +447,8 @@ async def batch_generate(request: BatchGenerationRequest) -> BatchGenerationResp
             "top_p": request.top_p if request.top_p is not None else 0.92,  # Optimized default
             "top_k": request.top_k if request.top_k is not None else 80,  # Optimized default
             "repetition_penalty": request.repetition_penalty if request.repetition_penalty is not None else 1.15,  # Optimized default
-            "do_sample": model_params.get("do_sample", True)  # Pass do_sample from model params
+            "do_sample": model_params.get("do_sample", True),  # Pass do_sample from model params
+            "max_time": request.max_time  # Pass max_time parameter
         }
 
         # Merge model-specific params with request params
