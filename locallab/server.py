@@ -811,8 +811,34 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
             try:
                 logger.info("Server startup callback triggered")
 
-                # Set server status to running
-                set_server_status("running")
+                # Check if a model is configured to load on startup
+                try:
+                    from .cli.config import get_config_value
+                    from .config import DEFAULT_MODEL
+                    import os
+
+                    # Get the model that should be loaded
+                    model_to_load = (
+                        os.environ.get("HUGGINGFACE_MODEL") or
+                        get_config_value("model") or
+                        DEFAULT_MODEL
+                    )
+
+                    if model_to_load:
+                        # Set server status to loading while model loads
+                        set_server_status("loading")
+                        logger.info("Server status changed to: loading (waiting for model)")
+                        # Don't display running banner yet - wait for model to load
+                        return
+                    else:
+                        # No model to load, set to running immediately
+                        set_server_status("running")
+                        logger.info("Server status changed to: running")
+                except Exception as e:
+                    # Fallback if anything fails
+                    logger.warning(f"Could not determine model loading status: {e}")
+                    set_server_status("running")
+                    logger.info("Server status changed to: running")
 
                 # Display the RUNNING banner
                 print_running_banner(__version__)
@@ -862,8 +888,30 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
                 logger.debug(f"Startup display error details: {traceback.format_exc()}")
                 # Still mark startup as complete to avoid repeated attempts
                 startup_complete[0] = True
-                # Ensure server status is set to running even if display fails
-                set_server_status("running")
+                # Check if a model is configured to load before setting to running
+                try:
+                    from .cli.config import get_config_value
+                    from .config import DEFAULT_MODEL
+                    import os
+
+                    # Get the model that should be loaded
+                    model_to_load = (
+                        os.environ.get("HUGGINGFACE_MODEL") or
+                        get_config_value("model") or
+                        DEFAULT_MODEL
+                    )
+
+                    if model_to_load:
+                        set_server_status("loading")
+                        logger.info("Server status changed to: loading (waiting for model)")
+                    else:
+                        set_server_status("running")
+                        logger.info("Server status changed to: running")
+                except Exception as e:
+                    # Fallback if anything fails
+                    logger.warning(f"Could not determine model loading status: {e}")
+                    set_server_status("running")
+                    logger.info("Server status changed to: running")
 
         # Define async callback that uvicorn can call
         async def on_startup_async():

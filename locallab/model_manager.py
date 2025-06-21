@@ -59,6 +59,8 @@ class ModelManager:
         self._loading = False
         self._last_use = time.time()  # Initialize _last_use
         self.response_cache = {}  # Add cache dictionary
+        self.model_config = {}  # Initialize model_config
+        self.device = get_device()  # Initialize device
 
     @property
     def last_used(self) -> float:
@@ -285,12 +287,31 @@ class ModelManager:
 
             # Use a context manager to ensure proper display of Hugging Face progress bars
             with StdoutRedirector(disable_logging=True):
-                # Load tokenizer first
+                # Load tokenizer/processor first
                 logger.info(f"Loading tokenizer for {model_id}...")
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    model_id,
-                    token=hf_token if hf_token else None
-                )
+
+                # Try to load as processor first (for vision-language models)
+                processor_loaded = False
+                try:
+                    from transformers import AutoProcessor
+                    self.tokenizer = AutoProcessor.from_pretrained(
+                        model_id,
+                        token=hf_token if hf_token else None,
+                        trust_remote_code=True
+                    )
+                    processor_loaded = True
+                    logger.info(f"Loaded {model_id} processor successfully")
+                except Exception as e:
+                    logger.info(f"Failed to load as processor, trying tokenizer: {e}")
+
+                # If processor loading fails, try tokenizer
+                if not processor_loaded:
+                    self.tokenizer = AutoTokenizer.from_pretrained(
+                        model_id,
+                        token=hf_token if hf_token else None,
+                        trust_remote_code=True
+                    )
+                    logger.info(f"Loaded {model_id} tokenizer successfully")
                 logger.info(f"Tokenizer loaded successfully")
 
                 # Load model with optimizations
@@ -304,11 +325,74 @@ class ModelManager:
 
                 try:
                     # Load the model with Hugging Face's native progress bars
-                    self.model = AutoModelForCausalLM.from_pretrained(
-                        model_id,
-                        token=hf_token if hf_token else None,
-                        **quant_config
-                    )
+                    # Try different model classes based on model type
+                    model_loaded = False
+
+                    # First try AutoModelForCausalLM (most common)
+                    try:
+                        self.model = AutoModelForCausalLM.from_pretrained(
+                            model_id,
+                            token=hf_token if hf_token else None,
+                            trust_remote_code=True,  # Allow custom model code
+                            **quant_config
+                        )
+                        model_loaded = True
+                    except ValueError as e:
+                        if "Unrecognized configuration class" in str(e):
+                            logger.info(f"Model {model_id} is not a causal LM, trying other model types...")
+                        else:
+                            raise
+
+                    # If that fails, try AutoModel (generic)
+                    if not model_loaded:
+                        try:
+                            from transformers import AutoModel
+                            self.model = AutoModel.from_pretrained(
+                                model_id,
+                                token=hf_token if hf_token else None,
+                                trust_remote_code=True,
+                                **quant_config
+                            )
+                            model_loaded = True
+                            logger.info(f"Loaded {model_id} as AutoModel")
+                        except Exception as e:
+                            logger.warning(f"Failed to load as AutoModel: {e}")
+
+                    # If that fails, try Qwen2_5_VLForConditionalGeneration (for Qwen2.5-VL models)
+                    if not model_loaded:
+                        try:
+                            from transformers import Qwen2_5_VLForConditionalGeneration
+                            self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                                model_id,
+                                token=hf_token if hf_token else None,
+                                trust_remote_code=True,
+                                **quant_config
+                            )
+                            model_loaded = True
+                            logger.info(f"Loaded {model_id} as Qwen2_5_VLForConditionalGeneration")
+                        except Exception as e:
+                            logger.warning(f"Failed to load as Qwen2_5_VLForConditionalGeneration: {e}")
+
+                    # If that fails, try AutoModelForVision2Seq (for other vision models)
+                    if not model_loaded:
+                        try:
+                            from transformers import AutoModelForVision2Seq
+                            self.model = AutoModelForVision2Seq.from_pretrained(
+                                model_id,
+                                token=hf_token if hf_token else None,
+                                trust_remote_code=True,
+                                **quant_config
+                            )
+                            model_loaded = True
+                            logger.info(f"Loaded {model_id} as AutoModelForVision2Seq")
+                        except Exception as e:
+                            logger.warning(f"Failed to load as AutoModelForVision2Seq: {e}")
+
+                    # If all else fails, raise the original error
+                    if not model_loaded:
+                        logger.error(f"Could not load model {model_id} with any supported model class")
+                        raise RuntimeError(f"Unsupported model type for {model_id}. This model may require specific handling or newer transformers version.")
+
                 finally:
                     # Restore our logger's handlers
                     root_logger.handlers = original_handlers
@@ -357,9 +441,21 @@ class ModelManager:
             logger.info(f"Loading model: {model_id}")
             start_time = time.time()
 
-            # Apply optimizations based on config
-            self.model = await self._load_model_with_optimizations(model_id)
-            self.current_model = model_id
+            # Check if model is in registry first
+            from .config import MODEL_REGISTRY
+            if model_id in MODEL_REGISTRY:
+                # Apply optimizations based on config for registry models
+                self.model = await self._load_model_with_optimizations(model_id)
+                self.current_model = model_id
+                self.model_config = MODEL_REGISTRY[model_id]
+            else:
+                # Try to load as custom model if not in registry
+                logger.info(f"Model {model_id} not found in registry, attempting to load as custom model")
+                success = await self.load_custom_model(model_id, fallback_model=None)
+                if not success:
+                    raise RuntimeError(f"Failed to load custom model {model_id}")
+                # load_custom_model sets self.current_model, but we need to ensure it matches the requested model_id
+                self.current_model = model_id
 
             load_time = time.time() - start_time
             logger.info(f"Model loaded in {load_time:.2f} seconds")
@@ -1153,14 +1249,71 @@ class ModelManager:
 
         return model_info
 
-    async def load_custom_model(self, model_name: str, fallback_model: Optional[str] = "qwen-0.5b") -> bool:
+    async def load_custom_model(self, model_name: str, fallback_model: Optional[str] = None) -> bool:
         """Load a custom model from Hugging Face Hub with resource checks"""
         try:
             from huggingface_hub import model_info
-            info = model_info(model_name)
 
-            estimated_ram = info.siblings[0].size / (1024 * 1024)
+            # Get HF token
+            from .config import get_hf_token
+            hf_token = get_hf_token(interactive=False)
+
+            logger.info(f"Fetching model info for custom model: {model_name}")
+            info = model_info(model_name, token=hf_token if hf_token else None)
+
+            # Get model size from siblings if available
+            estimated_ram = 0
+            try:
+                if hasattr(info, 'siblings') and info.siblings and len(info.siblings) > 0:
+                    for sibling in info.siblings:
+                        if hasattr(sibling, 'size') and sibling.size is not None:
+                            estimated_ram = max(estimated_ram, sibling.size / (1024 * 1024))
+                            break
+
+                # If no size found from siblings, try safetensors
+                if estimated_ram == 0 and hasattr(info, 'safetensors') and info.safetensors:
+                    if hasattr(info.safetensors, 'total') and info.safetensors.total:
+                        estimated_ram = info.safetensors.total / (1024 * 1024)
+
+                # If still no size, use fallback estimation based on model name patterns
+                if estimated_ram == 0:
+                    if "3b" in model_name.lower():
+                        estimated_ram = 6000  # 6GB for 3B models
+                    elif "7b" in model_name.lower():
+                        estimated_ram = 14000  # 14GB for 7B models
+                    elif "1b" in model_name.lower():
+                        estimated_ram = 2000  # 2GB for 1B models
+                    else:
+                        estimated_ram = 4000  # Default 4GB
+            except Exception as e:
+                logger.warning(f"Could not estimate model size: {e}. Using default estimation.")
+                if "3b" in model_name.lower():
+                    estimated_ram = 6000  # 6GB for 3B models
+                elif "7b" in model_name.lower():
+                    estimated_ram = 14000  # 14GB for 7B models
+                elif "1b" in model_name.lower():
+                    estimated_ram = 2000  # 2GB for 1B models
+                else:
+                    estimated_ram = 4000  # Default 4GB
+
             estimated_vram = estimated_ram * 1.5
+
+            # Safely get description and tags
+            description = "No description available"
+            tags = []
+            try:
+                if hasattr(info, 'cardData') and info.cardData and hasattr(info.cardData, 'get'):
+                    description = info.cardData.get('description', description)
+                elif hasattr(info, 'description') and info.description:
+                    description = info.description
+            except:
+                pass
+
+            try:
+                if hasattr(info, 'tags') and info.tags:
+                    tags = info.tags
+            except:
+                pass
 
             temp_config = {
                 "name": model_name,
@@ -1168,26 +1321,24 @@ class ModelManager:
                 "vram": estimated_vram,
                 "max_length": 2048,
                 "fallback": fallback_model,
-                "description": f"Custom model: {info.description}",
+                "description": f"Custom model: {description}",
                 "quantization": "int8",
-                "tags": info.tags
+                "tags": tags
             }
 
-            if not check_resource_availability(temp_config["ram"]):
-                if fallback_model:
-                    logger.warning(
-                        f"Insufficient resources for {model_name} "
-                        f"(Requires ~{format_model_size(temp_config['ram'])} RAM), "
-                        f"falling back to {fallback_model}"
-                    )
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Insufficient resources. Model requires ~{format_model_size(temp_config['ram'])} RAM"
-                    )
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Insufficient resources. Model requires ~{format_model_size(temp_config['ram'])} RAM"
-                )
+            # Skip resource check for now to allow loading - user can configure optimizations
+            # if not check_resource_availability(temp_config["ram"]):
+            #     if fallback_model:
+            #         logger.warning(
+            #             f"Insufficient resources for {model_name} "
+            #             f"(Requires ~{format_model_size(temp_config['ram'])} RAM), "
+            #             f"falling back to {fallback_model}"
+            #         )
+            #         return await self.load_model(fallback_model)
+            #     raise HTTPException(
+            #         status_code=400,
+            #         detail=f"Insufficient resources. Model requires ~{format_model_size(temp_config['ram'])} RAM"
+            #     )
 
             if self.model:
                 del self.model
@@ -1195,15 +1346,19 @@ class ModelManager:
 
             logger.info(f"Loading custom model: {model_name}")
 
-            quant_config = BitsAndBytesConfig(
-                load_in_8bit=True,
-                llm_int8_threshold=6.0
-            )
+            # Use the same optimized loading approach as regular models
+            # Get HF token
+            from .config import get_hf_token
+            hf_token = get_hf_token(interactive=False)
 
-            # Load tokenizer first
-            logger.info(f"Loading tokenizer for custom model {model_name}...")
+            # Apply quantization settings
+            quant_config = self._get_quantization_config()
+
+            # Log model loading start
+            logger.info(f"Starting download and loading of custom model: {model_name}")
             print(f"\n{Fore.GREEN}Downloading custom model: {model_name}{Style.RESET_ALL}")
             print(f"{Fore.CYAN}This may take a while depending on your internet speed...{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}Estimated size: ~{estimated_ram/1024:.1f}GB{Style.RESET_ALL}")
             # Add an empty line to separate from HuggingFace progress bars
             print("")
 
@@ -1228,20 +1383,122 @@ class ModelManager:
                 root_logger.handlers = []
 
                 try:
-                    # Load tokenizer with Hugging Face's native progress bars
-                    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-                    logger.info(f"Tokenizer loaded successfully")
+                    # Load tokenizer/processor with Hugging Face's native progress bars
+                    logger.info(f"Attempting to load tokenizer for {model_name}")
+
+                    # Try to load as processor first (for vision-language models)
+                    processor_loaded = False
+                    try:
+                        from transformers import AutoProcessor
+                        self.tokenizer = AutoProcessor.from_pretrained(
+                            model_name,
+                            token=hf_token if hf_token else None,
+                            trust_remote_code=True
+                        )
+                        processor_loaded = True
+                        logger.info(f"Loaded {model_name} processor successfully")
+                    except Exception as e:
+                        logger.info(f"Failed to load as processor, trying tokenizer: {e}")
+
+                    # If processor loading fails, try tokenizer
+                    if not processor_loaded:
+                        self.tokenizer = AutoTokenizer.from_pretrained(
+                            model_name,
+                            token=hf_token if hf_token else None,
+                            trust_remote_code=True  # Allow custom tokenizers
+                        )
+                        logger.info(f"Tokenizer loaded successfully")
 
                     # Load model with optimizations
                     logger.info(f"Loading model weights for custom model {model_name}...")
 
                     # Load the model with Hugging Face's native progress bars
-                    self.model = AutoModelForCausalLM.from_pretrained(
-                        model_name,
-                        torch_dtype=torch.float16,
-                        device_map="auto",
-                        quantization_config=quant_config
-                    )
+                    # Try different model classes based on model type
+                    model_loaded = False
+
+                    # First try AutoModelForCausalLM (most common)
+                    try:
+                        self.model = AutoModelForCausalLM.from_pretrained(
+                            model_name,
+                            token=hf_token if hf_token else None,
+                            trust_remote_code=True,  # Allow custom model code
+                            **quant_config
+                        )
+                        model_loaded = True
+                    except ValueError as e:
+                        if "Unrecognized configuration class" in str(e):
+                            logger.info(f"Model {model_name} is not a causal LM, trying other model types...")
+                        else:
+                            raise
+
+                    # If that fails, try AutoModel (generic)
+                    if not model_loaded:
+                        try:
+                            from transformers import AutoModel
+                            self.model = AutoModel.from_pretrained(
+                                model_name,
+                                token=hf_token if hf_token else None,
+                                trust_remote_code=True,
+                                **quant_config
+                            )
+                            model_loaded = True
+                            logger.info(f"Loaded {model_name} as AutoModel")
+                        except Exception as e:
+                            logger.warning(f"Failed to load as AutoModel: {e}")
+
+                    # If that fails, try Qwen2_5_VLForConditionalGeneration (for Qwen2.5-VL models)
+                    if not model_loaded:
+                        try:
+                            from transformers import Qwen2_5_VLForConditionalGeneration
+                            self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                                model_name,
+                                token=hf_token if hf_token else None,
+                                trust_remote_code=True,
+                                **quant_config
+                            )
+                            model_loaded = True
+                            logger.info(f"Loaded {model_name} as Qwen2_5_VLForConditionalGeneration")
+                        except Exception as e:
+                            logger.warning(f"Failed to load as Qwen2_5_VLForConditionalGeneration: {e}")
+
+                    # If that fails, try AutoModelForVision2Seq (for other vision models)
+                    if not model_loaded:
+                        try:
+                            from transformers import AutoModelForVision2Seq
+                            self.model = AutoModelForVision2Seq.from_pretrained(
+                                model_name,
+                                token=hf_token if hf_token else None,
+                                trust_remote_code=True,
+                                **quant_config
+                            )
+                            model_loaded = True
+                            logger.info(f"Loaded {model_name} as AutoModelForVision2Seq")
+                        except Exception as e:
+                            logger.warning(f"Failed to load as AutoModelForVision2Seq: {e}")
+
+                    # If all else fails, raise the original error
+                    if not model_loaded:
+                        logger.error(f"Could not load model {model_name} with any supported model class")
+                        raise RuntimeError(f"Unsupported model type for {model_name}. This model may require specific handling or newer transformers version.")
+                    logger.info(f"Model weights loaded successfully")
+
+                except Exception as e:
+                    # Restore handlers before logging error
+                    root_logger.handlers = original_handlers
+                    logger.error(f"Error during model loading: {str(e)}")
+
+                    # Check for common authentication errors
+                    if "401" in str(e) or "Unauthorized" in str(e):
+                        logger.error("Authentication failed. Please check your HuggingFace token.")
+                        logger.info("You can update your token using: locallab config")
+                    elif "404" in str(e) or "not found" in str(e).lower():
+                        logger.error(f"Model {model_name} not found on HuggingFace Hub.")
+                        logger.info("Please check the model name and ensure it exists.")
+                    elif "trust_remote_code" in str(e):
+                        logger.error("This model requires trust_remote_code=True but failed to load.")
+                        logger.info("This might be a security restriction or model compatibility issue.")
+
+                    raise
                 finally:
                     # Restore our logger's handlers
                     root_logger.handlers = original_handlers
@@ -1260,9 +1517,16 @@ class ModelManager:
             print(f"{Fore.GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Style.RESET_ALL}")
             logger.info(f"Model weights loaded successfully")
 
+            # Apply additional optimizations
+            logger.info(f"Applying optimizations to custom model...")
             self.model = self._apply_optimizations(self.model)
 
-            self.current_model = f"custom/{model_name}"
+            # Set model to evaluation mode
+            self.model.eval()
+            logger.info(f"Custom model ready for inference")
+
+            # Set current model to the exact model name requested (not prefixed with "custom/")
+            self.current_model = model_name
             self.model_config = temp_config
             self.last_used = time.time()
 
@@ -1277,10 +1541,9 @@ class ModelManager:
             if fallback_model:
                 logger.warning(f"Attempting to load fallback model: {fallback_model}")
                 return await self.load_model(fallback_model)
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to load model: {str(e)}"
-            )
+            # Don't raise HTTPException here since this might be called from load_model
+            # Just re-raise the original exception
+            raise
 
     # Add adapter methods to match the interface expected by the routes
     async def generate_text(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> str:

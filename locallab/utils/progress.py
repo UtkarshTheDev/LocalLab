@@ -164,9 +164,14 @@ def configure_hf_hub_progress():
         from huggingface_hub.utils import logging as hf_logging
         hf_logging.enable_progress_bars()
 
-        # 2. Enable HF Transfer for better download experience
-        from huggingface_hub import constants
-        constants.HF_HUB_ENABLE_HF_TRANSFER = True
+        # 2. Enable HF Transfer for better download experience (only if available)
+        try:
+            import hf_transfer
+            from huggingface_hub import constants
+            constants.HF_HUB_ENABLE_HF_TRANSFER = True
+        except ImportError:
+            # hf_transfer not available, skip enabling it
+            pass
 
         # 3. Make sure we're NOT overriding HuggingFace's progress callback
         # This is critical - we want to use their native implementation

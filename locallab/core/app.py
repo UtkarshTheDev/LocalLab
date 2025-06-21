@@ -84,6 +84,9 @@ app.include_router(system_router)
 # Startup event triggered flag
 startup_event_triggered = False
 
+# Model loading status flag
+model_loading_in_progress = False
+
 # Application startup event to ensure banners are displayed
 @app.on_event("startup")
 async def startup_event():
@@ -155,7 +158,11 @@ async def startup_event():
     if model_to_load:
         try:
             # This will run asynchronously without blocking server startup
+            # But we'll set a flag to indicate model loading is in progress
             asyncio.create_task(load_model_in_background(model_to_load))
+            # Set a global flag to indicate model is loading
+            global model_loading_in_progress
+            model_loading_in_progress = True
         except Exception as e:
             logger.error(f"Error starting model loading task: {str(e)}")
     else:
@@ -288,6 +295,7 @@ async def add_process_time_header(request: Request, call_next):
 
 async def load_model_in_background(model_id: str):
     """Load the model asynchronously in the background"""
+    global model_loading_in_progress
     logger.info(f"Loading model {model_id} in background...")
     start_time = time.time()
 
@@ -309,8 +317,40 @@ async def load_model_in_background(model_id: str):
 
         # We don't need to call log_model_loaded here since it's already done in the model_manager
         logger.info(f"{Fore.GREEN}Model {model_id} loaded successfully in {load_time:.2f} seconds!{Style.RESET_ALL}")
+
+        # Now that model is loaded, set server status to running
+        from ..logger.logger import set_server_status
+        set_server_status("running")
+        logger.info("Server status changed to: running")
+
+        # Mark model loading as complete
+        model_loading_in_progress = False
+
+        # Display the running banner now that model is loaded
+        try:
+            from ..ui.banners import print_running_banner
+            from .. import __version__
+            print_running_banner(__version__)
+        except Exception as banner_e:
+            logger.warning(f"Could not display running banner: {banner_e}")
+
     except Exception as e:
         logger.error(f"Failed to load model {model_id}: {str(e)}")
         if "401 Client Error: Unauthorized" in str(e):
             logger.error("This appears to be an authentication error. Please ensure your HuggingFace token is set correctly.")
             logger.info("You can set your token using: locallab config")
+
+        # Even if model loading fails, mark it as complete and set server to running
+        # so the server can still be used for other operations
+        model_loading_in_progress = False
+        from ..logger.logger import set_server_status
+        set_server_status("running")
+        logger.info("Server status changed to: running (model loading failed)")
+
+        # Display the running banner even if model loading failed
+        try:
+            from ..ui.banners import print_running_banner
+            from .. import __version__
+            print_running_banner(__version__)
+        except Exception as banner_e:
+            logger.warning(f"Could not display running banner: {banner_e}")

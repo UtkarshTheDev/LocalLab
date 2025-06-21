@@ -49,18 +49,11 @@ class LoadModelRequest(BaseModel):
 async def load_model(request: LoadModelRequest) -> Dict[str, str]:
     """Load a specific model"""
     try:
-        # Check if model exists in registry
-        if request.model_id not in MODEL_REGISTRY:
-            raise HTTPException(
-                status_code=404, 
-                detail=f"Model {request.model_id} not found. Available models: {list(MODEL_REGISTRY.keys())}"
-            )
-        
         # Check if model is already loaded
         if model_manager.current_model == request.model_id and model_manager.is_model_loaded(request.model_id):
             return {"status": "success", "message": f"Model {request.model_id} is already loaded"}
-        
-        # Load the model
+
+        # Load the model (this will handle both registry and custom models)
         await model_manager.load_model(request.model_id)
         return {"status": "success", "message": f"Model {request.model_id} loaded successfully"}
     except Exception as e:
@@ -108,17 +101,14 @@ async def get_current_model() -> ModelResponse:
     )
 
 @router.post("/load/{model_id}", response_model=Dict[str, str])
-async def load_model(model_id: str, background_tasks: BackgroundTasks) -> Dict[str, str]:
+async def load_model_by_path(model_id: str, background_tasks: BackgroundTasks) -> Dict[str, str]:
     """Load a specific model"""
-    if model_id not in MODEL_REGISTRY:
-        raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
-    
     # Check if the model is already loaded
     if model_manager.current_model == model_id and model_manager.is_model_loaded(model_id):
         return {"status": "success", "message": f"Model {model_id} is already loaded"}
-    
+
     try:
-        # Load model in background
+        # Load model in background (this will handle both registry and custom models)
         background_tasks.add_task(model_manager.load_model, model_id)
         return {"status": "loading", "message": f"Model {model_id} loading started in background"}
     except Exception as e:
@@ -129,15 +119,13 @@ async def load_model(model_id: str, background_tasks: BackgroundTasks) -> Dict[s
 async def load_model_from_body(request: LoadModelRequest, background_tasks: BackgroundTasks) -> Dict[str, str]:
     """Load a specific model using model_id from request body"""
     model_id = request.model_id
-    if model_id not in MODEL_REGISTRY:
-        raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
-    
+
     # Check if the model is already loaded
     if model_manager.current_model == model_id and model_manager.is_model_loaded(model_id):
         return {"status": "success", "message": f"Model {model_id} is already loaded"}
-    
+
     try:
-        # Load model in background
+        # Load model in background (this will handle both registry and custom models)
         background_tasks.add_task(model_manager.load_model, model_id)
         return {"status": "loading", "message": f"Model {model_id} loading started in background"}
     except Exception as e:
@@ -161,12 +149,10 @@ async def unload_model() -> Dict[str, str]:
 @router.get("/status/{model_id}", response_model=ModelResponse)
 async def get_model_status(model_id: str) -> ModelResponse:
     """Get the loading status of a specific model"""
-    if model_id not in MODEL_REGISTRY:
-        raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
-    
+    # Check if model is in registry first, otherwise treat as custom model
     model_info = MODEL_REGISTRY.get(model_id, {})
     is_loaded = model_manager.is_model_loaded(model_id)
-    
+
     # If this is the current model and it's loaded or loading
     if model_manager.current_model == model_id:
         return ModelResponse(

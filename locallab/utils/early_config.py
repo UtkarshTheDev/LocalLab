@@ -9,7 +9,14 @@ import logging
 import warnings
 
 # Configure environment variables for Hugging Face
-os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"  # Enable HF Transfer for better downloads
+# Only enable HF Transfer if the package is available
+try:
+    import hf_transfer
+    os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"  # Enable HF Transfer for better downloads
+except ImportError:
+    # hf_transfer not available, disable it to avoid errors
+    os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
+
 os.environ["TOKENIZERS_PARALLELISM"] = "true"  # Enable parallelism for tokenizers
 os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"  # Disable advisory warnings
 os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"  # Disable telemetry
@@ -106,9 +113,14 @@ def enable_hf_progress_bars():
         # Method 3: Set environment variable (works for all versions)
         os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "0"
 
-        # Also enable HF Transfer for better download experience
+        # Also enable HF Transfer for better download experience (only if available)
         if hasattr(huggingface_hub, "constants"):
-            huggingface_hub.constants.HF_HUB_ENABLE_HF_TRANSFER = True
+            try:
+                import hf_transfer
+                huggingface_hub.constants.HF_HUB_ENABLE_HF_TRANSFER = True
+            except ImportError:
+                # hf_transfer not available, don't enable it
+                huggingface_hub.constants.HF_HUB_ENABLE_HF_TRANSFER = False
     except ImportError:
         pass
 
