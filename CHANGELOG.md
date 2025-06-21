@@ -2,6 +2,13 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.7.2] - 2025-05-19
+
+### Fixed
+
+- Fixed Hugging Face Model Download Issues with ModelManager and ModelLoading Processes
+- Improved Model Downloading and Loading Processes for better reliability and performance
+
 ## [0.7.1] - 2025-05-18
 
 ### Fixed
