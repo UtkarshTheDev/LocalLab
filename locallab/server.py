@@ -811,6 +811,9 @@ def start_server(use_ngrok: bool = None, port: int = None, ngrok_auth_token: Opt
             try:
                 logger.info("Server startup callback triggered")
 
+                # Mark startup as complete to prevent repeated calls
+                startup_complete[0] = True
+
                 # Check if a model is configured to load on startup
                 try:
                     from .cli.config import get_config_value

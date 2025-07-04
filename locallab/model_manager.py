@@ -72,11 +72,34 @@ class ModelManager:
         """Set the timestamp of last model use"""
         self._last_use = value
 
+    def _get_safe_device_map(self) -> str:
+        """Get a safe device mapping strategy that avoids disk offloading"""
+        if torch.cuda.is_available():
+            # Check available GPU memory
+            try:
+                gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)  # GB
+                logger.info(f"Available GPU memory: {gpu_memory:.1f} GB")
+
+                # If we have sufficient GPU memory (>4GB), use GPU
+                if gpu_memory > 4.0:
+                    return "cuda:0"
+                else:
+                    logger.warning(f"Limited GPU memory ({gpu_memory:.1f} GB), using CPU to avoid disk offloading")
+                    return "cpu"
+            except Exception as e:
+                logger.warning(f"Could not determine GPU memory: {e}, using CPU")
+                return "cpu"
+        else:
+            return "cpu"
+
     def _get_quantization_config(self) -> Optional[Dict[str, Any]]:
         """Get quantization configuration based on settings"""
         # Check if quantization is explicitly disabled (not just False but also '0', 'none', '')
         # Use the config system to get the value, which checks environment variables and config file
         from .cli.config import get_config_value
+
+        # Get safe device mapping
+        safe_device_map = self._get_safe_device_map()
 
         # First check if CUDA is available - if not, we can't use bitsandbytes quantization
         if not torch.cuda.is_available():
@@ -84,7 +107,7 @@ class ModelManager:
             logger.info("Disabling quantization and using CPU-compatible settings")
             return {
                 "torch_dtype": torch.float32,
-                "device_map": "auto"
+                "device_map": safe_device_map
             }
 
         enable_quantization = get_config_value('enable_quantization', ENABLE_QUANTIZATION)
@@ -98,7 +121,7 @@ class ModelManager:
             logger.info("Quantization is disabled, using default precision")
             return {
                 "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
-                "device_map": "auto"
+                "device_map": safe_device_map
             }
 
         try:
@@ -127,7 +150,7 @@ class ModelManager:
             if quantization_type == "int8":
                 logger.info("Using INT8 quantization")
                 return {
-                    "device_map": "auto",
+                    "device_map": safe_device_map,
                     "quantization_config": BitsAndBytesConfig(
                         load_in_8bit=True,
                         llm_int8_threshold=6.0,
@@ -138,7 +161,7 @@ class ModelManager:
             elif quantization_type == "int4":
                 logger.info("Using INT4 quantization")
                 return {
-                    "device_map": "auto",
+                    "device_map": safe_device_map,
                     "quantization_config": BitsAndBytesConfig(
                         load_in_4bit=True,
                         bnb_4bit_compute_dtype=torch.float16,
@@ -150,7 +173,7 @@ class ModelManager:
                 logger.info(f"Unrecognized quantization type '{quantization_type}', defaulting to fp16")
                 return {
                     "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
-                    "device_map": "auto"
+                    "device_map": safe_device_map
                 }
 
         except ImportError:
@@ -160,7 +183,7 @@ class ModelManager:
             )
             return {
                 "torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
-                "device_map": "auto"
+                "device_map": safe_device_map
             }
 
     def _apply_optimizations(self, model: AutoModelForCausalLM) -> AutoModelForCausalLM:
@@ -290,21 +313,22 @@ class ModelManager:
                 # Load tokenizer/processor first
                 logger.info(f"Loading tokenizer for {model_id}...")
 
-                # Try to load as processor first (for vision-language models)
+                # For vision-language models, try processor first
                 processor_loaded = False
-                try:
-                    from transformers import AutoProcessor
-                    self.tokenizer = AutoProcessor.from_pretrained(
-                        model_id,
-                        token=hf_token if hf_token else None,
-                        trust_remote_code=True
-                    )
-                    processor_loaded = True
-                    logger.info(f"Loaded {model_id} processor successfully")
-                except Exception as e:
-                    logger.info(f"Failed to load as processor, trying tokenizer: {e}")
+                if "vl" in model_id.lower() or "vision" in model_id.lower() or "qwen2.5-vl" in model_id.lower():
+                    try:
+                        from transformers import AutoProcessor
+                        self.tokenizer = AutoProcessor.from_pretrained(
+                            model_id,
+                            token=hf_token if hf_token else None,
+                            trust_remote_code=True
+                        )
+                        processor_loaded = True
+                        logger.info(f"Loaded {model_id} processor successfully")
+                    except Exception as e:
+                        logger.info(f"Failed to load as processor, trying tokenizer: {e}")
 
-                # If processor loading fails, try tokenizer
+                # If processor loading fails or not a VL model, try tokenizer
                 if not processor_loaded:
                     self.tokenizer = AutoTokenizer.from_pretrained(
                         model_id,
@@ -342,6 +366,27 @@ class ModelManager:
                             logger.info(f"Model {model_id} is not a causal LM, trying other model types...")
                         else:
                             raise
+                    except Exception as e:
+                        # Handle disk offloading errors
+                        if "disk_offload" in str(e).lower() or "offload the whole model" in str(e).lower():
+                            logger.info("Retrying AutoModelForCausalLM with CPU-only configuration...")
+                            try:
+                                cpu_config = {
+                                    "torch_dtype": torch.float32,
+                                    "device_map": "cpu"
+                                }
+                                self.model = AutoModelForCausalLM.from_pretrained(
+                                    model_id,
+                                    token=hf_token if hf_token else None,
+                                    trust_remote_code=True,
+                                    **cpu_config
+                                )
+                                model_loaded = True
+                                logger.info(f"Loaded {model_id} as AutoModelForCausalLM (CPU-only)")
+                            except Exception as cpu_e:
+                                logger.warning(f"CPU-only retry also failed: {cpu_e}")
+                        else:
+                            logger.warning(f"Failed to load as AutoModelForCausalLM: {e}")
 
                     # If that fails, try AutoModel (generic)
                     if not model_loaded:
@@ -372,6 +417,25 @@ class ModelManager:
                             logger.info(f"Loaded {model_id} as Qwen2_5_VLForConditionalGeneration")
                         except Exception as e:
                             logger.warning(f"Failed to load as Qwen2_5_VLForConditionalGeneration: {e}")
+
+                            # If it's a disk offloading error, try with CPU-only configuration
+                            if "disk_offload" in str(e).lower() or "offload the whole model" in str(e).lower():
+                                logger.info("Retrying Qwen2_5_VLForConditionalGeneration with CPU-only configuration...")
+                                try:
+                                    cpu_config = {
+                                        "torch_dtype": torch.float32,
+                                        "device_map": "cpu"
+                                    }
+                                    self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                                        model_id,
+                                        token=hf_token if hf_token else None,
+                                        trust_remote_code=True,
+                                        **cpu_config
+                                    )
+                                    model_loaded = True
+                                    logger.info(f"Loaded {model_id} as Qwen2_5_VLForConditionalGeneration (CPU-only)")
+                                except Exception as cpu_e:
+                                    logger.warning(f"CPU-only retry also failed: {cpu_e}")
 
                     # If that fails, try AutoModelForVision2Seq (for other vision models)
                     if not model_loaded:
@@ -1386,21 +1450,22 @@ class ModelManager:
                     # Load tokenizer/processor with Hugging Face's native progress bars
                     logger.info(f"Attempting to load tokenizer for {model_name}")
 
-                    # Try to load as processor first (for vision-language models)
+                    # For vision-language models, try processor first
                     processor_loaded = False
-                    try:
-                        from transformers import AutoProcessor
-                        self.tokenizer = AutoProcessor.from_pretrained(
-                            model_name,
-                            token=hf_token if hf_token else None,
-                            trust_remote_code=True
-                        )
-                        processor_loaded = True
-                        logger.info(f"Loaded {model_name} processor successfully")
-                    except Exception as e:
-                        logger.info(f"Failed to load as processor, trying tokenizer: {e}")
+                    if "vl" in model_name.lower() or "vision" in model_name.lower() or "qwen2.5-vl" in model_name.lower():
+                        try:
+                            from transformers import AutoProcessor
+                            self.tokenizer = AutoProcessor.from_pretrained(
+                                model_name,
+                                token=hf_token if hf_token else None,
+                                trust_remote_code=True
+                            )
+                            processor_loaded = True
+                            logger.info(f"Loaded {model_name} processor successfully")
+                        except Exception as e:
+                            logger.info(f"Failed to load as processor, trying tokenizer: {e}")
 
-                    # If processor loading fails, try tokenizer
+                    # If processor loading fails or not a VL model, try tokenizer
                     if not processor_loaded:
                         self.tokenizer = AutoTokenizer.from_pretrained(
                             model_name,
@@ -1430,6 +1495,27 @@ class ModelManager:
                             logger.info(f"Model {model_name} is not a causal LM, trying other model types...")
                         else:
                             raise
+                    except Exception as e:
+                        # Handle disk offloading errors
+                        if "disk_offload" in str(e).lower() or "offload the whole model" in str(e).lower():
+                            logger.info("Retrying AutoModelForCausalLM with CPU-only configuration...")
+                            try:
+                                cpu_config = {
+                                    "torch_dtype": torch.float32,
+                                    "device_map": "cpu"
+                                }
+                                self.model = AutoModelForCausalLM.from_pretrained(
+                                    model_name,
+                                    token=hf_token if hf_token else None,
+                                    trust_remote_code=True,
+                                    **cpu_config
+                                )
+                                model_loaded = True
+                                logger.info(f"Loaded {model_name} as AutoModelForCausalLM (CPU-only)")
+                            except Exception as cpu_e:
+                                logger.warning(f"CPU-only retry also failed: {cpu_e}")
+                        else:
+                            logger.warning(f"Failed to load as AutoModelForCausalLM: {e}")
 
                     # If that fails, try AutoModel (generic)
                     if not model_loaded:
@@ -1460,6 +1546,25 @@ class ModelManager:
                             logger.info(f"Loaded {model_name} as Qwen2_5_VLForConditionalGeneration")
                         except Exception as e:
                             logger.warning(f"Failed to load as Qwen2_5_VLForConditionalGeneration: {e}")
+
+                            # If it's a disk offloading error, try with CPU-only configuration
+                            if "disk_offload" in str(e).lower() or "offload the whole model" in str(e).lower():
+                                logger.info("Retrying Qwen2_5_VLForConditionalGeneration with CPU-only configuration...")
+                                try:
+                                    cpu_config = {
+                                        "torch_dtype": torch.float32,
+                                        "device_map": "cpu"
+                                    }
+                                    self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                                        model_name,
+                                        token=hf_token if hf_token else None,
+                                        trust_remote_code=True,
+                                        **cpu_config
+                                    )
+                                    model_loaded = True
+                                    logger.info(f"Loaded {model_name} as Qwen2_5_VLForConditionalGeneration (CPU-only)")
+                                except Exception as cpu_e:
+                                    logger.warning(f"CPU-only retry also failed: {cpu_e}")
 
                     # If that fails, try AutoModelForVision2Seq (for other vision models)
                     if not model_loaded:
