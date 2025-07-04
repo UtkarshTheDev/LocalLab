@@ -2,6 +2,88 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.8.0] - 2025-07-04
+
+### 🎉 Major Release - Comprehensive Model Loading Fixes
+
+This release addresses critical issues that were preventing text generation LLMs from working properly with LocalLab, particularly the Qwen2.5-VL model and disk offloading errors.
+
+### Fixed
+
+#### 🔧 Critical Disk Offloading Issue
+- **Fixed "You are trying to offload the whole model to the disk" error** that was preventing all text generation LLMs from loading
+- Implemented intelligent device mapping strategy that prevents disk offloading:
+  - **GPU Memory Detection**: Automatically checks available GPU memory before device placement
+  - **Safe Device Selection**: Uses specific device assignments (`cuda:0` or `cpu`) instead of problematic `device_map: "auto"`
+  - **CPU Fallback Logic**: Automatically uses CPU when GPU memory is insufficient (<4GB)
+  - **Error Recovery**: Detects disk offloading errors and automatically retries with CPU-only configuration
+
+#### 🔧 Qwen2.5-VL Model Loading
+- **Fixed Qwen2.5-VL model loading errors** with proper model class detection
+- Added comprehensive fallback logic for different model types:
+  - `AutoModelForCausalLM` → `AutoModel` → `Qwen2_5_VLForConditionalGeneration` → `AutoModelForVision2Seq`
+- Enhanced processor/tokenizer loading with smart detection:
+  - **Vision-Language Models**: Use `AutoProcessor` for models with "vl", "vision", or "qwen2.5-vl" in name
+  - **Text-Only Models**: Use `AutoTokenizer` for all other models
+
+#### 🔧 Server Stability Issues
+- **Fixed repeated startup callbacks** that were spamming logs every 30 seconds
+- Added completion flag to prevent callback loops during server initialization
+- Enhanced server startup process for cleaner, one-time initialization
+
+#### 🔧 Enhanced Error Recovery
+- **CPU Retry Logic**: When GPU loading fails with disk offloading errors, automatically retry with CPU-only configuration
+- **Comprehensive Error Detection**: Intelligently detects various error patterns and triggers appropriate fallbacks
+- **Memory-Aware Loading**: Considers available system resources when selecting device mapping strategy
+
+### Added
+
+#### 🚀 Smart Device Management
+- **New `_get_safe_device_map()` method** for intelligent device selection
+- **GPU Memory Inspection**: Checks GPU memory capacity before attempting GPU loading
+- **Adaptive Configuration**: Automatically adjusts quantization settings based on available hardware
+- **Multi-Level Fallbacks**: Multiple fallback strategies ensure models load successfully
+
+#### 🚀 Enhanced Model Support
+- **Universal Text Generation Support**: All text generation LLMs now work properly with the package
+- **Vision-Language Model Support**: Proper handling of multimodal models like Qwen2.5-VL
+- **Cross-Platform Compatibility**: Works reliably across different hardware configurations
+
+### Changed
+
+#### ⚡ Improved Model Loading Process
+- **Updated quantization configuration** to use safe device mapping across all scenarios
+- **Enhanced model class detection** with comprehensive fallback chains
+- **Optimized memory usage** with intelligent device selection
+- **Better error messages** with clear guidance for troubleshooting
+
+#### ⚡ Dependencies
+- **Updated transformers requirement** to `>=4.49.0` (minimum version for Qwen2.5-VL support)
+- Ensured compatibility with latest Hugging Face ecosystem
+
+### Technical Details
+
+#### Files Modified
+- `locallab/model_manager.py`: Core model loading logic with device mapping and error recovery
+- `locallab/server.py`: Fixed startup callback loop
+- `requirements.txt` & `setup.py`: Updated transformers version
+
+#### Key Improvements
+- **Device Mapping Strategy**: Prevents disk offloading by using specific device assignments
+- **Error Recovery Mechanisms**: Multiple fallback strategies ensure successful model loading
+- **Memory Management**: Intelligent resource allocation based on available hardware
+- **Cross-Model Compatibility**: Universal support for text generation and vision-language models
+
+### Impact
+
+This release ensures that **ALL text generation LLMs work properly** with LocalLab:
+- ✅ Qwen2.5-VL models load successfully
+- ✅ Large models don't fail with disk offloading errors
+- ✅ GPU models use GPU when memory is sufficient
+- ✅ CPU fallback works seamlessly when needed
+- ✅ Server startup is clean and stable
+- ✅ Universal compatibility across different model types
+
 ## [0.7.2] - 2025-05-19
 
 ### Fixed
