@@ -42,6 +42,13 @@ class ChatInterface:
         self.model_info: Optional[Dict[str, Any]] = None
         self.ui = ChatUI()
 
+        # Error handling and reconnection settings
+        self.max_retries = 3
+        self.retry_delay = 2.0  # seconds
+        self.connection_timeout = 10.0  # seconds
+        self.auto_reconnect = True
+        self.graceful_shutdown = False
+
     async def connect(self) -> bool:
         """Connect to the LocalLab server"""
         try:
@@ -84,10 +91,75 @@ class ChatInterface:
 
     async def disconnect(self):
         """Disconnect from the server"""
-        if self.connection:
-            await self.connection.disconnect()
+        try:
+            if self.connection:
+                await self.connection.disconnect()
+                self.connection = None
+            self.connected = False
+            logger.info("Successfully disconnected from server")
+        except Exception as e:
+            logger.error(f"Error during disconnection: {str(e)}")
+            # Force cleanup even if disconnect fails
             self.connection = None
-        self.connected = False
+            self.connected = False
+
+    async def _check_connection(self) -> bool:
+        """Check if connection is still alive"""
+        if not self.connection or not self.connected:
+            return False
+
+        try:
+            # Perform a quick health check
+            health_ok = await self.connection.health_check()
+            if not health_ok:
+                logger.warning("Health check failed - connection may be lost")
+                self.connected = False
+                return False
+            return True
+        except Exception as e:
+            logger.warning(f"Connection check failed: {str(e)}")
+            self.connected = False
+            return False
+
+    async def _attempt_reconnection(self) -> bool:
+        """Attempt to reconnect to the server with retries"""
+        if not self.auto_reconnect or self.graceful_shutdown:
+            return False
+
+        self.ui.display_info("🔄 Connection lost. Attempting to reconnect...")
+
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                self.ui.display_info(f"   Attempt {attempt}/{self.max_retries}...")
+
+                # Clean up old connection
+                if self.connection:
+                    try:
+                        await self.connection.disconnect()
+                    except:
+                        pass
+                    self.connection = None
+
+                # Create new connection
+                self.connection = ServerConnection(self.url, timeout=self.connection_timeout)
+                success = await self.connection.connect()
+
+                if success:
+                    self.connected = True
+                    self.ui.display_info("✅ Reconnection successful!")
+                    return True
+                else:
+                    logger.warning(f"Reconnection attempt {attempt} failed")
+
+            except Exception as e:
+                logger.warning(f"Reconnection attempt {attempt} failed: {str(e)}")
+
+            if attempt < self.max_retries:
+                self.ui.display_info(f"   Waiting {self.retry_delay} seconds before next attempt...")
+                await asyncio.sleep(self.retry_delay)
+
+        self.ui.display_error("❌ Failed to reconnect after all attempts")
+        return False
 
     def _display_connection_info(self):
         """Display server and model information using the UI framework"""
@@ -98,11 +170,11 @@ class ChatInterface:
         )
 
     async def start_chat(self):
-        """Start the interactive chat session"""
-        if not await self.connect():
-            return
-
+        """Start the interactive chat session with comprehensive error handling"""
         try:
+            if not await self.connect():
+                return
+
             # Display help information
             self.ui.display_info("Type your message and press Enter to send.")
             self.ui.display_info("Type '/help' for commands, '/exit' or '/quit' to end the session.")
@@ -112,14 +184,28 @@ class ChatInterface:
             await self._chat_loop()
 
         except KeyboardInterrupt:
-            self.ui.display_goodbye()
+            self.graceful_shutdown = True
+            self.ui.display_info("\n🛑 Received interrupt signal. Shutting down gracefully...")
+            await self._graceful_shutdown()
+        except Exception as e:
+            logger.error(f"Unexpected error in chat session: {str(e)}")
+            self.ui.display_error(f"❌ Unexpected error: {str(e)}")
         finally:
-            await self.disconnect()
+            await self._cleanup()
 
     async def _chat_loop(self):
-        """Main chat interaction loop"""
-        while True:
+        """Main chat interaction loop with enhanced error handling"""
+        consecutive_errors = 0
+        max_consecutive_errors = 5
+
+        while not self.graceful_shutdown:
             try:
+                # Check connection periodically
+                if not await self._check_connection():
+                    if not await self._attempt_reconnection():
+                        self.ui.display_error("❌ Unable to maintain connection. Exiting...")
+                        break
+
                 # Get user input
                 user_input = self.ui.get_user_input()
 
@@ -129,27 +215,57 @@ class ChatInterface:
 
                 # Handle commands
                 if user_input.startswith('/'):
-                    if await self._handle_command(user_input):
-                        break  # Exit command was used
-                    continue
+                    try:
+                        if await self._handle_command(user_input):
+                            break  # Exit command was used
+                        consecutive_errors = 0  # Reset error count on successful command
+                        continue
+                    except Exception as e:
+                        logger.error(f"Error handling command '{user_input}': {str(e)}")
+                        self.ui.display_error(f"❌ Command error: {str(e)}")
+                        consecutive_errors += 1
 
                 # Display user message
                 self.ui.display_user_message(user_input)
 
                 # Process the message
-                await self._process_message(user_input)
+                try:
+                    await self._process_message(user_input)
+                    consecutive_errors = 0  # Reset error count on successful processing
+                except Exception as e:
+                    logger.error(f"Error processing message: {str(e)}")
+                    self.ui.display_error(f"❌ Processing error: {str(e)}")
+                    consecutive_errors += 1
+
                 self.ui.display_separator()
 
             except KeyboardInterrupt:
+                self.graceful_shutdown = True
+                break
+            except EOFError:
+                # Handle EOF gracefully
+                self.ui.display_info("\n📝 End of input detected. Exiting...")
+                break
+            except Exception as e:
+                logger.error(f"Unexpected error in chat loop: {str(e)}")
+                self.ui.display_error(f"❌ Unexpected error: {str(e)}")
+                consecutive_errors += 1
+
+            # Check for too many consecutive errors
+            if consecutive_errors >= max_consecutive_errors:
+                self.ui.display_error(f"❌ Too many consecutive errors ({consecutive_errors}). Exiting for safety...")
                 break
 
-        self.ui.display_goodbye()
+        if not self.graceful_shutdown:
+            self.ui.display_goodbye()
 
     async def _handle_command(self, command: str) -> bool:
         """Handle chat commands. Returns True if should exit."""
         command = command.lower().strip()
 
-        if command in ['/exit', '/quit']:
+        if command in ['/exit', '/quit', '/bye', '/goodbye']:
+            self.graceful_shutdown = True
+            self.ui.display_info("👋 Initiating graceful shutdown...")
             return True
         elif command == '/help':
             self.ui.display_help()
@@ -174,48 +290,149 @@ class ChatInterface:
         return False
 
     async def _process_message(self, message: str):
-        """Process user message and get AI response"""
-        try:
-            if not self.connection:
-                self.ui.display_error("Not connected to server")
+        """Process user message and get AI response with error handling and reconnection"""
+        max_attempts = 2  # Allow one retry
+
+        for attempt in range(max_attempts):
+            try:
+                # Check connection before processing
+                if not await self._check_connection():
+                    if attempt == 0 and await self._attempt_reconnection():
+                        continue  # Retry with new connection
+                    else:
+                        self.ui.display_error("❌ Not connected to server and reconnection failed")
+                        return
+
+                # Show loading indicator
+                self.ui.display_info("🤔 Thinking...")
+
+                # Choose generation method based on mode
+                if self.mode == GenerationMode.STREAM:
+                    await self._generate_stream_with_recovery(message)
+                elif self.mode == GenerationMode.CHAT:
+                    response = await self._chat_completion_with_recovery(message)
+                    if response:
+                        response_text = self._extract_response_text(response)
+                        if response_text:
+                            model_name = self.model_info.get('model_id', 'AI') if self.model_info else 'AI'
+                            self.ui.display_ai_response(response_text, model_name)
+                        else:
+                            self.ui.display_error("Received empty response from server")
+                    else:
+                        self.ui.display_error("Failed to get response from server")
+                elif self.mode == GenerationMode.BATCH:
+                    # For batch mode, treat single messages as single-item batches
+                    await self._process_batch_with_recovery([message])
+                else:
+                    # Simple generation mode
+                    response = await self._generate_text_with_recovery(message)
+                    if response:
+                        response_text = self._extract_response_text(response)
+                        if response_text:
+                            model_name = self.model_info.get('model_id', 'AI') if self.model_info else 'AI'
+                            self.ui.display_ai_response(response_text, model_name)
+                        else:
+                            self.ui.display_error("Received empty response from server")
+                    else:
+                        self.ui.display_error("Failed to get response from server")
+
+                # If we reach here, processing was successful
                 return
 
-            # Show loading indicator
-            self.ui.display_info("🤔 Thinking...")
+            except ConnectionError as e:
+                logger.warning(f"Connection error on attempt {attempt + 1}: {str(e)}")
+                if attempt == 0:
+                    # Try to reconnect on first failure
+                    if await self._attempt_reconnection():
+                        continue
+                self.ui.display_error(f"❌ Connection error: {str(e)}")
+                return
 
-            # Choose generation method based on mode
-            if self.mode == GenerationMode.STREAM:
-                await self._generate_stream(message)
-            elif self.mode == GenerationMode.CHAT:
-                response = await self._chat_completion(message)
-                if response:
-                    response_text = self._extract_response_text(response)
-                    if response_text:
-                        model_name = self.model_info.get('model_id', 'AI') if self.model_info else 'AI'
-                        self.ui.display_ai_response(response_text, model_name)
-                    else:
-                        self.ui.display_error("Received empty response from server")
-                else:
-                    self.ui.display_error("Failed to get response from server")
-            elif self.mode == GenerationMode.BATCH:
-                # For batch mode, treat single messages as single-item batches
-                await self._process_batch([message])
-            else:
-                # Simple generation mode
-                response = await self._generate_text(message)
-                if response:
-                    response_text = self._extract_response_text(response)
-                    if response_text:
-                        model_name = self.model_info.get('model_id', 'AI') if self.model_info else 'AI'
-                        self.ui.display_ai_response(response_text, model_name)
-                    else:
-                        self.ui.display_error("Received empty response from server")
-                else:
-                    self.ui.display_error("Failed to get response from server")
+            except Exception as e:
+                logger.error(f"Error processing message on attempt {attempt + 1}: {str(e)}")
+                if attempt == max_attempts - 1:  # Last attempt
+                    self.ui.display_error(f"❌ Error processing message: {str(e)}")
+                    return
+
+    async def _generate_stream_with_recovery(self, prompt: str):
+        """Generate streaming text with connection recovery"""
+        try:
+            await self._generate_stream(prompt)
+        except Exception as e:
+            if "connection" in str(e).lower() or "timeout" in str(e).lower():
+                raise ConnectionError(f"Streaming connection failed: {str(e)}")
+            raise
+
+    async def _chat_completion_with_recovery(self, message: str):
+        """Chat completion with connection recovery"""
+        try:
+            return await self._chat_completion(message)
+        except Exception as e:
+            if "connection" in str(e).lower() or "timeout" in str(e).lower():
+                raise ConnectionError(f"Chat completion connection failed: {str(e)}")
+            raise
+
+    async def _generate_text_with_recovery(self, prompt: str):
+        """Generate text with connection recovery"""
+        try:
+            return await self._generate_text(prompt)
+        except Exception as e:
+            if "connection" in str(e).lower() or "timeout" in str(e).lower():
+                raise ConnectionError(f"Text generation connection failed: {str(e)}")
+            raise
+
+    async def _process_batch_with_recovery(self, prompts: list):
+        """Process batch with connection recovery"""
+        try:
+            await self._process_batch(prompts)
+        except Exception as e:
+            if "connection" in str(e).lower() or "timeout" in str(e).lower():
+                raise ConnectionError(f"Batch processing connection failed: {str(e)}")
+            raise
+
+    async def _graceful_shutdown(self):
+        """Perform graceful shutdown operations"""
+        try:
+            self.ui.display_info("🔄 Performing graceful shutdown...")
+
+            # Save conversation if it exists and user wants to
+            if self.session_history:
+                try:
+                    save_choice = self.ui.get_yes_no_input("💾 Save current conversation before exiting?")
+                    if save_choice:
+                        await self._save_conversation()
+                except Exception as e:
+                    logger.warning(f"Failed to save conversation during shutdown: {str(e)}")
+
+            # Disconnect from server
+            await self.disconnect()
+
+            self.ui.display_info("✅ Graceful shutdown completed")
 
         except Exception as e:
-            logger.error(f"Error processing message: {str(e)}")
-            self.ui.display_error(f"Error processing message: {str(e)}")
+            logger.error(f"Error during graceful shutdown: {str(e)}")
+            self.ui.display_error(f"❌ Shutdown error: {str(e)}")
+
+    async def _cleanup(self):
+        """Final cleanup operations"""
+        try:
+            # Ensure disconnection
+            if self.connected or self.connection:
+                await self.disconnect()
+
+            # Clear sensitive data
+            self.session_history.clear()
+            self.server_info = None
+            self.model_info = None
+
+            logger.info("Cleanup completed successfully")
+
+        except Exception as e:
+            logger.error(f"Error during cleanup: {str(e)}")
+        finally:
+            # Always display goodbye message
+            if not self.graceful_shutdown:
+                self.ui.display_goodbye()
 
     async def _generate_text(self, prompt: str) -> Optional[Dict[str, Any]]:
         """Generate text using the /generate endpoint"""
@@ -800,12 +1017,23 @@ def chat(url, generate, max_tokens, temperature, top_p, verbose):
     click.echo(f"🎯 Top-p: {top_p}")
     click.echo()
     
-    # Start the chat interface
+    # Start the chat interface with comprehensive error handling
     try:
         asyncio.run(interface.start_chat())
     except KeyboardInterrupt:
-        click.echo("\n\n👋 Goodbye!")
+        click.echo("\n\n🛑 Interrupted by user")
+        click.echo("👋 Goodbye!")
         sys.exit(0)
+    except ConnectionError as e:
+        click.echo(f"\n❌ Connection Error: {str(e)}")
+        click.echo("💡 Make sure the LocalLab server is running and accessible.")
+        sys.exit(1)
+    except asyncio.TimeoutError:
+        click.echo("\n❌ Timeout Error: Connection or operation timed out")
+        click.echo("💡 Try increasing timeout or check your network connection.")
+        sys.exit(1)
     except Exception as e:
-        click.echo(f"\n❌ Error: {str(e)}")
+        logger.error(f"Unexpected error in chat command: {str(e)}")
+        click.echo(f"\n❌ Unexpected Error: {str(e)}")
+        click.echo("💡 Please check the logs for more details.")
         sys.exit(1)

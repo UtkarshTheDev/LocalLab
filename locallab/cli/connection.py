@@ -65,20 +65,40 @@ class ServerConnection:
             logger.info("Disconnected from server")
             
     async def health_check(self) -> bool:
-        """Check if the server is healthy"""
+        """Check if the server is healthy with enhanced error handling"""
         try:
             if not self.client:
+                logger.debug("Health check failed: No client connection")
                 return False
 
             url = urljoin(self.base_url, '/health')
             response = await self.client.get(url)
-            if response.status_code == 200:
-                data = response.json()
-                return data.get('status') == 'healthy'
-            return False
 
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    is_healthy = data.get('status') == 'healthy'
+                    logger.debug(f"Health check successful: {is_healthy}")
+                    return is_healthy
+                except Exception:
+                    # Fallback: if we can't parse JSON, assume healthy if 200 OK
+                    logger.debug("Health check successful (fallback)")
+                    return True
+            else:
+                logger.debug(f"Health check failed: HTTP {response.status_code}")
+                return False
+
+        except httpx.TimeoutException:
+            logger.debug("Health check failed: Request timeout")
+            return False
+        except httpx.ConnectError:
+            logger.debug("Health check failed: Connection error")
+            return False
+        except httpx.NetworkError as e:
+            logger.debug(f"Health check failed: Network error - {str(e)}")
+            return False
         except Exception as e:
-            logger.debug(f"Health check failed: {str(e)}")
+            logger.debug(f"Health check failed: Unexpected error - {str(e)}")
             return False
 
     async def get_server_info(self) -> Optional[Dict[str, Any]]:

@@ -60,8 +60,10 @@ class ChatUI:
         help_text.append("\n📋 Basic Commands:\n", style="bold yellow")
         help_text.append("  /help     - Show this help message\n", style="cyan")
         help_text.append("  /clear    - Clear the screen\n", style="cyan")
-        help_text.append("  /exit     - Exit the chat\n", style="cyan")
-        help_text.append("  /quit     - Exit the chat\n", style="cyan")
+        help_text.append("  /exit     - Exit the chat gracefully\n", style="cyan")
+        help_text.append("  /quit     - Same as /exit\n", style="cyan")
+        help_text.append("  /bye      - Same as /exit\n", style="cyan")
+        help_text.append("  /goodbye  - Same as /exit\n", style="cyan")
         help_text.append("\n💬 Conversation Management:\n", style="bold yellow")
         help_text.append("  /history  - Show conversation history\n", style="cyan")
         help_text.append("  /reset    - Reset conversation history\n", style="cyan")
@@ -400,6 +402,23 @@ class BatchProgressDisplay:
         """Update the current status"""
         self.status_text = status
         self.console.print(f"  {status}", style="dim")
+
+    def get_yes_no_input(self, prompt: str, default: bool = False) -> bool:
+        """Get yes/no input from user with default value"""
+        try:
+            default_text = "Y/n" if default else "y/N"
+            full_prompt = f"{prompt} [{default_text}]"
+
+            response = Prompt.ask(full_prompt, console=self.console, default="")
+
+            if not response:
+                return default
+
+            response = response.lower().strip()
+            return response in ['y', 'yes', 'true', '1']
+
+        except (KeyboardInterrupt, EOFError):
+            return False
 
 
 class StreamingDisplay:
