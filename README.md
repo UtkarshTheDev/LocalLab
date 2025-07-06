@@ -152,9 +152,88 @@ locallab start
 locallab start --model microsoft/phi-2 --quantize --quantize-type int8
 ```
 
+## 💬 CLI Chat Interface
+
+LocalLab includes a powerful terminal-based chat interface that lets you interact with your AI models directly from the command line. Perfect for quick conversations, testing, and interactive AI sessions.
+
+### Quick Start
+
+```bash
+# Connect to local server
+locallab chat
+
+# Connect to remote server
+locallab chat --url https://your-ngrok-url.app
+
+# Use different generation modes
+locallab chat --generate chat    # Conversational mode with context
+locallab chat --generate batch   # Batch processing mode
+locallab chat --generate stream  # Real-time streaming (default)
+```
+
+### Features
+
+- **🚀 Multiple Generation Modes**: Stream, Simple, Chat, and Batch processing
+- **💬 Rich Terminal UI**: Enhanced markdown rendering and syntax highlighting
+- **🔄 Real-time Streaming**: Live response streaming with Server-Sent Events
+- **📚 Conversation Management**: History tracking, persistence, and context retention
+- **🛠️ Error Handling**: Automatic reconnection and graceful error recovery
+- **⚡ Batch Processing**: Process multiple prompts efficiently
+
+### Interactive Commands
+
+```bash
+/help     - Show available commands
+/history  - Display conversation history
+/batch    - Enter batch processing mode
+/save     - Save conversation to file
+/clear    - Clear the screen
+/exit     - Exit gracefully
+```
+
+### Example Session
+
+```bash
+$ locallab chat
+🚀 LocalLab Chat Interface
+✅ Connected to: http://localhost:8000
+📊 Server: LocalLab v0.9.0 | Model: qwen-0.5b
+
+You: Hello! Can you help me with Python?
+
+AI: Hello! I'd be happy to help you with Python programming.
+What specific topic would you like to explore?
+
+You: Show me how to create a class
+
+AI: Here's how to create a simple class in Python:
+
+```python
+class Person:
+    def __init__(self, name, age):
+        self.name = name
+        self.age = age
+
+    def introduce(self):
+        return f"Hi, I'm {self.name} and I'm {self.age} years old."
+
+# Usage
+person = Person("Alice", 25)
+print(person.introduce())
+```
+
+You: /exit
+👋 Goodbye!
+```
+
+> 📖 **Learn More**: See the [CLI Chat Documentation](./docs/cli/chat.md) for complete usage guide and examples.
+
 ## 💡 Client Connection & Usage
 
-After starting your LocalLab server (either locally or on Google Colab), you'll need to connect to it using the LocalLab client package. This is how your code interacts with the AI models running on the server.
+After starting your LocalLab server (either locally or on Google Colab), you can connect to it in two ways:
+
+1. **CLI Chat Interface** (above) - For interactive terminal conversations
+2. **Python Client Package** (below) - For programmatic access in your code
 
 ### Synchronous Client Usage (Easier for Beginners)
 
@@ -359,7 +438,8 @@ graph LR
 
 1. [Installation Guide](./docs/guides/getting-started.md)
 2. [Basic Examples](./docs/guides/examples.md)
-3. [CLI Usage](./docs/guides/cli.md)
+3. [CLI Chat Interface](./docs/cli/chat.md)
+4. [CLI Usage](./docs/guides/cli.md)
 
 ### Advanced Topics
 
