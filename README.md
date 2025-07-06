@@ -2,44 +2,70 @@
 
 [![LocalLab Server](https://img.shields.io/pypi/v/locallab.svg?label=locallab&color=blue)](https://pypi.org/project/locallab/) [![LocalLab Client](https://img.shields.io/pypi/v/locallab-client.svg?label=locallab-client&color=green)](https://pypi.org/project/locallab-client/) [![License](https://img.shields.io/badge/license-Apache%202.0-green)](./LICENSE) [![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
 
-**Run ChatGPT-like AI on your own computer!** LocalLab is a server that runs AI models locally and makes them accessible from anywhere.
+**Run ChatGPT-like AI on your own computer!** LocalLab is a complete AI platform that runs models locally with a powerful chat interface and Python client.
 
-## 🤔 What is LocalLab?
+## ✨ What Makes LocalLab Special?
 
-LocalLab is like having your own personal ChatGPT that runs on your computer. Here's how it works:
+LocalLab gives you **your own personal ChatGPT** that runs entirely on your computer:
 
-1. **LocalLab Server**: Runs on your computer and loads AI models
-2. **Python Client**: A separate package that connects to the server
-3. **Access From Anywhere**: Use your AI from any device with the ngrok feature
+- 🎯 **Terminal Chat Interface** - ChatGPT-like experience in your terminal
+- 🔒 **Complete Privacy** - Your data never leaves your computer
+- 💰 **Zero Cost** - No monthly fees or API charges
+- 🌐 **Access Anywhere** - Use from any device with ngrok tunneling
+- ⚡ **Multiple Models** - Support for various open-source AI models
+- 🎮 **Free GPU** - Run on Google Colab for free GPU acceleration
 
-No complicated setup, no monthly fees, and your data stays private. Perfect for developers, students, researchers, or anyone who wants to experiment with AI.
+Perfect for developers, students, researchers, or anyone who wants to experiment with AI without privacy concerns or ongoing costs.
 
-## 🧠 How LocalLab Works (In Simple Terms)
+## 🚀 Quick Start (3 Steps)
 
-Think of LocalLab as having two parts:
+```bash
+# 1. Install LocalLab
+pip install locallab locallab-client
 
-1. **The Server** (what you install with `pip install locallab`)
+# 2. Start your AI server
+locallab start
 
-   - This is like a mini-ChatGPT that runs on your computer
-   - It loads AI models and makes them available through a web server
-   - You start it with a simple command: `locallab start`
+# 3. Chat with your AI
+locallab chat
+```
 
-2. **The Client** (what you install with `pip install locallab-client`)
-   - This is how your Python code talks to the server
-   - It's a separate package that connects to the server
-   - You use it in your code with: `client = SyncLocalLabClient("http://localhost:8000")`
+That's it! You now have your own ChatGPT running locally.
+
+## 🧠 How LocalLab Works
+
+LocalLab has three main components:
+
+### 1. 🖥️ **LocalLab Server** (`pip install locallab`)
+- Runs AI models on your computer
+- Provides a web API for interactions
+- Handles model loading and optimization
+- Start with: `locallab start`
+
+### 2. 💬 **Chat Interface** (Built-in)
+- Terminal-based ChatGPT-like experience
+- Real-time streaming responses
+- Multiple generation modes
+- Access with: `locallab chat`
+
+### 3. 🐍 **Python Client** (`pip install locallab-client`)
+- Programmatic access for your code
+- Both sync and async support
+- Use with: `client = SyncLocalLabClient("http://localhost:8000")`
 
 ```mermaid
 graph TD
-    A[Your Python Code] -->|Uses| B[LocalLab Client Package]
-    B -->|Connects to| C[LocalLab Server]
+    A[Terminal Chat] -->|Uses| C[LocalLab Server]
+    B[Python Code] -->|Uses| C
     C -->|Runs| D[AI Models]
-    C -->|Optional| E[Ngrok for Remote Access]
+    C -->|Optional| E[Ngrok Tunnel]
+    E -->|Access from| F[Any Device]
     style C fill:#f9f,stroke:#333,stroke-width:2px
     style D fill:#bbf,stroke:#333,stroke-width:2px
+    style A fill:#9f9,stroke:#333,stroke-width:2px
 ```
 
-**The Magic Part**: With the `--use-ngrok` option, you can access your AI from anywhere - your phone, another computer, or share with friends!
+**🌟 The Magic**: Use `--use-ngrok` to access your AI from anywhere - your phone, another computer, or share with friends!
 
 ### 🎯 Key Features
 
@@ -152,46 +178,66 @@ locallab start
 locallab start --model microsoft/phi-2 --quantize --quantize-type int8
 ```
 
-## 💬 CLI Chat Interface
+## 💬 Terminal Chat Interface - Your Personal ChatGPT
 
-LocalLab includes a powerful terminal-based chat interface that lets you interact with your AI models directly from the command line. Perfect for quick conversations, testing, and interactive AI sessions.
+The **LocalLab Chat Interface** is a powerful terminal-based tool that gives you a ChatGPT-like experience right in your command line. It's the easiest way to interact with your AI models.
 
-### Quick Start
+### 🎯 Why Use the Chat Interface?
+
+- **Instant AI Access** - No coding required, just type and chat
+- **Real-time Responses** - See AI responses as they're generated
+- **Rich Formatting** - Markdown rendering with syntax highlighting
+- **Smart Features** - History, saving, batch processing, and more
+- **Works Everywhere** - Local, remote, or Google Colab
+
+### 🚀 Getting Started
 
 ```bash
-# Connect to local server
+# Start your server
+locallab start
+
+# Open chat interface
 locallab chat
-
-# Connect to remote server
-locallab chat --url https://your-ngrok-url.app
-
-# Use different generation modes
-locallab chat --generate chat    # Conversational mode with context
-locallab chat --generate batch   # Batch processing mode
-locallab chat --generate stream  # Real-time streaming (default)
 ```
 
-### Features
+### ✨ Key Features
 
-- **🚀 Multiple Generation Modes**: Stream, Simple, Chat, and Batch processing
-- **💬 Rich Terminal UI**: Enhanced markdown rendering and syntax highlighting
-- **🔄 Real-time Streaming**: Live response streaming with Server-Sent Events
-- **📚 Conversation Management**: History tracking, persistence, and context retention
-- **🛠️ Error Handling**: Automatic reconnection and graceful error recovery
-- **⚡ Batch Processing**: Process multiple prompts efficiently
+| Feature | Description | Example |
+|---------|-------------|---------|
+| **Dynamic Mode Switching** | Change generation mode per message | `Explain AI --stream` |
+| **Real-time Streaming** | See responses as they're typed | Live text generation |
+| **Conversation History** | Track and save your chats | `/history`, `/save` |
+| **Batch Processing** | Process multiple prompts | `/batch` command |
+| **Remote Access** | Connect to any LocalLab server | `--url https://your-server.com` |
+| **Error Recovery** | Auto-reconnection and graceful handling | Seamless experience |
 
-### Interactive Commands
+### 🎮 Interactive Commands
 
 ```bash
-/help     - Show available commands
-/history  - Display conversation history
-/batch    - Enter batch processing mode
-/save     - Save conversation to file
-/clear    - Clear the screen
-/exit     - Exit gracefully
+/help      # Show all available commands
+/history   # View conversation history
+/save      # Save current conversation
+/batch     # Enter batch processing mode
+/reset     # Clear conversation history
+/exit      # Exit gracefully
 ```
 
-### Example Session
+### 🔄 Dynamic Mode Switching (New!)
+
+Override the default generation mode for any message:
+
+```bash
+You: Write a story --stream          # Use streaming mode
+🔄 Using stream mode for this message
+
+You: Remember my name is Alice --chat # Use chat mode with context
+🔄 Using chat mode for this message
+
+You: What's 2+2? --simple            # Use simple mode
+🔄 Using simple mode for this message
+```
+
+### 📱 Example Chat Session
 
 ```bash
 $ locallab chat
@@ -204,7 +250,7 @@ You: Hello! Can you help me with Python?
 AI: Hello! I'd be happy to help you with Python programming.
 What specific topic would you like to explore?
 
-You: Show me how to create a class
+You: Show me how to create a class --stream
 
 AI: Here's how to create a simple class in Python:
 
@@ -222,20 +268,39 @@ person = Person("Alice", 25)
 print(person.introduce())
 ```
 
+You: /save
+💾 Conversation saved to: chat_2024-07-06_14-30-15.json
+
 You: /exit
 👋 Goodbye!
 ```
 
-> 📖 **Learn More**: See the [CLI Chat Documentation](./docs/cli/chat.md) for complete usage guide and examples.
+### 🌐 Remote Access
 
-## 💡 Client Connection & Usage
+Connect to any LocalLab server from anywhere:
 
-After starting your LocalLab server (either locally or on Google Colab), you can connect to it in two ways:
+```bash
+# Connect to remote server
+locallab chat --url https://abc123.ngrok.app
 
-1. **CLI Chat Interface** (above) - For interactive terminal conversations
-2. **Python Client Package** (below) - For programmatic access in your code
+# Use with Google Colab
+locallab chat --url https://your-colab-ngrok-url.app
+```
 
-### Synchronous Client Usage (Easier for Beginners)
+> 📖 **Complete Guide**: See the [Chat Interface Documentation](./docs/cli/chat.md) for advanced features, examples, and troubleshooting.
+
+## 🐍 Python Client - Programmatic Access
+
+For developers who want to integrate AI into their applications, LocalLab provides a powerful Python client package.
+
+### 🎯 Two Ways to Use LocalLab
+
+| Method | Best For | Getting Started |
+|--------|----------|-----------------|
+| **Chat Interface** | Interactive use, testing, quick questions | `locallab chat` |
+| **Python Client** | Applications, scripts, automation | `from locallab_client import SyncLocalLabClient` |
+
+### 📦 Synchronous Client (Recommended for Beginners)
 
 ```python
 from locallab_client import SyncLocalLabClient
@@ -434,24 +499,26 @@ graph LR
 
 ## 📚 Documentation
 
-### Getting Started
+### 🚀 Getting Started
+| Guide | Description |
+|-------|-------------|
+| [**Installation & Setup**](./docs/guides/getting-started.md) | Complete installation guide for all platforms |
+| [**CLI Overview**](./docs/cli/README.md) | Command-line interface documentation |
+| [**Chat Interface**](./docs/cli/chat.md) | Terminal chat features and examples |
 
-1. [Installation Guide](./docs/guides/getting-started.md)
-2. [Basic Examples](./docs/guides/examples.md)
-3. [CLI Chat Interface](./docs/cli/chat.md)
-4. [CLI Usage](./docs/guides/cli.md)
+### 💻 Using LocalLab
+| Guide | Description |
+|-------|-------------|
+| [**CLI Reference**](./docs/guides/cli.md) | Complete command documentation |
+| [**Python Client**](./docs/clients/README.md) | Programmatic access guide |
+| [**API Reference**](./docs/guides/API.md) | HTTP API documentation |
 
-### Advanced Topics
-
-1. [API Reference](./docs/guides/API.md)
-2. [Client Libraries](./docs/clients/README.md)
-3. [Advanced Features](./docs/guides/advanced.md)
-4. [Performance Guide](./docs/features/performance.md)
-
-### Deployment
-
-1. [Local Setup](./docs/deployment/local.md)
-2. [Google Colab Guide](./docs/colab/README.md)
+### 🌐 Deployment & Advanced
+| Guide | Description |
+|-------|-------------|
+| [**Google Colab Setup**](./docs/colab/README.md) | Free GPU deployment guide |
+| [**Troubleshooting**](./docs/guides/troubleshooting.md) | Common issues and solutions |
+| [**Advanced Features**](./docs/guides/advanced.md) | Power user features |
 
 ## 🔍 Need Help?
 

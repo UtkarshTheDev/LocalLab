@@ -1,25 +1,41 @@
 # LocalLab CLI Guide
 
-LocalLab provides a powerful command-line interface (CLI) that makes it easy to configure and run your AI inference server. This guide covers all the CLI features and how to use them effectively.
+LocalLab provides a comprehensive command-line interface (CLI) that makes it easy to run AI models locally and interact with them. This guide covers all CLI features from basic server management to the powerful chat interface.
+
+## 🚀 Quick Start
+
+```bash
+# Install LocalLab
+pip install locallab locallab-client
+
+# Configure your setup
+locallab config
+
+# Start the server
+locallab start
+
+# Chat with your AI
+locallab chat
+```
 
 ## 📚 Table of Contents
 
 1. [Installation](#installation)
-2. [Basic Commands](#basic-commands)
-3. [Interactive Configuration](#interactive-configuration)
-4. [Command Reference](#command-reference)
-5. [Environment Variables](#environment-variables)
-6. [Configuration Storage](#configuration-storage)
-7. [Google Colab Integration](#google-colab-integration)
-8. [New in v0.4.9](#new-in-v049)
-9. [New in v0.4.8](#new-in-v048)
+2. [Chat Interface](#chat-interface) ⭐ **Most Popular**
+3. [Server Management](#server-management)
+4. [Interactive Configuration](#interactive-configuration)
+5. [Command Reference](#command-reference)
+6. [Environment Variables](#environment-variables)
+7. [Configuration Storage](#configuration-storage)
+8. [Google Colab Integration](#google-colab-integration)
+9. [Recent Updates](#recent-updates)
 
 ## Installation
 
 The LocalLab CLI is automatically installed when you install the LocalLab package:
 
 ```bash
-pip install locallab
+pip install locallab locallab-client
 ```
 
 After installation, you can access the CLI using the `locallab` command:
@@ -28,9 +44,70 @@ After installation, you can access the CLI using the `locallab` command:
 locallab --help
 ```
 
-## Basic Commands
+## Chat Interface ⭐
 
-LocalLab CLI provides several commands for different operations:
+The **LocalLab Chat Interface** is the easiest way to interact with your AI models. It provides a ChatGPT-like experience right in your terminal.
+
+### Quick Start
+
+```bash
+# Start your server
+locallab start
+
+# Open chat interface
+locallab chat
+```
+
+### Key Features
+
+- **🎯 Dynamic Mode Switching** - Change generation mode per message with `--stream`, `--chat`, etc.
+- **🔄 Real-time Streaming** - See responses as they're generated
+- **💬 Rich Terminal UI** - Markdown rendering with syntax highlighting
+- **📚 Conversation Management** - History, saving, and loading
+- **🌐 Remote Access** - Connect to any LocalLab server
+- **🛠️ Error Recovery** - Automatic reconnection and graceful handling
+
+### Basic Usage
+
+```bash
+# Connect to local server
+locallab chat
+
+# Connect to remote server
+locallab chat --url https://your-ngrok-url.app
+
+# Use specific generation mode
+locallab chat --generate chat
+
+# Custom parameters
+locallab chat --max-tokens 200 --temperature 0.8
+```
+
+### Interactive Commands
+
+```bash
+/help      # Show all available commands
+/history   # View conversation history
+/save      # Save current conversation
+/batch     # Enter batch processing mode
+/reset     # Clear conversation history
+/exit      # Exit gracefully
+```
+
+### Dynamic Mode Switching
+
+Override the default generation mode for any message:
+
+```bash
+You: Write a story --stream          # Use streaming mode
+You: Remember my name --chat         # Use chat mode with context
+You: What's 2+2? --simple           # Use simple mode
+You: Process these --batch          # Use batch mode
+```
+
+> 📖 **Complete Guide**: See the [Chat Interface Documentation](../cli/chat.md) for detailed features and examples.
+
+## Server Management
 
 ### Start Server
 
