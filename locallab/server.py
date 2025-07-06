@@ -1326,6 +1326,10 @@ def cli():
             click.echo("Please check that all required dependencies are installed.")
             return 1
 
+    # Import and add the chat command
+    from .cli.chat import chat
+    locallab_cli.add_command(chat)
+
     # Use sys.argv to check if we're just showing help
     if len(sys.argv) <= 1 or sys.argv[1] == '--help' or sys.argv[1] == '-h':
         return locallab_cli()
