@@ -34,13 +34,14 @@ class ChatUI:
         welcome_text = Text()
         welcome_text.append("🎉 Welcome to LocalLab Chat Interface!\n", style="bold green")
         welcome_text.append(f"📡 Connected to: {server_url}\n", style="cyan")
-        welcome_text.append(f"⚙️  Generation mode: {mode}\n", style="yellow")
-        
+        welcome_text.append(f"⚙️  Default mode: {mode}\n", style="yellow")
+        welcome_text.append("🎯 Use --stream, --chat, --batch, --simple to override per message\n", style="dim")
+
         if model_info and model_info.get('model_id'):
             welcome_text.append(f"🤖 Active model: {model_info['model_id']}\n", style="magenta")
         else:
             welcome_text.append("⚠️  No model currently loaded\n", style="red")
-            
+
         welcome_text.append("\n💬 Start typing your messages below!", style="bold blue")
         
         panel = Panel(
@@ -73,6 +74,16 @@ class ChatUI:
         help_text.append("  /load     - Load conversation from file\n", style="cyan")
         help_text.append("\n🔄 Batch Processing:\n", style="bold yellow")
         help_text.append("  /batch    - Enter batch processing mode\n", style="cyan")
+        help_text.append("\n🎯 Inline Mode Switching:\n", style="bold yellow")
+        help_text.append("  Add mode switches to any message:\n", style="white")
+        help_text.append("  • --stream  - Stream response in real-time\n", style="cyan")
+        help_text.append("  • --chat    - Use conversational mode\n", style="cyan")
+        help_text.append("  • --batch   - Process as single batch item\n", style="cyan")
+        help_text.append("  • --simple  - Simple text generation\n", style="cyan")
+        help_text.append("\n  Examples:\n", style="white")
+        help_text.append("  'Hello world --stream'\n", style="dim")
+        help_text.append("  'Explain Python --chat'\n", style="dim")
+        help_text.append("  'Write a story --simple'\n", style="dim")
         help_text.append("\n✨ Or just type your message and press Enter!", style="green")
 
         panel = Panel(help_text, title="🤖 LocalLab Chat Help", border_style="blue")

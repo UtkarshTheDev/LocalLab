@@ -5,7 +5,7 @@ Comprehensive tests for the LocalLab CLI chat interface
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-from locallab.cli.chat import ChatInterface, GenerationMode
+from locallab.cli.chat import ChatInterface, GenerationMode, parse_inline_mode
 from locallab.cli.connection import ServerConnection
 from locallab.cli.ui import ChatUI
 
@@ -313,6 +313,98 @@ class TestGenerationMode:
         assert GenerationMode("simple") == GenerationMode.SIMPLE
         assert GenerationMode("chat") == GenerationMode.CHAT
         assert GenerationMode("batch") == GenerationMode.BATCH
+
+
+class TestInlineModeParsing:
+    """Test cases for inline mode switching functionality"""
+
+    def test_valid_mode_switches(self):
+        """Test parsing of valid mode switches"""
+        test_cases = [
+            ("Hello world --stream", "Hello world", GenerationMode.STREAM, None),
+            ("Explain Python --chat", "Explain Python", GenerationMode.CHAT, None),
+            ("Write a story --simple", "Write a story", GenerationMode.SIMPLE, None),
+            ("Process this --batch", "Process this", GenerationMode.BATCH, None),
+        ]
+
+        for input_msg, expected_msg, expected_mode, expected_error in test_cases:
+            result_msg, result_mode, result_error = parse_inline_mode(input_msg)
+            assert result_msg == expected_msg
+            assert result_mode == expected_mode
+            assert result_error == expected_error
+
+    def test_case_insensitive_modes(self):
+        """Test that mode switches are case insensitive"""
+        test_cases = [
+            ("Hello --STREAM", "Hello", GenerationMode.STREAM, None),
+            ("Test --Chat", "Test", GenerationMode.CHAT, None),
+            ("Message --SIMPLE", "Message", GenerationMode.SIMPLE, None),
+            ("Process --BATCH", "Process", GenerationMode.BATCH, None),
+        ]
+
+        for input_msg, expected_msg, expected_mode, expected_error in test_cases:
+            result_msg, result_mode, result_error = parse_inline_mode(input_msg)
+            assert result_msg == expected_msg
+            assert result_mode == expected_mode
+            assert result_error == expected_error
+
+    def test_mode_with_extra_spaces(self):
+        """Test mode switches with extra whitespace"""
+        test_cases = [
+            ("Message --stream   ", "Message", GenerationMode.STREAM, None),
+            ("  Another test   --batch  ", "Another test", GenerationMode.BATCH, None),
+            ("   --chat   ", "", GenerationMode.CHAT, None),
+        ]
+
+        for input_msg, expected_msg, expected_mode, expected_error in test_cases:
+            result_msg, result_mode, result_error = parse_inline_mode(input_msg)
+            assert result_msg == expected_msg
+            assert result_mode == expected_mode
+            assert result_error == expected_error
+
+    def test_no_mode_switch(self):
+        """Test messages without mode switches"""
+        test_cases = [
+            ("Just a regular message", "Just a regular message", None, None),
+            ("Message with --stream in middle", "Message with --stream in middle", None, None),
+            ("", "", None, None),
+            ("   ", "", None, None),
+        ]
+
+        for input_msg, expected_msg, expected_mode, expected_error in test_cases:
+            result_msg, result_mode, result_error = parse_inline_mode(input_msg)
+            assert result_msg == expected_msg
+            assert result_mode == expected_mode
+            assert result_error == expected_error
+
+    def test_invalid_mode_switches(self):
+        """Test handling of invalid mode switches"""
+        test_cases = [
+            ("Test --invalid", "Test --invalid", None, "Invalid mode: --invalid. Valid modes: --stream, --chat, --batch, --simple"),
+            ("Hello --wrong", "Hello --wrong", None, "Invalid mode: --wrong. Valid modes: --stream, --chat, --batch, --simple"),
+            ("--invalid", "--invalid", None, "Invalid mode: --invalid. Valid modes: --stream, --chat, --batch, --simple"),
+        ]
+
+        for input_msg, expected_msg, expected_mode, expected_error in test_cases:
+            result_msg, result_mode, result_error = parse_inline_mode(input_msg)
+            assert result_msg == expected_msg
+            assert result_mode == expected_mode
+            assert result_error == expected_error
+
+    def test_mode_only_messages(self):
+        """Test messages that are only mode switches"""
+        test_cases = [
+            ("--stream", "", GenerationMode.STREAM, None),
+            ("--chat", "", GenerationMode.CHAT, None),
+            ("--simple", "", GenerationMode.SIMPLE, None),
+            ("--batch", "", GenerationMode.BATCH, None),
+        ]
+
+        for input_msg, expected_msg, expected_mode, expected_error in test_cases:
+            result_msg, result_mode, result_error = parse_inline_mode(input_msg)
+            assert result_msg == expected_msg
+            assert result_mode == expected_mode
+            assert result_error == expected_error
 
 
 if __name__ == "__main__":

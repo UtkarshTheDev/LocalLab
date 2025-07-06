@@ -132,6 +132,51 @@ locallab chat --generate batch
 ### Batch Processing
 - `/batch` - Enter interactive batch mode
 
+## Inline Mode Switching
+
+You can override the default generation mode for individual messages using inline mode switches. Simply append the desired mode to your message:
+
+### Syntax
+```
+Your message --[mode]
+```
+
+### Available Modes
+- `--stream` - Stream response in real-time
+- `--chat` - Use conversational mode with context
+- `--batch` - Process as single batch item
+- `--simple` - Simple text generation
+
+### Examples
+
+```bash
+# Override to stream mode for one message
+You: Explain quantum physics --stream
+🔄 Using stream mode for this message
+AI: [Streaming response...]
+
+# Override to chat mode
+You: Remember my name is Alice --chat
+🔄 Using chat mode for this message
+AI: I'll remember that your name is Alice.
+
+# Override to simple mode
+You: What's 2+2? --simple
+🔄 Using simple mode for this message
+AI: 4
+
+# Invalid mode shows error
+You: Hello --invalid
+❌ Invalid mode: --invalid. Valid modes: --stream, --chat, --batch, --simple
+```
+
+### Features
+- **Per-message overrides**: Change mode for specific messages without affecting the default
+- **Case insensitive**: `--STREAM`, `--Stream`, and `--stream` all work
+- **Backward compatible**: Existing CLI options continue to work as default mode setters
+- **Error handling**: Clear error messages for invalid mode specifications
+- **Visual feedback**: Mode override notifications show which mode is being used
+
 ## Usage Examples
 
 ### Basic Chat Session

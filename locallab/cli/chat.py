@@ -23,6 +23,55 @@ class GenerationMode(str, Enum):
     BATCH = "batch"
 
 
+def parse_inline_mode(message: str) -> tuple[str, Optional[GenerationMode], Optional[str]]:
+    """
+    Parse inline mode switches from user message.
+
+    Args:
+        message: User input message that may contain inline mode switches
+
+    Returns:
+        tuple: (cleaned_message, mode_override, error_message) where:
+        - mode_override is None if no override or if invalid
+        - error_message is None if no error, otherwise contains error description
+
+    Examples:
+        "Hello world --stream" -> ("Hello world", GenerationMode.STREAM, None)
+        "Explain Python --chat" -> ("Explain Python", GenerationMode.CHAT, None)
+        "Just a message" -> ("Just a message", None, None)
+        "Test --invalid" -> ("Test --invalid", None, "Invalid mode: --invalid")
+    """
+    import re
+
+    # Define valid mode patterns - match --mode at the end of the message
+    # Allow optional whitespace before the mode switch
+    valid_mode_patterns = {
+        r'(^|\s+)--stream\s*$': GenerationMode.STREAM,
+        r'(^|\s+)--simple\s*$': GenerationMode.SIMPLE,
+        r'(^|\s+)--chat\s*$': GenerationMode.CHAT,
+        r'(^|\s+)--batch\s*$': GenerationMode.BATCH,
+    }
+
+    # Check for valid mode switches first
+    for pattern, mode in valid_mode_patterns.items():
+        match = re.search(pattern, message, re.IGNORECASE)
+        if match:
+            # Remove the mode switch from the message
+            cleaned_message = re.sub(pattern, '', message, flags=re.IGNORECASE).strip()
+            return cleaned_message, mode, None
+
+    # Check for invalid mode switches (--something that's not valid)
+    invalid_mode_pattern = r'(^|\s+)(--\w+)\s*$'
+    invalid_match = re.search(invalid_mode_pattern, message, re.IGNORECASE)
+    if invalid_match:
+        invalid_mode = invalid_match.group(2)  # group(2) because group(1) is the whitespace
+        error_msg = f"Invalid mode: {invalid_mode}. Valid modes: --stream, --chat, --batch, --simple"
+        return message.strip(), None, error_msg
+
+    # No mode switch found
+    return message.strip(), None, None
+
+
 class ChatInterface:
     """Main chat interface class"""
 
@@ -303,14 +352,29 @@ class ChatInterface:
                         self.ui.display_error("❌ Not connected to server and reconnection failed")
                         return
 
+                # Parse inline mode switches
+                cleaned_message, mode_override, parse_error = parse_inline_mode(message)
+
+                # Handle parsing errors
+                if parse_error:
+                    self.ui.display_error(f"❌ {parse_error}")
+                    return
+
+                # Determine which mode to use (override or default)
+                active_mode = mode_override if mode_override else self.mode
+
+                # Display mode information if override is used
+                if mode_override:
+                    self.ui.display_info(f"🔄 Using {mode_override.value} mode for this message")
+
                 # Show loading indicator
                 self.ui.display_info("🤔 Thinking...")
 
-                # Choose generation method based on mode
-                if self.mode == GenerationMode.STREAM:
-                    await self._generate_stream_with_recovery(message)
-                elif self.mode == GenerationMode.CHAT:
-                    response = await self._chat_completion_with_recovery(message)
+                # Choose generation method based on active mode
+                if active_mode == GenerationMode.STREAM:
+                    await self._generate_stream_with_recovery(cleaned_message)
+                elif active_mode == GenerationMode.CHAT:
+                    response = await self._chat_completion_with_recovery(cleaned_message)
                     if response:
                         response_text = self._extract_response_text(response)
                         if response_text:
@@ -320,12 +384,12 @@ class ChatInterface:
                             self.ui.display_error("Received empty response from server")
                     else:
                         self.ui.display_error("Failed to get response from server")
-                elif self.mode == GenerationMode.BATCH:
+                elif active_mode == GenerationMode.BATCH:
                     # For batch mode, treat single messages as single-item batches
-                    await self._process_batch_with_recovery([message])
+                    await self._process_batch_with_recovery([cleaned_message])
                 else:
                     # Simple generation mode
-                    response = await self._generate_text_with_recovery(message)
+                    response = await self._generate_text_with_recovery(cleaned_message)
                     if response:
                         response_text = self._extract_response_text(response)
                         if response_text:
