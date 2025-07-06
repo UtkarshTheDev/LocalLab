@@ -1194,30 +1194,97 @@ def cli():
         from .cli.interactive import prompt_for_config
         from .cli.config import save_config, load_config, get_all_config
 
-        # Show current configuration if it exists
+        # Check if this is a fresh installation
         current_config = load_config()
-        if current_config:
-            click.echo("\n📋 Current Configuration:")
-            for key, value in current_config.items():
-                click.echo(f"  {key}: {value}")
-            click.echo("")
+
+        # Check if this is truly a fresh install (no meaningful config exists)
+        is_fresh_install = not current_config or len(current_config) == 0 or not any(
+            key in current_config for key in [
+                'model_id', 'enable_quantization', 'enable_cpu_offloading',
+                'enable_attention_slicing', 'enable_flash_attention', 'enable_bettertransformer'
+            ]
+        )
+
+        if is_fresh_install:
+            # Fresh installation - show welcome screen
+            click.echo("\n" + "🌟" * 25)
+            click.echo("🎉 Welcome to LocalLab!")
+            click.echo("🌟" * 25)
+            click.echo("\n💡 This appears to be your first time using LocalLab.")
+            click.echo("   Let's get you set up with a quick configuration!")
+            click.echo("\n🚀 We'll guide you through:")
+            click.echo("   • Choosing an AI model")
+            click.echo("   • Optimizing performance for your hardware")
+            click.echo("   • Setting up authentication tokens")
+            click.echo("   • Configuring public access (optional)")
+            click.echo("\n✨ This will only take a few minutes!")
+
+            if not click.confirm("\n🎯 Ready to start the setup?", default=True):
+                click.echo("\n👋 Setup cancelled. You can run 'locallab config' anytime to configure.")
+                return
+        else:
+            # Existing installation - show current config and ask to reconfigure
+            click.echo("\n" + "⚙️" * 25)
+            click.echo("📋 LocalLab Configuration")
+            click.echo("⚙️" * 25)
+
+            # Show current configuration in a nice format
+            click.echo("\n🔍 Current Configuration:")
+            click.echo("   ─────────────────────")
+
+            # Group settings logically
+            model_id = current_config.get('model_id', 'Not set')
+            port = current_config.get('port', 8000)
+            click.echo(f"   🤖 Model: {model_id}")
+            click.echo(f"   🌐 Port: {port}")
+
+            # Optimization settings
+            click.echo(f"\n   ⚡ Optimization:")
+            quantization = current_config.get('enable_quantization', False)
+            click.echo(f"      • Quantization: {'✅ Enabled' if quantization else '❌ Disabled'}")
+            if quantization:
+                quant_type = current_config.get('quantization_type', 'fp16')
+                click.echo(f"        Type: {quant_type}")
+
+            cpu_offload = current_config.get('enable_cpu_offloading', False)
+            attention_slice = current_config.get('enable_attention_slicing', False)
+            flash_attn = current_config.get('enable_flash_attention', False)
+            better_trans = current_config.get('enable_bettertransformer', False)
+
+            click.echo(f"      • CPU Offloading: {'✅ Enabled' if cpu_offload else '❌ Disabled'}")
+            click.echo(f"      • Attention Slicing: {'✅ Enabled' if attention_slice else '❌ Disabled'}")
+            click.echo(f"      • Flash Attention: {'✅ Enabled' if flash_attn else '❌ Disabled'}")
+            click.echo(f"      • Better Transformer: {'✅ Enabled' if better_trans else '❌ Disabled'}")
+
+            # Access settings
+            click.echo(f"\n   🔐 Access:")
+            hf_token = current_config.get('huggingface_token')
+            ngrok_enabled = current_config.get('use_ngrok', False)
+            click.echo(f"      • HuggingFace Token: {'✅ Set' if hf_token else '❌ Not set'}")
+            click.echo(f"      • Public Access (Ngrok): {'✅ Enabled' if ngrok_enabled else '❌ Disabled'}")
 
             # Ask if user wants to reconfigure
-            if not click.confirm("Would you like to reconfigure these settings?", default=True):
-                click.echo("Configuration unchanged.")
+            click.echo("\n" + "─" * 50)
+            if not click.confirm("🔧 Would you like to reconfigure these settings?", default=True):
+                click.echo("\n✅ Configuration unchanged.")
+                click.echo("💡 You can run 'locallab start' to use your current settings.")
                 return
 
         # Run the interactive configuration
         config = prompt_for_config(force_reconfigure=True)
         save_config(config)
 
-        # Show the new configuration
-        click.echo("\n📋 New Configuration:")
-        for key, value in config.items():
-            click.echo(f"  {key}: {value}")
+        # Show success message
+        click.echo("\n" + "🎉" * 25)
+        click.echo("✅ Configuration Complete!")
+        click.echo("🎉" * 25)
+        click.echo("\n💡 Your settings have been saved successfully!")
+        click.echo("🚀 You can now run 'locallab start' to launch your AI server.")
 
-        click.echo("\n✅ Configuration saved successfully!")
-        click.echo("You can now run 'locallab start' to start the server with these settings.")
+        if config.get('use_ngrok', False):
+            click.echo("🌐 Ngrok is enabled - your server will be accessible publicly!")
+        else:
+            click.echo("🏠 Your server will be accessible locally only.")
 
     @locallab_cli.command()
     def info():

@@ -2,6 +2,85 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.9.0] - 2025-07-06
+
+### 🎉 Major Release - CLI Configuration Interface Redesign
+
+This release completely transforms the LocalLab configuration experience with a comprehensive redesign of the CLI interface, fixing critical bugs and dramatically improving user experience for both new and existing users.
+
+### Fixed
+
+#### 🔧 Critical Fresh Installation Configuration Bug
+- **Fixed "enable_quantization: True" display bug** that was confusing new users on fresh installations
+- Implemented intelligent fresh installation detection that checks for meaningful configuration keys
+- Added proper differentiation between fresh installations and existing configurations
+- Fixed configuration display to show appropriate welcome screen instead of raw config dump for new users
+
+#### 🔧 Configuration Interface Issues
+- **Fixed quantization type descriptions appearing after user selection** instead of before decision-making
+- **Fixed model selection limitation** that only allowed MODEL_REGISTRY models instead of custom HuggingFace IDs
+- **Fixed poor spacing and layout** in authentication token sections
+- **Fixed boolean setting handling** that was causing KeyError exceptions in CLI prompts
+
+### Added
+
+#### 🚀 Fresh Installation Welcome Experience
+- **New attractive welcome screen** for first-time users with clear guidance and expectations
+- **Step-by-step setup guidance** that explains what each configuration step accomplishes
+- **Visual indicators and emojis** throughout the interface for better user engagement
+- **Context-aware messaging** that adapts based on whether it's a fresh or existing installation
+
+#### 🚀 Enhanced Configuration Flow
+- **Improved model selection** that allows both registry models and custom HuggingFace model IDs
+- **Better optimization settings display** with clear descriptions and recommendations for low-spec hardware
+- **Organized configuration summary** with logical grouping (Model, Optimization, Access)
+- **Enhanced completion screens** with different messaging for fresh vs. existing installations
+
+#### 🚀 Visual Design Improvements
+- **Modern emoji-rich interface** with consistent visual hierarchy
+- **Better spacing and formatting** throughout all configuration sections
+- **Clear section separators** and organized information display
+- **Attractive banners and visual elements** for improved user experience
+
+### Changed
+
+#### ⚡ Configuration User Experience
+- **Redesigned welcome flow** to be more intuitive and informative for new users
+- **Enhanced reconfigure experience** for existing users with clear current settings display
+- **Improved error handling** and user guidance throughout the configuration process
+- **Better default value presentation** with clear recommendations
+
+#### ⚡ Interface Organization
+- **Reorganized settings into logical groups**: Model selection, Optimization, Advanced settings, Authentication
+- **Improved information hierarchy** with better visual organization
+- **Enhanced completion summary** with comprehensive configuration overview
+- **Better next-step guidance** after configuration completion
+
+### Technical Details
+
+#### Files Modified
+- `locallab/server.py`: Added fresh installation detection and improved config command flow
+- `locallab/cli/interactive.py`: Complete redesign of interactive configuration interface
+- Enhanced fresh install detection logic and removed duplicate code
+- Improved visual design and user experience throughout
+
+#### Key Improvements
+- **Fresh Installation Detection**: Intelligent detection based on meaningful configuration keys
+- **Contextual UI Flow**: Different experiences for fresh vs. existing installations
+- **Visual Appeal**: Consistent emoji usage, better spacing, and clear section organization
+- **User Guidance**: Clear explanations and recommendations throughout the process
+- **Error Prevention**: Better handling of edge cases and user input validation
+
+### Impact
+
+This release ensures that **ALL users have an excellent configuration experience**:
+- ✅ New users get a proper welcome and guided setup experience
+- ✅ Existing users see their current settings clearly organized and easy to understand
+- ✅ No more confusing "enable_quantization: True" on fresh installations
+- ✅ Beautiful, modern interface that's easy to navigate and understand
+- ✅ Clear guidance and recommendations for optimal configuration
+- ✅ Consistent visual design throughout the entire configuration flow
+
 ## [0.8.0] - 2025-07-04
 
 ### 🎉 Major Release - Comprehensive Model Loading Fixes
