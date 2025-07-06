@@ -91,36 +91,33 @@ class ChatUI:
         self.console.print()
         
     def display_ai_response(self, response: str, model_name: Optional[str] = None):
-        """Display AI response with markdown formatting"""
+        """Display AI response with enhanced markdown formatting and syntax highlighting"""
         # Create header
         ai_label = model_name or "AI"
         header = Text()
         header.append(f"{ai_label}: ", style="bold green")
-        
+
         self.console.print(header, end="")
-        
-        # Try to render as markdown if it contains markdown syntax
-        if self._contains_markdown(response):
-            try:
-                markdown = Markdown(response)
-                self.console.print(markdown)
-            except Exception:
-                # Fallback to plain text if markdown parsing fails
-                self.console.print(response, style="white")
-        else:
+
+        # Enhanced markdown rendering with syntax highlighting
+        try:
+            rendered_content = self._render_enhanced_markdown(response)
+            self.console.print(rendered_content)
+        except Exception as e:
+            # Fallback to plain text if enhanced rendering fails
             self.console.print(response, style="white")
-            
+
         self.console.print()
         
     def display_streaming_response(self, model_name: Optional[str] = None):
-        """Start displaying a streaming response"""
+        """Start displaying a streaming response with markdown post-processing"""
         ai_label = model_name or "AI"
         header = Text()
         header.append(f"{ai_label}: ", style="bold green")
         self.console.print(header, end="")
-        
-        # Return a context manager for streaming
-        return StreamingDisplay(self.console)
+
+        # Return a context manager for streaming with UI instance for markdown processing
+        return StreamingDisplay(self.console, ui_instance=self)
         
     def display_error(self, error_message: str):
         """Display error message"""
@@ -165,45 +162,224 @@ class ChatUI:
     def _contains_markdown(self, text: str) -> bool:
         """Check if text contains markdown syntax"""
         markdown_patterns = [
-            r'```[\s\S]*?```',  # Code blocks
-            r'`[^`]+`',         # Inline code
-            r'\*\*[^*]+\*\*',   # Bold
-            r'\*[^*]+\*',       # Italic
-            r'#{1,6}\s',        # Headers
-            r'^\s*[-*+]\s',     # Lists
-            r'^\s*\d+\.\s',     # Numbered lists
+            r'```[\s\S]*?```',      # Code blocks
+            r'`[^`\n]+`',           # Inline code (no newlines)
+            r'\*\*[^*\n]+\*\*',     # Bold
+            r'\*[^*\n]+\*',         # Italic
+            r'__[^_\n]+__',         # Bold (underscore)
+            r'_[^_\n]+_',           # Italic (underscore)
+            r'#{1,6}\s+.+',         # Headers
+            r'^\s*[-*+]\s+.+',      # Unordered lists
+            r'^\s*\d+\.\s+.+',      # Numbered lists
+            r'\[.+\]\(.+\)',        # Links
+            r'!\[.*\]\(.+\)',       # Images
+            r'^\s*>\s+.+',          # Blockquotes
+            r'^\s*\|.+\|',          # Tables
+            r'---+',                # Horizontal rules
         ]
-        
+
         for pattern in markdown_patterns:
             if re.search(pattern, text, re.MULTILINE):
                 return True
         return False
 
+    def _render_enhanced_markdown(self, text: str):
+        """Enhanced markdown rendering with syntax highlighting for code blocks"""
+        # Check if text contains code blocks that need special handling
+        if self._contains_code_blocks(text):
+            return self._render_with_syntax_highlighting(text)
+        elif self._contains_markdown(text):
+            # Use Rich's built-in markdown renderer for standard markdown
+            return Markdown(text)
+        else:
+            # Plain text
+            return Text(text, style="white")
+
+    def _contains_code_blocks(self, text: str) -> bool:
+        """Check if text contains code blocks with language specifications"""
+        code_block_pattern = r'```(\w+)?\s*\n[\s\S]*?\n```'
+        return bool(re.search(code_block_pattern, text, re.MULTILINE))
+
+    def _render_with_syntax_highlighting(self, text: str):
+        """Render text with enhanced syntax highlighting for code blocks"""
+        # Split text into parts: before code, code blocks, after code
+        parts = []
+        last_end = 0
+
+        # Find all code blocks
+        code_block_pattern = r'```(\w+)?\s*\n([\s\S]*?)\n```'
+
+        for match in re.finditer(code_block_pattern, text, re.MULTILINE):
+            start, end = match.span()
+            language = match.group(1) or "text"
+            code_content = match.group(2)
+
+            # Add text before code block
+            if start > last_end:
+                before_text = text[last_end:start]
+                if before_text.strip():
+                    if self._contains_markdown(before_text):
+                        parts.append(Markdown(before_text))
+                    else:
+                        parts.append(Text(before_text, style="white"))
+
+            # Add syntax-highlighted code block
+            try:
+                # Normalize language name for better syntax highlighting
+                normalized_language = self._normalize_language(language)
+
+                syntax = Syntax(
+                    code_content,
+                    normalized_language,
+                    theme="github-dark",  # Better theme for terminals
+                    line_numbers=True,
+                    word_wrap=True,
+                    background_color="default",
+                    indent_guides=True
+                )
+                parts.append(syntax)
+            except Exception:
+                # Fallback to plain code block if syntax highlighting fails
+                code_text = Text(f"```{language}\n{code_content}\n```", style="cyan")
+                parts.append(code_text)
+
+            last_end = end
+
+        # Add remaining text after last code block
+        if last_end < len(text):
+            remaining_text = text[last_end:]
+            if remaining_text.strip():
+                if self._contains_markdown(remaining_text):
+                    parts.append(Markdown(remaining_text))
+                else:
+                    parts.append(Text(remaining_text, style="white"))
+
+        # If no code blocks found, fall back to regular markdown
+        if not parts:
+            return Markdown(text) if self._contains_markdown(text) else Text(text, style="white")
+
+        # Combine all parts
+        from rich.console import Group
+        return Group(*parts)
+
+    def _normalize_language(self, language: str) -> str:
+        """Normalize language names for better syntax highlighting"""
+        if not language:
+            return "text"
+
+        # Common language aliases and normalizations
+        language_map = {
+            "js": "javascript",
+            "ts": "typescript",
+            "py": "python",
+            "rb": "ruby",
+            "sh": "bash",
+            "shell": "bash",
+            "zsh": "bash",
+            "fish": "bash",
+            "ps1": "powershell",
+            "pwsh": "powershell",
+            "cmd": "batch",
+            "bat": "batch",
+            "yml": "yaml",
+            "json5": "json",
+            "jsonc": "json",
+            "md": "markdown",
+            "rst": "restructuredtext",
+            "tex": "latex",
+            "dockerfile": "docker",
+            "makefile": "make",
+            "cmake": "cmake",
+            "sql": "sql",
+            "plsql": "sql",
+            "mysql": "sql",
+            "postgresql": "sql",
+            "sqlite": "sql",
+            "c++": "cpp",
+            "cxx": "cpp",
+            "cc": "cpp",
+            "c#": "csharp",
+            "cs": "csharp",
+            "fs": "fsharp",
+            "vb": "vb.net",
+            "kt": "kotlin",
+            "scala": "scala",
+            "clj": "clojure",
+            "cljs": "clojure",
+            "hs": "haskell",
+            "elm": "elm",
+            "erl": "erlang",
+            "ex": "elixir",
+            "exs": "elixir",
+            "nim": "nim",
+            "zig": "zig",
+            "v": "v",
+            "dart": "dart",
+            "swift": "swift",
+            "objc": "objective-c",
+            "m": "objective-c",
+        }
+
+        normalized = language.lower().strip()
+        return language_map.get(normalized, normalized)
+
 
 class StreamingDisplay:
-    """Context manager for streaming text display"""
-    
-    def __init__(self, console: Console):
+    """Context manager for streaming text display with markdown post-processing"""
+
+    def __init__(self, console: Console, ui_instance=None):
         self.console = console
+        self.ui_instance = ui_instance
         self.buffer = ""
-        
+        self.enable_markdown_post_processing = True
+
     def __enter__(self):
         return self
-        
+
     def __exit__(self, exc_type, exc_val, exc_tb):
-        # Ensure we end with a newline
-        if self.buffer and not self.buffer.endswith('\n'):
-            self.console.print()
+        # Post-process for markdown if enabled and we have content
+        if (self.enable_markdown_post_processing and
+            self.ui_instance and
+            self.buffer.strip() and
+            self._should_rerender_as_markdown()):
+
+            # Clear the current line and re-render with markdown
+            self.console.print("\r", end="")  # Return to start of line
+            self.console.print(" " * 80, end="")  # Clear line
+            self.console.print("\r", end="")  # Return to start again
+
+            # Re-render with enhanced markdown
+            try:
+                rendered_content = self.ui_instance._render_enhanced_markdown(self.buffer)
+                self.console.print(rendered_content)
+            except Exception:
+                # Fallback to what we already displayed
+                pass
+        else:
+            # Ensure we end with a newline
+            if self.buffer and not self.buffer.endswith('\n'):
+                self.console.print()
+
         self.console.print()
-        
+
     def write(self, text: str):
         """Write streaming text"""
         self.buffer += text
         self.console.print(text, end="", style="white")
-        
+
     def write_chunk(self, chunk: str):
         """Write a chunk of streaming text"""
         self.write(chunk)
+
+    def _should_rerender_as_markdown(self) -> bool:
+        """Check if the complete buffer should be re-rendered as markdown"""
+        if not self.ui_instance:
+            return False
+
+        # Only re-render if we have significant markdown content
+        return (self.ui_instance._contains_code_blocks(self.buffer) or
+                (self.ui_instance._contains_markdown(self.buffer) and
+                 len(self.buffer.strip()) > 50))  # Only for substantial content
 
 
 def create_loading_spinner(message: str = "Generating response...") -> Live:
