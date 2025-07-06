@@ -57,13 +57,21 @@ class ChatUI:
         """Display help information"""
         help_text = Text()
         help_text.append("Available commands:\n", style="bold")
-        help_text.append("  /help    - Show this help message\n", style="cyan")
-        help_text.append("  /clear   - Clear the screen\n", style="cyan")
-        help_text.append("  /exit    - Exit the chat\n", style="cyan")
-        help_text.append("  /quit    - Exit the chat\n", style="cyan")
-        help_text.append("\nOr just type your message and press Enter!", style="green")
-        
-        panel = Panel(help_text, title="Help", border_style="blue")
+        help_text.append("\n📋 Basic Commands:\n", style="bold yellow")
+        help_text.append("  /help     - Show this help message\n", style="cyan")
+        help_text.append("  /clear    - Clear the screen\n", style="cyan")
+        help_text.append("  /exit     - Exit the chat\n", style="cyan")
+        help_text.append("  /quit     - Exit the chat\n", style="cyan")
+        help_text.append("\n💬 Conversation Management:\n", style="bold yellow")
+        help_text.append("  /history  - Show conversation history\n", style="cyan")
+        help_text.append("  /reset    - Reset conversation history\n", style="cyan")
+        help_text.append("  /stats    - Show conversation statistics\n", style="cyan")
+        help_text.append("\n💾 Save/Load:\n", style="bold yellow")
+        help_text.append("  /save     - Save conversation to file\n", style="cyan")
+        help_text.append("  /load     - Load conversation from file\n", style="cyan")
+        help_text.append("\n✨ Or just type your message and press Enter!", style="green")
+
+        panel = Panel(help_text, title="🤖 LocalLab Chat Help", border_style="blue")
         self.console.print(panel)
         
     def get_user_input(self) -> Optional[str]:

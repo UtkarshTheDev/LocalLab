@@ -34,6 +34,8 @@ class ChatInterface:
         self.temperature = temperature
         self.top_p = top_p
         self.session_history = []
+        self.max_history_length = 50  # Maximum number of messages to keep
+        self.conversation_started = False
         self.connected = False
         self.connection: Optional[ServerConnection] = None
         self.server_info: Optional[Dict[str, Any]] = None
@@ -154,6 +156,16 @@ class ChatInterface:
         elif command == '/clear':
             self.ui.clear_screen()
             self._display_connection_info()
+        elif command == '/history':
+            self._display_conversation_history()
+        elif command == '/reset':
+            self._reset_conversation()
+        elif command == '/save':
+            await self._save_conversation()
+        elif command == '/load':
+            await self._load_conversation()
+        elif command == '/stats':
+            self._display_conversation_stats()
         else:
             self.ui.display_error(f"Unknown command: {command}")
 
@@ -251,6 +263,8 @@ class ChatInterface:
                 if full_response.strip():
                     self.session_history.append({"role": "user", "content": prompt})
                     self.session_history.append({"role": "assistant", "content": full_response})
+                    self.conversation_started = True
+                    self._manage_history_length()
 
         except Exception as e:
             logger.error(f"Streaming generation failed: {str(e)}")
@@ -311,6 +325,8 @@ class ChatInterface:
                 assistant_message = self._extract_response_text(response)
                 if assistant_message:
                     self.session_history.append({"role": "assistant", "content": assistant_message})
+                    self.conversation_started = True
+                    self._manage_history_length()
 
             return response
 
@@ -378,10 +394,187 @@ class ChatInterface:
                 # Add assistant response to history
                 if full_response.strip():
                     self.session_history.append({"role": "assistant", "content": full_response})
+                    self.conversation_started = True
+                    self._manage_history_length()
 
         except Exception as e:
             logger.error(f"Streaming chat completion failed: {str(e)}")
             self.ui.display_error(f"Streaming chat failed: {str(e)}")
+
+    def _display_conversation_history(self):
+        """Display the current conversation history"""
+        if not self.session_history:
+            self.ui.display_info("No conversation history yet.")
+            return
+
+        self.ui.display_info(f"Conversation History ({len(self.session_history)} messages):")
+        self.ui.display_separator()
+
+        for i, message in enumerate(self.session_history, 1):
+            role = message.get("role", "unknown")
+            content = message.get("content", "")
+
+            # Truncate long messages for history display
+            if len(content) > 100:
+                content = content[:97] + "..."
+
+            if role == "user":
+                self.ui.display_info(f"{i}. You: {content}")
+            elif role == "assistant":
+                model_name = self.model_info.get('model_id', 'AI') if self.model_info else 'AI'
+                self.ui.display_info(f"{i}. {model_name}: {content}")
+            else:
+                self.ui.display_info(f"{i}. {role}: {content}")
+
+        self.ui.display_separator()
+
+    def _reset_conversation(self):
+        """Reset the conversation history"""
+        old_count = len(self.session_history)
+        self.session_history.clear()
+        self.conversation_started = False
+        self.ui.display_info(f"Conversation reset. Cleared {old_count} messages.")
+
+    async def _save_conversation(self):
+        """Save conversation history to a file"""
+        if not self.session_history:
+            self.ui.display_info("No conversation to save.")
+            return
+
+        try:
+            import json
+            from datetime import datetime
+            import os
+
+            # Create conversations directory if it doesn't exist
+            conversations_dir = "conversations"
+            os.makedirs(conversations_dir, exist_ok=True)
+
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"conversation_{timestamp}.json"
+            filepath = os.path.join(conversations_dir, filename)
+
+            # Prepare conversation data
+            conversation_data = {
+                "timestamp": datetime.now().isoformat(),
+                "mode": self.mode.value,
+                "model_info": self.model_info,
+                "server_url": self.url,
+                "messages": self.session_history,
+                "stats": {
+                    "total_messages": len(self.session_history),
+                    "user_messages": len([m for m in self.session_history if m.get("role") == "user"]),
+                    "assistant_messages": len([m for m in self.session_history if m.get("role") == "assistant"])
+                }
+            }
+
+            # Save to file
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(conversation_data, f, indent=2, ensure_ascii=False)
+
+            self.ui.display_info(f"Conversation saved to: {filepath}")
+
+        except Exception as e:
+            logger.error(f"Failed to save conversation: {str(e)}")
+            self.ui.display_error(f"Failed to save conversation: {str(e)}")
+
+    async def _load_conversation(self):
+        """Load conversation history from a file"""
+        try:
+            import json
+            import os
+            from pathlib import Path
+
+            conversations_dir = "conversations"
+            if not os.path.exists(conversations_dir):
+                self.ui.display_info("No conversations directory found.")
+                return
+
+            # List available conversation files
+            conversation_files = list(Path(conversations_dir).glob("conversation_*.json"))
+            if not conversation_files:
+                self.ui.display_info("No saved conversations found.")
+                return
+
+            # Display available conversations
+            self.ui.display_info("Available conversations:")
+            for i, file_path in enumerate(conversation_files, 1):
+                # Extract timestamp from filename
+                filename = file_path.stem
+                timestamp_str = filename.replace("conversation_", "")
+                try:
+                    from datetime import datetime
+                    timestamp = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
+                    formatted_time = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                    self.ui.display_info(f"  {i}. {formatted_time} ({file_path.name})")
+                except:
+                    self.ui.display_info(f"  {i}. {file_path.name}")
+
+            # For now, just load the most recent one
+            # In a full implementation, you'd prompt the user to choose
+            latest_file = max(conversation_files, key=lambda p: p.stat().st_mtime)
+
+            with open(latest_file, 'r', encoding='utf-8') as f:
+                conversation_data = json.load(f)
+
+            # Load the conversation history
+            old_count = len(self.session_history)
+            self.session_history = conversation_data.get("messages", [])
+            self.conversation_started = len(self.session_history) > 0
+
+            self.ui.display_info(f"Loaded conversation from {latest_file.name}")
+            self.ui.display_info(f"Replaced {old_count} messages with {len(self.session_history)} messages")
+
+        except Exception as e:
+            logger.error(f"Failed to load conversation: {str(e)}")
+            self.ui.display_error(f"Failed to load conversation: {str(e)}")
+
+    def _display_conversation_stats(self):
+        """Display conversation statistics"""
+        if not self.session_history:
+            self.ui.display_info("No conversation data available.")
+            return
+
+        user_messages = [m for m in self.session_history if m.get("role") == "user"]
+        assistant_messages = [m for m in self.session_history if m.get("role") == "assistant"]
+
+        total_user_chars = sum(len(m.get("content", "")) for m in user_messages)
+        total_assistant_chars = sum(len(m.get("content", "")) for m in assistant_messages)
+
+        self.ui.display_info("📊 Conversation Statistics:")
+        self.ui.display_info(f"  Total messages: {len(self.session_history)}")
+        self.ui.display_info(f"  User messages: {len(user_messages)}")
+        self.ui.display_info(f"  Assistant messages: {len(assistant_messages)}")
+        self.ui.display_info(f"  User characters: {total_user_chars:,}")
+        self.ui.display_info(f"  Assistant characters: {total_assistant_chars:,}")
+        self.ui.display_info(f"  Average user message length: {total_user_chars // max(len(user_messages), 1):,}")
+        self.ui.display_info(f"  Average assistant message length: {total_assistant_chars // max(len(assistant_messages), 1):,}")
+
+        if self.model_info:
+            model_name = self.model_info.get('model_id', 'Unknown')
+            self.ui.display_info(f"  Model: {model_name}")
+
+        self.ui.display_info(f"  Mode: {self.mode.value}")
+        self.ui.display_info(f"  Max history length: {self.max_history_length}")
+
+    def _manage_history_length(self):
+        """Manage conversation history length to prevent context overflow"""
+        if len(self.session_history) > self.max_history_length:
+            # Keep the most recent messages, but preserve conversation flow
+            # Remove pairs of messages (user + assistant) to maintain context
+            messages_to_remove = len(self.session_history) - self.max_history_length
+
+            # Ensure we remove an even number to maintain user/assistant pairs
+            if messages_to_remove % 2 == 1:
+                messages_to_remove += 1
+
+            if messages_to_remove > 0:
+                removed_messages = self.session_history[:messages_to_remove]
+                self.session_history = self.session_history[messages_to_remove:]
+
+                logger.info(f"Trimmed {len(removed_messages)} old messages from conversation history")
+                self.ui.display_info(f"📝 Trimmed {len(removed_messages)} old messages to manage context length")
         
 
 def validate_url(ctx, param, value):
