@@ -198,6 +198,35 @@ class ServerConnection:
             logger.error(f"Failed to complete chat: {str(e)}")
             return None
 
+    async def chat_completion_stream(self, messages: list, **kwargs):
+        """Chat completion with streaming using the /chat endpoint"""
+        try:
+            if not self.client:
+                return
+
+            url = urljoin(self.base_url, '/chat')
+            payload = {
+                "messages": messages,
+                "stream": True,
+                **kwargs
+            }
+
+            async with self.client.stream('POST', url, json=payload) as response:
+                if response.status_code == 200:
+                    async for line in response.aiter_lines():
+                        line = line.strip()
+                        if line.startswith('data: '):
+                            data = line[6:]  # Remove 'data: ' prefix
+                            if data == '[DONE]':
+                                break
+                            yield data
+                else:
+                    error_text = response.text
+                    logger.error(f"Streaming chat completion failed: {response.status_code} - {error_text}")
+
+        except Exception as e:
+            logger.error(f"Failed to stream chat completion: {str(e)}")
+
 
 async def detect_local_server(ports: list = [8000, 8080, 3000]) -> Optional[str]:
     """Detect if a LocalLab server is running locally"""

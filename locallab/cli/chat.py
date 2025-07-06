@@ -170,21 +170,31 @@ class ChatInterface:
             self.ui.display_info("🤔 Thinking...")
 
             # Choose generation method based on mode
-            if self.mode == GenerationMode.CHAT:
+            if self.mode == GenerationMode.STREAM:
+                await self._generate_stream(message)
+            elif self.mode == GenerationMode.CHAT:
                 response = await self._chat_completion(message)
-            else:
-                response = await self._generate_text(message)
-
-            if response:
-                # Extract and display the response text
-                response_text = self._extract_response_text(response)
-                if response_text:
-                    model_name = self.model_info.get('model_id', 'AI') if self.model_info else 'AI'
-                    self.ui.display_ai_response(response_text, model_name)
+                if response:
+                    response_text = self._extract_response_text(response)
+                    if response_text:
+                        model_name = self.model_info.get('model_id', 'AI') if self.model_info else 'AI'
+                        self.ui.display_ai_response(response_text, model_name)
+                    else:
+                        self.ui.display_error("Received empty response from server")
                 else:
-                    self.ui.display_error("Received empty response from server")
+                    self.ui.display_error("Failed to get response from server")
             else:
-                self.ui.display_error("Failed to get response from server")
+                # Simple generation mode
+                response = await self._generate_text(message)
+                if response:
+                    response_text = self._extract_response_text(response)
+                    if response_text:
+                        model_name = self.model_info.get('model_id', 'AI') if self.model_info else 'AI'
+                        self.ui.display_ai_response(response_text, model_name)
+                    else:
+                        self.ui.display_error("Received empty response from server")
+                else:
+                    self.ui.display_error("Failed to get response from server")
 
         except Exception as e:
             logger.error(f"Error processing message: {str(e)}")
@@ -204,6 +214,81 @@ class ChatInterface:
 
         except Exception as e:
             logger.error(f"Text generation failed: {str(e)}")
+            return None
+
+    async def _generate_stream(self, prompt: str):
+        """Generate text with streaming using the /generate endpoint"""
+        try:
+            if not self.connection:
+                self.ui.display_error("Not connected to server")
+                return
+
+            # Prepare generation parameters
+            params = {
+                "max_tokens": self.max_tokens,
+                "temperature": self.temperature,
+                "top_p": self.top_p,
+            }
+
+            model_name = self.model_info.get('model_id', 'AI') if self.model_info else 'AI'
+
+            # Start streaming display
+            with self.ui.display_streaming_response(model_name) as stream_display:
+                full_response = ""
+
+                async for chunk in self.connection.generate_stream(prompt, **params):
+                    try:
+                        # Parse the streaming chunk
+                        chunk_text = self._parse_stream_chunk(chunk)
+                        if chunk_text:
+                            full_response += chunk_text
+                            stream_display.write_chunk(chunk_text)
+                    except Exception as e:
+                        logger.debug(f"Error parsing stream chunk: {str(e)}")
+                        continue
+
+                # Add to session history if we got a response
+                if full_response.strip():
+                    self.session_history.append({"role": "user", "content": prompt})
+                    self.session_history.append({"role": "assistant", "content": full_response})
+
+        except Exception as e:
+            logger.error(f"Streaming generation failed: {str(e)}")
+            self.ui.display_error(f"Streaming failed: {str(e)}")
+
+    def _parse_stream_chunk(self, chunk: str) -> Optional[str]:
+        """Parse a streaming chunk and extract text content"""
+        try:
+            if not chunk or chunk.strip() == "":
+                return None
+
+            # Try to parse as JSON
+            import json
+            try:
+                data = json.loads(chunk)
+
+                # Handle different streaming formats
+                if "choices" in data and data["choices"]:
+                    choice = data["choices"][0]
+                    if "delta" in choice and "content" in choice["delta"]:
+                        return choice["delta"]["content"]
+                    elif "text" in choice:
+                        return choice["text"]
+                elif "token" in data:
+                    return data["token"]
+                elif "text" in data:
+                    return data["text"]
+                elif "content" in data:
+                    return data["content"]
+
+            except json.JSONDecodeError:
+                # If not JSON, treat as plain text
+                return chunk
+
+            return None
+
+        except Exception as e:
+            logger.debug(f"Error parsing stream chunk: {str(e)}")
             return None
 
     async def _chat_completion(self, message: str) -> Optional[Dict[str, Any]]:
@@ -255,6 +340,48 @@ class ChatInterface:
         except Exception as e:
             logger.error(f"Failed to extract response text: {str(e)}")
             return None
+
+    async def _chat_completion_stream(self, message: str):
+        """Chat completion with streaming using the /chat endpoint"""
+        try:
+            if not self.connection:
+                self.ui.display_error("Not connected to server")
+                return
+
+            # Add message to session history
+            self.session_history.append({"role": "user", "content": message})
+
+            # Prepare generation parameters
+            params = {
+                "max_tokens": self.max_tokens,
+                "temperature": self.temperature,
+                "top_p": self.top_p,
+            }
+
+            model_name = self.model_info.get('model_id', 'AI') if self.model_info else 'AI'
+
+            # Start streaming display
+            with self.ui.display_streaming_response(model_name) as stream_display:
+                full_response = ""
+
+                async for chunk in self.connection.chat_completion_stream(self.session_history, **params):
+                    try:
+                        # Parse the streaming chunk
+                        chunk_text = self._parse_stream_chunk(chunk)
+                        if chunk_text:
+                            full_response += chunk_text
+                            stream_display.write_chunk(chunk_text)
+                    except Exception as e:
+                        logger.debug(f"Error parsing stream chunk: {str(e)}")
+                        continue
+
+                # Add assistant response to history
+                if full_response.strip():
+                    self.session_history.append({"role": "assistant", "content": full_response})
+
+        except Exception as e:
+            logger.error(f"Streaming chat completion failed: {str(e)}")
+            self.ui.display_error(f"Streaming chat failed: {str(e)}")
         
 
 def validate_url(ctx, param, value):
