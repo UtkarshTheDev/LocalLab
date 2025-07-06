@@ -166,6 +166,8 @@ class ChatInterface:
             await self._load_conversation()
         elif command == '/stats':
             self._display_conversation_stats()
+        elif command == '/batch':
+            await self._handle_batch_mode()
         else:
             self.ui.display_error(f"Unknown command: {command}")
 
@@ -195,6 +197,9 @@ class ChatInterface:
                         self.ui.display_error("Received empty response from server")
                 else:
                     self.ui.display_error("Failed to get response from server")
+            elif self.mode == GenerationMode.BATCH:
+                # For batch mode, treat single messages as single-item batches
+                await self._process_batch([message])
             else:
                 # Simple generation mode
                 response = await self._generate_text(message)
@@ -575,6 +580,132 @@ class ChatInterface:
 
                 logger.info(f"Trimmed {len(removed_messages)} old messages from conversation history")
                 self.ui.display_info(f"📝 Trimmed {len(removed_messages)} old messages to manage context length")
+
+    async def _handle_batch_mode(self):
+        """Handle interactive batch processing mode"""
+        self.ui.display_info("🔄 Entering batch processing mode")
+        self.ui.display_info("Enter prompts one by one. Type '/done' when finished, '/cancel' to abort.")
+        self.ui.display_separator()
+
+        prompts = []
+        prompt_count = 1
+
+        while True:
+            try:
+                prompt = self.ui.get_batch_input(prompt_count)
+                if not prompt:
+                    continue
+
+                if prompt.lower() == '/done':
+                    if prompts:
+                        break
+                    else:
+                        self.ui.display_info("No prompts entered. Add at least one prompt or type '/cancel' to abort.")
+                        continue
+                elif prompt.lower() == '/cancel':
+                    self.ui.display_info("Batch processing cancelled.")
+                    return
+                elif prompt.lower() == '/clear':
+                    prompts.clear()
+                    prompt_count = 1
+                    self.ui.display_info("Batch cleared. Start adding prompts again.")
+                    continue
+                elif prompt.lower() == '/list':
+                    self._display_batch_prompts(prompts)
+                    continue
+
+                prompts.append(prompt)
+                self.ui.display_info(f"✅ Added prompt {prompt_count}: {prompt[:50]}{'...' if len(prompt) > 50 else ''}")
+                prompt_count += 1
+
+            except KeyboardInterrupt:
+                self.ui.display_info("\nBatch processing cancelled.")
+                return
+
+        if prompts:
+            await self._process_batch(prompts)
+
+    def _display_batch_prompts(self, prompts: list):
+        """Display current batch prompts"""
+        if not prompts:
+            self.ui.display_info("No prompts in batch yet.")
+            return
+
+        self.ui.display_info(f"📋 Current batch ({len(prompts)} prompts):")
+        for i, prompt in enumerate(prompts, 1):
+            truncated = prompt[:80] + "..." if len(prompt) > 80 else prompt
+            self.ui.display_info(f"  {i}. {truncated}")
+
+    async def _process_batch(self, prompts: list):
+        """Process a batch of prompts"""
+        if not self.connection:
+            self.ui.display_error("Not connected to server")
+            return
+
+        self.ui.display_info(f"🚀 Processing batch of {len(prompts)} prompts...")
+        self.ui.display_separator()
+
+        # Prepare generation parameters
+        params = {
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+        }
+
+        try:
+            # Show progress indicator
+            with self.ui.display_batch_progress() as progress:
+                progress.update_status("Sending batch request...")
+
+                # Send batch request
+                response = await self.connection.batch_generate(prompts, **params)
+
+                if not response:
+                    self.ui.display_error("Batch processing failed - no response from server")
+                    return
+
+                responses = response.get("responses", [])
+                if len(responses) != len(prompts):
+                    self.ui.display_error(f"Response count mismatch: expected {len(prompts)}, got {len(responses)}")
+                    return
+
+                progress.update_status("Processing responses...")
+
+                # Display results
+                self.ui.display_info("📊 Batch Results:")
+                self.ui.display_separator()
+
+                for i, (prompt, response) in enumerate(zip(prompts, responses), 1):
+                    progress.update_status(f"Displaying result {i}/{len(prompts)}")
+                    self.ui.display_batch_result(i, prompt, response)
+
+                progress.update_status("Batch processing complete!")
+
+            # Display batch statistics
+            self._display_batch_stats(prompts, responses)
+
+        except Exception as e:
+            logger.error(f"Batch processing failed: {str(e)}")
+            self.ui.display_error(f"Batch processing failed: {str(e)}")
+
+    def _display_batch_stats(self, prompts: list, responses: list):
+        """Display batch processing statistics"""
+        total_prompt_chars = sum(len(p) for p in prompts)
+        total_response_chars = sum(len(r) for r in responses)
+        avg_prompt_length = total_prompt_chars // len(prompts)
+        avg_response_length = total_response_chars // len(responses)
+
+        self.ui.display_separator()
+        self.ui.display_info("📈 Batch Statistics:")
+        self.ui.display_info(f"  Total prompts: {len(prompts)}")
+        self.ui.display_info(f"  Total responses: {len(responses)}")
+        self.ui.display_info(f"  Average prompt length: {avg_prompt_length:,} characters")
+        self.ui.display_info(f"  Average response length: {avg_response_length:,} characters")
+        self.ui.display_info(f"  Total characters processed: {total_prompt_chars + total_response_chars:,}")
+
+        if self.model_info:
+            model_name = self.model_info.get('model_id', 'Unknown')
+            self.ui.display_info(f"  Model used: {model_name}")
         
 
 def validate_url(ctx, param, value):

@@ -227,6 +227,58 @@ class ServerConnection:
         except Exception as e:
             logger.error(f"Failed to stream chat completion: {str(e)}")
 
+    async def batch_generate(self, prompts: list, **kwargs) -> Optional[dict]:
+        """Generate text for multiple prompts using the /generate/batch endpoint"""
+        try:
+            if not self.client:
+                return None
+
+            url = urljoin(self.base_url, '/generate/batch')
+
+            # Prepare the batch request payload
+            payload = {
+                "prompts": prompts,
+                **kwargs  # Include max_tokens, temperature, top_p, etc.
+            }
+
+            response = await self.client.post(url, json=payload)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                error_text = response.text
+                logger.error(f"Batch generation failed: {response.status_code} - {error_text}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Failed to perform batch generation: {str(e)}")
+            return None
+
+    async def batch_generate(self, prompts: list, **kwargs) -> Optional[dict]:
+        """Generate text for multiple prompts using the /generate/batch endpoint"""
+        try:
+            if not self.client:
+                return None
+
+            url = urljoin(self.base_url, '/generate/batch')
+
+            # Prepare the batch request payload
+            payload = {
+                "prompts": prompts,
+                **kwargs  # Include max_tokens, temperature, top_p, etc.
+            }
+
+            response = await self.client.post(url, json=payload)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                error_text = response.text
+                logger.error(f"Batch generation failed: {response.status_code} - {error_text}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Failed to perform batch generation: {str(e)}")
+            return None
+
 
 async def detect_local_server(ports: list = [8000, 8080, 3000]) -> Optional[str]:
     """Detect if a LocalLab server is running locally"""

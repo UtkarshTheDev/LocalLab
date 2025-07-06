@@ -69,6 +69,8 @@ class ChatUI:
         help_text.append("\n💾 Save/Load:\n", style="bold yellow")
         help_text.append("  /save     - Save conversation to file\n", style="cyan")
         help_text.append("  /load     - Load conversation from file\n", style="cyan")
+        help_text.append("\n🔄 Batch Processing:\n", style="bold yellow")
+        help_text.append("  /batch    - Enter batch processing mode\n", style="cyan")
         help_text.append("\n✨ Or just type your message and press Enter!", style="green")
 
         panel = Panel(help_text, title="🤖 LocalLab Chat Help", border_style="blue")
@@ -330,6 +332,74 @@ class ChatUI:
 
         normalized = language.lower().strip()
         return language_map.get(normalized, normalized)
+
+    def get_batch_input(self, prompt_number: int) -> Optional[str]:
+        """Get input for batch processing with special prompt"""
+        try:
+            prompt_text = f"[bold magenta]Prompt {prompt_number}[/bold magenta] [dim](/done to finish, /cancel to abort, /list to view, /clear to reset)[/dim]"
+            user_input = Prompt.ask(prompt_text, console=self.console)
+            return user_input.strip() if user_input else None
+        except (KeyboardInterrupt, EOFError):
+            return None
+
+    def display_batch_result(self, index: int, prompt: str, response: str):
+        """Display a single batch result with formatting"""
+        # Create a panel for each result
+        result_content = Text()
+
+        # Add prompt
+        result_content.append("📝 Prompt:\n", style="bold cyan")
+        result_content.append(f"{prompt}\n\n", style="white")
+
+        # Add response with markdown rendering
+        result_content.append("🤖 Response:\n", style="bold green")
+
+        # Use enhanced markdown rendering for the response
+        try:
+            rendered_response = self._render_enhanced_markdown(response)
+            panel_content = Group(result_content, rendered_response)
+        except Exception:
+            # Fallback to plain text
+            result_content.append(response, style="white")
+            panel_content = result_content
+
+        panel = Panel(
+            panel_content,
+            title=f"Result {index}",
+            border_style="blue",
+            padding=(1, 2)
+        )
+
+        self.console.print(panel)
+        self.console.print()
+
+    def display_batch_progress(self):
+        """Return a context manager for batch progress display"""
+        return BatchProgressDisplay(self.console)
+
+
+class BatchProgressDisplay:
+    """Context manager for batch processing progress display"""
+
+    def __init__(self, console: Console):
+        self.console = console
+        self.status_text = ""
+
+    def __enter__(self):
+        self.console.print("⏳ Starting batch processing...", style="yellow")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is None:
+            self.console.print("✅ Batch processing completed!", style="green")
+        else:
+            self.console.print("❌ Batch processing failed!", style="red")
+        self.console.print()
+
+    def update_status(self, status: str):
+        """Update the current status"""
+        self.status_text = status
+        self.console.print(f"  {status}", style="dim")
 
 
 class StreamingDisplay:
