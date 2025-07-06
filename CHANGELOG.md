@@ -2,6 +2,77 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.10.0] - 2025-07-06
+
+### 🎉 Major Release - Enhanced Chat Interface & Documentation Overhaul
+
+This release significantly enhances the LocalLab chat interface with dynamic mode switching capabilities and provides a comprehensive documentation overhaul that makes LocalLab more accessible and user-friendly.
+
+### Added
+
+#### 🚀 Dynamic Generation Mode Switching
+- **New inline mode switching syntax** - Override generation mode per message using `--stream`, `--chat`, `--simple`, `--batch`
+- **Visual feedback system** - Clear indicators when mode overrides are applied
+- **Backward compatibility** - All existing CLI options continue to work seamlessly
+- **Smart parsing** - Robust regex-based mode detection with comprehensive error handling
+
+#### 🚀 Enhanced Chat Interface Features
+- **Improved mode override handling** - Seamless switching between generation modes within conversations
+- **Better error messages** - Clear feedback for invalid mode specifications
+- **Enhanced user experience** - Visual confirmation of mode changes during chat sessions
+
+#### 📚 Comprehensive Documentation Overhaul
+- **New CLI documentation hub** - Created `docs/cli/README.md` with complete CLI overview and navigation
+- **Restructured main README** - Chat interface now prominently featured as the star feature
+- **Enhanced getting started guide** - 3-step quick start process for immediate success
+- **Improved CLI reference** - Better organized with chat interface as primary section
+- **Better visual hierarchy** - Tables, emojis, and clear formatting throughout all documentation
+
+### Enhanced
+
+#### 💬 Chat Interface Improvements
+- **Better command documentation** - All interactive commands clearly explained with examples
+- **Improved feature descriptions** - Clear benefits and use cases for each generation mode
+- **Enhanced examples** - Comprehensive usage scenarios and practical demonstrations
+- **Better error handling** - More graceful handling of invalid mode switches
+
+#### 📖 Documentation Quality
+- **Consistent formatting** - Unified style across all documentation files
+- **Better organization** - Logical flow from installation to advanced usage
+- **Cross-references** - Proper linking between all documentation sections
+- **User-focused content** - Clear value propositions and practical examples
+- **Fixed markdown issues** - Resolved formatting problems that affected rendering
+
+### Changed
+
+#### 🎯 User Experience Focus
+- **Chat interface prominence** - Now positioned as the primary way to interact with LocalLab
+- **Simplified onboarding** - Clear 3-step process gets users to success immediately
+- **Better feature discovery** - Enhanced documentation helps users find and use advanced features
+- **Improved accessibility** - Documentation is now easier to read and navigate for all skill levels
+
+#### 📚 Documentation Structure
+- **Reorganized navigation** - Better hierarchy and cross-referencing between docs
+- **Enhanced examples** - More practical, real-world usage scenarios
+- **Clearer instructions** - Step-by-step guidance for all major features
+- **Better visual design** - Tables, code blocks, and formatting improvements
+
+### Technical Details
+
+#### 🔧 Implementation
+- **Regex-based parsing** - Robust pattern matching for inline mode detection
+- **Comprehensive testing** - Full test coverage for dynamic mode switching functionality
+- **Error handling** - Graceful degradation and clear error messages
+- **Performance optimization** - Efficient parsing with minimal overhead
+
+#### 📝 Documentation Infrastructure
+- **Markdown validation** - Ensured all documentation renders correctly
+- **Link verification** - All cross-references properly validated
+- **Content organization** - Logical structure with clear navigation paths
+- **Visual consistency** - Unified formatting and style guidelines
+
+This release makes LocalLab significantly more user-friendly while adding powerful new features that enhance the chat experience. The comprehensive documentation overhaul ensures that users can easily discover and utilize all of LocalLab's capabilities.
+
 ## [0.9.0] - 2025-07-06
 
 ### 🎉 Major Release - CLI Configuration Interface Redesign

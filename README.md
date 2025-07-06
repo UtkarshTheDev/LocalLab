@@ -266,7 +266,6 @@ class Person:
 # Usage
 person = Person("Alice", 25)
 print(person.introduce())
-```
 
 You: /save
 💾 Conversation saved to: chat_2024-07-06_14-30-15.json

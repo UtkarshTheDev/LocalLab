@@ -6,7 +6,7 @@ LocalLab - A lightweight AI inference server for running LLMs locally
 # This ensures Hugging Face's progress bars are displayed correctly
 from .utils.early_config import configure_hf_logging
 
-__version__ = "0.9.0"  # Major CLI configuration interface redesign with fresh install detection and improved UX
+__version__ = "0.10.0"  # Enhanced chat interface with dynamic mode switching and comprehensive documentation overhaul
 
 # Only import what's necessary initially, lazy-load the rest
 from .logger import get_logger
