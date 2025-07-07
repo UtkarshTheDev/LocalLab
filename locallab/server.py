@@ -1330,6 +1330,10 @@ def cli():
     from .cli.chat import chat
     locallab_cli.add_command(chat)
 
+    # Import and add the models command group
+    from .cli.models import models
+    locallab_cli.add_command(models)
+
     # Use sys.argv to check if we're just showing help
     if len(sys.argv) <= 1 or sys.argv[1] == '--help' or sys.argv[1] == '-h':
         return locallab_cli()
@@ -1337,6 +1341,8 @@ def cli():
     # For specific commands, we can optimize further
     if sys.argv[1] == 'info':
         return locallab_cli(['info'])
+    elif sys.argv[1] == 'models':
+        return locallab_cli()
 
     return locallab_cli()
 
