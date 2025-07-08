@@ -91,24 +91,36 @@ def enable_hf_progress_bars():
     except ImportError:
         pass
 
-    # Configure huggingface_hub
+    # Configure huggingface_hub progress bars
     try:
         import huggingface_hub
+        import os
 
         # Different versions of huggingface_hub have different ways to enable progress bars
         # Try multiple approaches to ensure compatibility
+        progress_enabled = False
 
         # Method 1: Try direct module function (newer versions)
         if hasattr(huggingface_hub, "enable_progress_bars"):
-            huggingface_hub.enable_progress_bars()
+            try:
+                huggingface_hub.enable_progress_bars()
+                progress_enabled = True
+            except Exception:
+                pass
 
-        # Method 2: Try through utils.logging (some versions)
-        try:
-            from huggingface_hub.utils import logging as hf_logging
-            if hasattr(hf_logging, "enable_progress_bars"):
-                hf_logging.enable_progress_bars()
-        except (ImportError, AttributeError):
-            pass
+        # Method 2: Try through utils.logging (older versions)
+        if not progress_enabled:
+            try:
+                from huggingface_hub.utils import logging as hf_logging
+                if hasattr(hf_logging, "enable_progress_bars"):
+                    hf_logging.enable_progress_bars()
+                    progress_enabled = True
+            except (ImportError, AttributeError):
+                pass
+
+        # Method 3: Use environment variable as fallback
+        if not progress_enabled:
+            os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "0"
 
         # Method 3: Set environment variable (works for all versions)
         os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "0"

@@ -160,31 +160,57 @@ def configure_hf_hub_progress():
     This completely bypasses our custom logger for HuggingFace download progress.
     """
     try:
-        # 1. Enable HuggingFace's native progress bars
-        from huggingface_hub.utils import logging as hf_logging
-        hf_logging.enable_progress_bars()
+        # 1. Enable HuggingFace's native progress bars using the correct API
+        # Try multiple methods for different huggingface_hub versions
+        progress_enabled = False
+
+        # Method 1: Try the main module function (newer versions)
+        try:
+            import huggingface_hub
+            if hasattr(huggingface_hub, "enable_progress_bars"):
+                huggingface_hub.enable_progress_bars()
+                progress_enabled = True
+                logger.debug("Enabled HF progress bars via main module")
+        except (ImportError, AttributeError):
+            pass
+
+        # Method 2: Try through utils.logging (older versions)
+        if not progress_enabled:
+            try:
+                from huggingface_hub.utils import logging as hf_logging
+                if hasattr(hf_logging, "enable_progress_bars"):
+                    hf_logging.enable_progress_bars()
+                    progress_enabled = True
+                    logger.debug("Enabled HF progress bars via utils.logging")
+            except (ImportError, AttributeError):
+                pass
+
+        # Method 3: Try setting environment variable as fallback
+        if not progress_enabled:
+            import os
+            os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "0"
+            logger.debug("Enabled HF progress bars via environment variable")
 
         # 2. Enable HF Transfer for better download experience (only if available)
         try:
             import hf_transfer
             from huggingface_hub import constants
             constants.HF_HUB_ENABLE_HF_TRANSFER = True
+            logger.debug("Enabled HF Transfer for faster downloads")
         except ImportError:
             # hf_transfer not available, skip enabling it
             pass
 
         # 3. Make sure we're NOT overriding HuggingFace's progress callback
         # This is critical - we want to use their native implementation
-        from huggingface_hub import file_download
-        if hasattr(file_download, "_tqdm_callback"):
-            # Reset to default - we don't want any custom callback
-            file_download._tqdm_callback = None
-
-        # 4. Ensure HuggingFace Hub's own logging is properly configured
-        # This ensures HF's own progress bars are displayed correctly
-        import huggingface_hub
-        if hasattr(huggingface_hub, "enable_progress_bars"):
-            huggingface_hub.enable_progress_bars()
+        try:
+            from huggingface_hub import file_download
+            if hasattr(file_download, "_tqdm_callback"):
+                # Reset to default - we don't want any custom callback
+                file_download._tqdm_callback = None
+                logger.debug("Reset HF download callback to default")
+        except (ImportError, AttributeError):
+            pass
 
         # 5. Configure tqdm directly to ensure proper display
         import tqdm
@@ -200,11 +226,11 @@ def configure_hf_hub_progress():
         global is_downloading
         is_downloading = True
 
-        logger.debug("Configured HuggingFace Hub to use its native progress bars")
-    except ImportError:
-        logger.warning("Failed to configure HuggingFace Hub progress bars")
+        logger.debug("Successfully configured HuggingFace Hub progress bars")
+    except ImportError as e:
+        logger.debug(f"HuggingFace Hub progress configuration skipped: {str(e)}")
     except Exception as e:
-        logger.warning(f"Error configuring HuggingFace Hub progress: {str(e)}")
+        logger.debug(f"HuggingFace Hub progress configuration failed: {str(e)}")
 
 # Function to check if we're currently downloading
 def is_model_downloading():

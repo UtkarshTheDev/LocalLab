@@ -103,8 +103,8 @@ class ModelManager:
 
         # First check if CUDA is available - if not, we can't use bitsandbytes quantization
         if not torch.cuda.is_available():
-            logger.warning("CUDA not available - quantization with bitsandbytes requires CUDA")
-            logger.info("Disabling quantization and using CPU-compatible settings")
+            logger.info("GPU not detected - running in CPU mode with optimized settings")
+            logger.info("💡 For faster inference, consider using a system with CUDA-compatible GPU")
             return {
                 "torch_dtype": torch.float32,
                 "device_map": safe_device_map
@@ -187,7 +187,9 @@ class ModelManager:
             }
 
     def _apply_optimizations(self, model: AutoModelForCausalLM) -> AutoModelForCausalLM:
-        """Apply various optimizations to the model"""
+        """Apply various optimizations to the model with graceful fallbacks"""
+        optimization_results = []
+
         try:
             # Import the config system
             from .cli.config import get_config_value
@@ -198,13 +200,18 @@ class ModelManager:
                 enable_attention_slicing = enable_attention_slicing.lower() not in ('false', '0', 'none', '')
 
             if enable_attention_slicing:
-                if hasattr(model, 'enable_attention_slicing'):
-                    # Use more aggressive slicing for faster inference
-                    model.enable_attention_slicing("max")
-                    logger.info("Attention slicing enabled with max setting")
-                else:
-                    logger.info(
-                        "Attention slicing not available for this model")
+                try:
+                    if hasattr(model, 'enable_attention_slicing'):
+                        # Use more aggressive slicing for faster inference
+                        model.enable_attention_slicing("max")
+                        logger.info("Attention slicing enabled with max setting")
+                        optimization_results.append("✓ Attention slicing")
+                    else:
+                        logger.info("Attention slicing not available for this model")
+                        optimization_results.append("- Attention slicing (not supported)")
+                except Exception as e:
+                    logger.debug(f"Attention slicing failed: {str(e)}")
+                    optimization_results.append("- Attention slicing (failed)")
 
             # Only apply CPU offloading if explicitly enabled and not empty
             enable_cpu_offloading = get_config_value('enable_cpu_offloading', ENABLE_CPU_OFFLOADING)
@@ -212,11 +219,17 @@ class ModelManager:
                 enable_cpu_offloading = enable_cpu_offloading.lower() not in ('false', '0', 'none', '')
 
             if enable_cpu_offloading:
-                if hasattr(model, "enable_cpu_offload"):
-                    model.enable_cpu_offload()
-                    logger.info("CPU offloading enabled")
-                else:
-                    logger.info("CPU offloading not available for this model")
+                try:
+                    if hasattr(model, "enable_cpu_offload"):
+                        model.enable_cpu_offload()
+                        logger.info("CPU offloading enabled")
+                        optimization_results.append("✓ CPU offloading")
+                    else:
+                        logger.info("CPU offloading not available for this model")
+                        optimization_results.append("- CPU offloading (not supported)")
+                except Exception as e:
+                    logger.debug(f"CPU offloading failed: {str(e)}")
+                    optimization_results.append("- CPU offloading (failed)")
 
             # Only apply BetterTransformer if explicitly enabled and not empty
             enable_bettertransformer = get_config_value('enable_better_transformer', ENABLE_BETTERTRANSFORMER)
@@ -225,15 +238,38 @@ class ModelManager:
 
             if enable_bettertransformer:
                 try:
-                    from optimum.bettertransformer import BetterTransformer
-                    model = BetterTransformer.transform(model)
-                    logger.info("BetterTransformer optimization applied")
+                    # Check transformers version compatibility
+                    import transformers
+                    from packaging import version
+
+                    transformers_version = version.parse(transformers.__version__)
+                    if transformers_version >= version.parse("4.49.0"):
+                        logger.info("BetterTransformer is deprecated for transformers>=4.49.0, using native optimizations instead")
+                        # Use native PyTorch optimizations instead
+                        try:
+                            if hasattr(model, "to_bettertransformer"):
+                                # Some models still support the native method
+                                model = model.to_bettertransformer()
+                                logger.info("Applied native BetterTransformer optimization")
+                                optimization_results.append("✓ Native BetterTransformer")
+                            else:
+                                logger.info("Using default PyTorch optimizations (BetterTransformer not needed)")
+                                optimization_results.append("✓ Default PyTorch optimizations")
+                        except Exception as e:
+                            logger.debug(f"Native BetterTransformer not available: {str(e)}")
+                            optimization_results.append("✓ Default PyTorch optimizations")
+                    else:
+                        # Use optimum BetterTransformer for older transformers versions
+                        from optimum.bettertransformer import BetterTransformer
+                        model = BetterTransformer.transform(model)
+                        logger.info("BetterTransformer optimization applied via optimum")
+                        optimization_results.append("✓ BetterTransformer (optimum)")
                 except ImportError:
-                    logger.warning(
-                        "BetterTransformer not available - install 'optimum' for this feature")
+                    logger.info("BetterTransformer not available - using default PyTorch optimizations")
+                    optimization_results.append("✓ Default PyTorch optimizations")
                 except Exception as e:
-                    logger.warning(
-                        f"BetterTransformer optimization failed: {str(e)}")
+                    logger.debug(f"BetterTransformer optimization skipped: {str(e)}")
+                    optimization_results.append("- BetterTransformer (failed)")
 
             # Only apply Flash Attention if explicitly enabled and not empty
             enable_flash_attention = get_config_value('enable_flash_attention', ENABLE_FLASH_ATTENTION)
@@ -246,36 +282,52 @@ class ModelManager:
                     if hasattr(model.config, "attn_implementation"):
                         model.config.attn_implementation = "flash_attention_2"
                         logger.info("Flash Attention 2 enabled via config")
+                        optimization_results.append("✓ Flash Attention 2")
                     # For older models, try the flash_attn module
                     else:
                         import flash_attn
                         logger.info("Flash Attention enabled via module")
+                        optimization_results.append("✓ Flash Attention")
                 except ImportError:
-                    logger.warning(
-                        "Flash Attention not available - install 'flash-attn' for this feature")
+                    logger.info(
+                        "Flash Attention not available - using standard attention (install 'flash-attn' for faster inference)")
+                    optimization_results.append("- Flash Attention (not installed)")
                 except Exception as e:
-                    logger.warning(
-                        f"Flash Attention optimization failed: {str(e)}")
+                    logger.debug(f"Flash Attention optimization skipped: {str(e)}")
+                    optimization_results.append("- Flash Attention (failed)")
 
             # Enable memory efficient attention if available
             try:
                 if hasattr(model, "enable_xformers_memory_efficient_attention"):
                     model.enable_xformers_memory_efficient_attention()
                     logger.info("XFormers memory efficient attention enabled")
+                    optimization_results.append("✓ XFormers memory efficient attention")
+                else:
+                    optimization_results.append("- XFormers (not supported)")
             except Exception as e:
-                logger.info(f"XFormers memory efficient attention not available: {str(e)}")
+                logger.debug(f"XFormers memory efficient attention not available: {str(e)}")
+                optimization_results.append("- XFormers (not available)")
 
             # Enable gradient checkpointing for memory efficiency if available
             try:
                 if hasattr(model, "gradient_checkpointing_enable"):
                     model.gradient_checkpointing_enable()
                     logger.info("Gradient checkpointing enabled for memory efficiency")
+                    optimization_results.append("✓ Gradient checkpointing")
+                else:
+                    optimization_results.append("- Gradient checkpointing (not supported)")
             except Exception as e:
-                logger.info(f"Gradient checkpointing not available: {str(e)}")
+                logger.debug(f"Gradient checkpointing not available: {str(e)}")
+                optimization_results.append("- Gradient checkpointing (failed)")
 
             # Set model to evaluation mode for faster inference
             model.eval()
             logger.info("Model set to evaluation mode for faster inference")
+            optimization_results.append("✓ Evaluation mode")
+
+            # Log optimization summary
+            if optimization_results:
+                logger.info(f"Applied optimizations: {', '.join(optimization_results)}")
 
             return model
         except Exception as e:

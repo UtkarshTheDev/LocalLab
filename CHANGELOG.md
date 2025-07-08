@@ -2,6 +2,33 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.11.1] - 2025-07-08
+
+### 🔧 Bug Fixes - Download Command Improvements
+
+This patch release fixes several warnings and errors that appeared during model downloads, providing a cleaner and more user-friendly experience.
+
+### Fixed
+
+#### 🚀 Download Command Improvements
+- **Fixed HuggingFace Hub progress bar configuration error** - Resolved `'module 'huggingface_hub.utils.logging' has no attribute 'enable_progress_bars''` error with multiple fallback methods for different huggingface_hub versions
+- **Fixed BetterTransformer version compatibility warning** - Updated optimization code to handle transformers>=4.49.0 requirement with intelligent version detection and graceful fallback to native PyTorch optimizations
+- **Improved CUDA availability warnings** - Changed alarming "CUDA not available" warning to informative "GPU not detected - running in CPU mode" with helpful tips
+- **Enhanced Flash Attention messages** - Improved warning messages to be more informative with installation guidance for faster inference
+- **Added graceful optimization fallbacks** - Implemented comprehensive error handling for all optimization attempts with result tracking and summary logging
+
+#### 🛠️ Enhanced Error Handling
+- **Robust optimization system** - Download process continues smoothly even if some optimizations fail
+- **Clear user feedback** - Users now get a summary of which optimizations were applied successfully
+- **Version compatibility** - Works correctly with current transformers and huggingface_hub versions
+- **Graceful degradation** - Falls back to safe defaults when advanced features aren't available
+
+### Technical Changes
+- Updated `locallab/utils/progress.py` with improved HuggingFace Hub progress bar configuration
+- Updated `locallab/utils/early_config.py` with better version compatibility handling
+- Enhanced `locallab/model_manager.py` with comprehensive optimization tracking and fallback mechanisms
+- Improved logging levels from warnings to informative messages for better user experience
+
 ## [0.11.0] - 2025-07-08
 
 ### 🎉 Major Release - Comprehensive Model Management CLI
