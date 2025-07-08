@@ -87,9 +87,12 @@ graph TD
     C -->|Runs| D[AI Models]
     C -->|Optional| E[Ngrok Tunnel]
     E -->|Access from| F[Any Device]
-    style C fill:#f9f,stroke:#333,stroke-width:2px
-    style D fill:#bbf,stroke:#333,stroke-width:2px
-    style A fill:#9f9,stroke:#333,stroke-width:2px
+    style C fill:#2563eb,stroke:#1e40af,stroke-width:2px,color:#ffffff
+    style D fill:#059669,stroke:#047857,stroke-width:2px,color:#ffffff
+    style A fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff
+    style B fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
+    style E fill:#ea580c,stroke:#c2410c,stroke-width:2px,color:#ffffff
+    style F fill:#0891b2,stroke:#0e7490,stroke-width:2px,color:#ffffff
 ```
 
 **🌟 The Magic**: Use `--use-ngrok` to access your AI from anywhere - your phone, another computer, or share with friends!
@@ -518,8 +521,12 @@ graph LR
     C -->|Runs| D[AI Models]
     C -->|Optional| E[Ngrok Tunnel]
     E -->|Remote Access| F[Any Device, Anywhere]
-    style E fill:#f9f,stroke:#333,stroke-width:2px
-    style F fill:#bbf,stroke:#333,stroke-width:2px
+    style A fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#ffffff
+    style B fill:#dc2626,stroke:#b91c1c,stroke-width:2px,color:#ffffff
+    style C fill:#2563eb,stroke:#1e40af,stroke-width:2px,color:#ffffff
+    style D fill:#059669,stroke:#047857,stroke-width:2px,color:#ffffff
+    style E fill:#ea580c,stroke:#c2410c,stroke-width:2px,color:#ffffff
+    style F fill:#0891b2,stroke:#0e7490,stroke-width:2px,color:#ffffff
 ```
 
 [➡️ See All Features](./docs/features/README.md)
