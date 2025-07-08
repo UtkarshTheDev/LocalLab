@@ -4,6 +4,7 @@
 
 - [Getting Started Guide](./getting-started.md) - Start here!
 - [CLI Guide](./cli.md) - Interactive command-line interface
+- [Model Management Guide](./model-management.md) - Download and organize AI models
 - [API Reference](./API.md)
 - [FAQ](./faq.md)
 - [Troubleshooting](./troubleshooting.md)

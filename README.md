@@ -13,6 +13,7 @@ LocalLab gives you **your own personal ChatGPT** that runs entirely on your comp
 - 💰 **Zero Cost** - No monthly fees or API charges
 - 🌐 **Access Anywhere** - Use from any device with ngrok tunneling
 - ⚡ **Multiple Models** - Support for various open-source AI models
+- 🤖 **Model Management** - Download, organize, and manage AI models locally
 - 🎮 **Free GPU** - Run on Google Colab for free GPU acceleration
 
 Perfect for developers, students, researchers, or anyone who wants to experiment with AI without privacy concerns or ongoing costs.
@@ -32,6 +33,26 @@ locallab chat
 
 That's it! You now have your own ChatGPT running locally.
 
+### 🤖 Model Management (Optional)
+
+Want to download models ahead of time or manage your local AI models? LocalLab includes powerful model management:
+
+```bash
+# Discover available models
+locallab models discover
+
+# Download a model locally (faster startup)
+locallab models download microsoft/phi-2
+
+# List your cached models
+locallab models list
+
+# Get detailed model information
+locallab models info microsoft/phi-2
+```
+
+> 📖 **Learn More**: See the [Model Management Guide](./docs/guides/model-management.md) for complete documentation.
+
 ## 🧠 How LocalLab Works
 
 LocalLab has three main components:
@@ -48,7 +69,13 @@ LocalLab has three main components:
 - Multiple generation modes
 - Access with: `locallab chat`
 
-### 3. 🐍 **Python Client** (`pip install locallab-client`)
+### 3. 🤖 **Model Management** (Built-in)
+- Download and organize AI models locally
+- Discover available models from HuggingFace Hub
+- Manage disk space and cache cleanup
+- Use with: `locallab models`
+
+### 4. 🐍 **Python Client** (`pip install locallab-client`)
 - Programmatic access for your code
 - Both sync and async support
 - Use with: `client = SyncLocalLabClient("http://localhost:8000")`
@@ -72,8 +99,9 @@ graph TD
 ```
 📦 Easy Setup         🔒 Privacy First       🎮 Free GPU Access
 🤖 Multiple Models    💾 Memory Efficient    🔄 Auto-Optimization
-🌐 Local or Colab    ⚡ Fast Response       🔧 Simple Server
-🌍 Access Anywhere   🔌 Client Package      🛡️ Secure Tunneling
+🗂️ Model Management   ⚡ Fast Response       🔧 Simple Server
+🌐 Local or Colab    🔌 Client Package      🛡️ Secure Tunneling
+🌍 Access Anywhere   📥 Offline Models      🧹 Cache Cleanup
 ```
 
 **Two-Part System**:
@@ -509,6 +537,7 @@ graph LR
 | Guide | Description |
 |-------|-------------|
 | [**CLI Reference**](./docs/guides/cli.md) | Complete command documentation |
+| [**Model Management**](./docs/guides/model-management.md) | Download and organize AI models |
 | [**Python Client**](./docs/clients/README.md) | Programmatic access guide |
 | [**API Reference**](./docs/guides/API.md) | HTTP API documentation |
 

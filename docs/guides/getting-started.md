@@ -8,6 +8,7 @@ After following this guide, you'll have:
 
 - ✅ **Your own ChatGPT** running locally on your computer
 - ✅ **Terminal chat interface** for easy AI interactions
+- ✅ **Model management** for downloading and organizing AI models
 - ✅ **Python client** for building AI-powered applications
 - ✅ **Remote access** capability to use your AI from anywhere
 
@@ -151,6 +152,29 @@ Congratulations! You now have:
 - ✅ Zero ongoing costs
 
 ## 💡 What's Next?
+
+### 🤖 Manage Your AI Models
+
+LocalLab includes powerful model management to help you download and organize AI models:
+
+```bash
+# Discover available models
+locallab models discover
+
+# Download a model for faster startup
+locallab models download microsoft/phi-2
+
+# List your cached models
+locallab models list
+
+# Get detailed model information
+locallab models info microsoft/phi-2
+
+# Clean up disk space
+locallab models clean
+```
+
+> 📖 **Learn More**: See the [Model Management Guide](./model-management.md) for complete documentation.
 
 ### Try Different Features
 
@@ -399,10 +423,11 @@ def sync_batch_example():
 
 ## Next Steps
 
-1. Explore the [CLI Guide](./cli.md) for interactive configuration
-2. Check [Advanced Features](./advanced.md) for optimization options
-3. Read the [API Reference](./API.md) for detailed endpoint documentation
-4. See the [Performance Guide](../features/performance.md) for optimization tips
+1. Learn [Model Management](./model-management.md) to download and organize AI models
+2. Explore the [CLI Guide](./cli.md) for interactive configuration
+3. Check [Advanced Features](./advanced.md) for optimization options
+4. Read the [API Reference](./API.md) for detailed endpoint documentation
+5. See the [Performance Guide](../features/performance.md) for optimization tips
 
 ## Need Help?
 

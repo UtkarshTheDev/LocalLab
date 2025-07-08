@@ -11,6 +11,9 @@ pip install locallab locallab-client
 # Configure your setup
 locallab config
 
+# Download a model (optional, for faster startup)
+locallab models download microsoft/phi-2
+
 # Start the server
 locallab start
 
@@ -22,13 +25,14 @@ locallab chat
 
 1. [Installation](#installation)
 2. [Chat Interface](#chat-interface) ⭐ **Most Popular**
-3. [Server Management](#server-management)
-4. [Interactive Configuration](#interactive-configuration)
-5. [Command Reference](#command-reference)
-6. [Environment Variables](#environment-variables)
-7. [Configuration Storage](#configuration-storage)
-8. [Google Colab Integration](#google-colab-integration)
-9. [Recent Updates](#recent-updates)
+3. [Model Management](#model-management) 🤖 **New Feature**
+4. [Server Management](#server-management)
+5. [Interactive Configuration](#interactive-configuration)
+6. [Command Reference](#command-reference)
+7. [Environment Variables](#environment-variables)
+8. [Configuration Storage](#configuration-storage)
+9. [Google Colab Integration](#google-colab-integration)
+10. [Recent Updates](#recent-updates)
 
 ## Installation
 
@@ -106,6 +110,49 @@ You: Process these --batch          # Use batch mode
 ```
 
 > 📖 **Complete Guide**: See the [Chat Interface Documentation](../cli/chat.md) for detailed features and examples.
+
+## Model Management
+
+LocalLab includes comprehensive model management capabilities to help you download, organize, and manage AI models locally.
+
+### Why Use Model Management?
+
+- **⚡ Faster Startup** - Pre-downloaded models load instantly
+- **📱 Offline Usage** - Use models without internet connection
+- **💾 Disk Management** - Monitor and clean up model cache
+- **🔍 Model Discovery** - Find and explore available models
+
+### Quick Examples
+
+```bash
+# Discover available models
+locallab models discover
+
+# Download a model for faster startup
+locallab models download microsoft/phi-2
+
+# List your cached models
+locallab models list
+
+# Get detailed model information
+locallab models info microsoft/phi-2
+
+# Clean up disk space
+locallab models clean
+```
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `locallab models list` | List locally cached models |
+| `locallab models download <model_id>` | Download a model locally |
+| `locallab models remove <model_id>` | Remove a cached model |
+| `locallab models discover` | Discover available models |
+| `locallab models info <model_id>` | Show detailed model information |
+| `locallab models clean` | Clean up orphaned cache files |
+
+> 📖 **Complete Guide**: See the [Model Management Documentation](./model-management.md) for detailed usage, examples, and advanced features.
 
 ## Server Management
 

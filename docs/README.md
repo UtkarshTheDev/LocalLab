@@ -5,6 +5,7 @@ Welcome! This guide will help you navigate LocalLab's documentation and get the 
 ## 🚀 What Can You Do With LocalLab?
 
 - **Run AI models locally** with a simple API interface
+- **Manage AI models** with built-in download and organization tools
 - **Access your models from anywhere** using the built-in ngrok integration
 - **Build applications** that use AI without relying on cloud services
 - **Share your models** with teammates or access from mobile devices
@@ -28,7 +29,13 @@ If you're new to LocalLab, follow this path:
    - Configuration options
    - Common commands
 
-3. **[Basic Examples](./guides/examples.md)**
+3. **[Model Management Guide](./guides/model-management.md)**
+
+   - Download and organize AI models
+   - Discover available models
+   - Manage disk space and cache
+
+4. **[Basic Examples](./guides/examples.md)**
    - Simple text generation
    - Chat conversations
    - Batch processing

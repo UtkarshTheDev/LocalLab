@@ -18,6 +18,22 @@ locallab start
 locallab chat
 ```
 
+### 🤖 Model Management Quick Start
+
+```bash
+# Discover available models
+locallab models discover
+
+# Download a model for faster startup
+locallab models download microsoft/phi-2
+
+# List your cached models
+locallab models list
+
+# Get detailed model information
+locallab models info microsoft/phi-2
+```
+
 ## 📋 Available Commands
 
 ### Core Commands
@@ -42,6 +58,39 @@ locallab chat
 | `locallab models clean` | Clean up orphaned cache files | [Model Management](../guides/model-management.md#cache-cleanup) |
 | `locallab logs` | View server logs | [CLI Guide](../guides/cli.md#view-logs) |
 | `locallab version` | Show version information | [CLI Guide](../guides/cli.md#version) |
+
+## 🤖 Model Management
+
+LocalLab includes comprehensive model management capabilities to help you download, organize, and manage AI models locally. This allows for faster server startup and offline usage.
+
+### Why Use Model Management?
+
+- **⚡ Faster Startup** - Pre-downloaded models load instantly
+- **📱 Offline Usage** - Use models without internet connection
+- **💾 Disk Management** - Monitor and clean up model cache
+- **🔍 Model Discovery** - Find and explore available models
+- **📊 System Compatibility** - Check if models work on your hardware
+
+### Common Workflows
+
+```bash
+# Discover and download a new model
+locallab models discover --search "phi"
+locallab models download microsoft/phi-2
+
+# Check model details before using
+locallab models info microsoft/phi-2
+
+# Start server with pre-downloaded model (faster!)
+locallab start --model microsoft/phi-2
+
+# Clean up space when needed
+locallab models list
+locallab models remove old-model-id
+locallab models clean
+```
+
+> 📖 **Complete Guide**: See the [Model Management Documentation](../guides/model-management.md) for detailed usage, examples, and advanced features.
 
 ## 💬 Chat Interface - The Star Feature
 
