@@ -2,6 +2,106 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.11.0] - 2025-07-08
+
+### 🎉 Major Release - Comprehensive Model Management CLI
+
+This release introduces a powerful model management system that allows users to discover, download, organize, and manage AI models locally. The new `locallab models` command group provides comprehensive model management capabilities with HuggingFace Hub integration.
+
+### Added
+
+#### 🤖 Complete Model Management CLI
+- **New `locallab models` command group** - Comprehensive model management functionality
+- **Model discovery** - Search and discover models from LocalLab registry and HuggingFace Hub
+- **Local model download** - Download models locally for faster startup and offline usage
+- **Model listing** - List all locally cached models with detailed information
+- **Model removal** - Remove cached models to free up disk space
+- **Model information** - Get detailed information about any model including system compatibility
+- **Cache cleanup** - Clean up orphaned cache files and free disk space
+
+#### 🔍 Advanced Model Discovery
+- **HuggingFace Hub integration** - Real-time search of HuggingFace Hub models
+- **Smart filtering** - Automatic filtering for text-generation models suitable for LocalLab
+- **Search functionality** - Search models by keywords, tags, or descriptions
+- **Tag filtering** - Filter models by categories (e.g., "conversational", "chat")
+- **Popularity metrics** - Display download counts and popularity information
+- **Sort options** - Sort by downloads, likes, or recent updates
+
+#### 🛠️ Model Management Features
+- **Offline capability** - Registry models always available without internet
+- **Cache management** - Intelligent model cache with metadata tracking
+- **System compatibility** - Check if models work on your hardware before downloading
+- **Progress indicators** - Beautiful progress bars for download operations
+- **Error handling** - Robust error handling with graceful fallbacks
+- **Multiple output formats** - Table and JSON output for both human and programmatic use
+
+#### 📊 Enhanced User Experience
+- **Rich UI components** - Beautiful tables and progress indicators using Rich library
+- **Clear feedback** - Informative messages and status indicators
+- **Graceful degradation** - Works perfectly with or without internet connection
+- **Rate limiting** - Respectful API usage with built-in rate limiting
+- **Network timeouts** - Proper timeout handling for network operations
+
+### Enhanced
+
+#### 🚀 Model Management Infrastructure
+- **New cache manager** - `locallab/utils/model_cache.py` for centralized cache management
+- **HuggingFace searcher** - `locallab/utils/huggingface_search.py` for Hub integration
+- **Model metadata tracking** - Track download dates, access counts, and model information
+- **Improved model loading** - Better integration with existing model loading system
+
+#### 📖 Documentation Expansion
+- **Comprehensive model management guide** - Complete documentation with examples and troubleshooting
+- **Updated CLI documentation** - Enhanced CLI reference with model management commands
+- **Getting started improvements** - Added model management to onboarding flow
+- **Cross-references** - Proper linking between all model management documentation
+
+### Commands Added
+
+#### 🎯 New CLI Commands
+```bash
+locallab models list              # List locally cached models
+locallab models download <id>    # Download a model locally
+locallab models remove <id>      # Remove a cached model
+locallab models discover         # Discover available models
+locallab models info <id>        # Show detailed model information
+locallab models clean            # Clean up orphaned cache files
+```
+
+#### 🔧 Command Options
+- **Discovery options**: `--search`, `--tags`, `--sort`, `--registry-only`, `--hub-only`
+- **Output formats**: `--format table|json` for all commands
+- **Filtering options**: `--registry-only`, `--custom-only` for listing
+- **Safety options**: `--force` for downloads and removals
+
+### Technical Improvements
+
+#### 🏗️ Architecture Enhancements
+- **Modular design** - Clean separation of concerns with dedicated modules
+- **API integration** - Proper HuggingFace Hub API integration with error handling
+- **Cache optimization** - Efficient model cache management and cleanup
+- **Memory management** - Proper cleanup of model resources after operations
+
+#### 🛡️ Reliability Features
+- **Network resilience** - Graceful handling of network issues and timeouts
+- **Error recovery** - Comprehensive error handling with helpful user messages
+- **Data validation** - Proper validation of model information and cache data
+- **Backward compatibility** - Full compatibility with existing LocalLab functionality
+
+### Benefits for Users
+
+#### ⚡ Performance Improvements
+- **Faster server startup** - Pre-downloaded models load instantly
+- **Offline usage** - Use models without internet connection after download
+- **Disk space management** - Easy cleanup and monitoring of model cache
+- **Better resource utilization** - Smart model selection based on system capabilities
+
+#### 🎯 User Experience
+- **Model discovery** - Easily find new models from HuggingFace Hub
+- **Informed decisions** - See popularity metrics and system requirements before downloading
+- **Simple management** - Easy-to-use commands for all model operations
+- **Clear feedback** - Always know what's happening with clear status messages
+
 ## [0.10.0] - 2025-07-06
 
 ### 🎉 Major Release - Enhanced Chat Interface & Documentation Overhaul

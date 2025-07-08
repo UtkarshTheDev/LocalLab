@@ -25,7 +25,7 @@ install_requires = [
     "psutil>=5.8.0",
     "nest-asyncio>=1.5.1",
     "fastapi-cache2>=0.2.1",
-    "huggingface_hub>=0.16.0",
+    "huggingface_hub>=0.20.0",
     "typing_extensions>=4.0.0",
     "questionary>=1.10.0",
 ]
@@ -47,7 +47,7 @@ else:
 
 setup(
     name="locallab",
-    version="0.10.0",
+    version="0.11.0",
     packages=find_packages(include=["locallab", "locallab.*"]),
     install_requires=install_requires,
     extras_require={
