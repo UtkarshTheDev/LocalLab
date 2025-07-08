@@ -19,6 +19,7 @@ from ..config import MODEL_REGISTRY, get_hf_token
 from ..utils.system import format_model_size, get_system_resources
 from ..utils.progress import configure_hf_hub_progress
 from ..utils.model_cache import model_cache_manager
+from ..utils.huggingface_search import hf_searcher
 from ..logger.logger import logger
 
 # Initialize rich console
@@ -203,73 +204,110 @@ def remove(model_id: str, force: bool):
         sys.exit(1)
 
 @models.command()
-@click.option('--search', help='Search models by name or description')
-@click.option('--limit', type=int, default=20, help='Maximum number of models to show')
+@click.option('--search', help='Search models by keywords, tags, or description')
+@click.option('--limit', type=int, default=20, help='Maximum number of models to show (default: 20)')
 @click.option('--format', 'output_format', type=click.Choice(['table', 'json']), default='table',
               help='Output format (table or json)')
-def discover(search: Optional[str], limit: int, output_format: str):
-    """Discover available models from HuggingFace Hub and registry"""
+@click.option('--registry-only', is_flag=True, help='Show only LocalLab registry models')
+@click.option('--hub-only', is_flag=True, help='Show only HuggingFace Hub models')
+@click.option('--sort', type=click.Choice(['downloads', 'likes', 'recent']), default='downloads',
+              help='Sort HuggingFace models by downloads, likes, or recent updates')
+@click.option('--tags', help='Filter by tags (comma-separated, e.g., "conversational,chat")')
+def discover(search: Optional[str], limit: int, output_format: str, registry_only: bool,
+             hub_only: bool, sort: str, tags: Optional[str]):
+    """Discover available models from HuggingFace Hub and LocalLab registry"""
     try:
         console.print("🔍 Discovering available models...", style="blue")
 
-        # Start with registry models
-        available_models = []
+        all_models = []
 
-        # Add registry models
-        for model_id, config in MODEL_REGISTRY.items():
-            model_info = {
-                "id": model_id,
-                "name": config.get("name", model_id),
-                "description": config.get("description", ""),
-                "size": config.get("size", "Unknown"),
-                "type": "Registry",
-                "requirements": config.get("requirements", {}),
-                "is_cached": False
-            }
-            available_models.append(model_info)
+        # Get registry models (unless hub-only is specified)
+        if not hub_only:
+            registry_models = _get_registry_models()
+            all_models.extend(registry_models)
+            console.print(f"📚 Found {len(registry_models)} LocalLab registry models", style="dim")
+
+        # Get HuggingFace Hub models (unless registry-only is specified)
+        if not registry_only:
+            hf_models, hf_success = _get_huggingface_models(search, limit, sort, tags)
+            if hf_success:
+                all_models.extend(hf_models)
+                console.print(f"🤗 Found {len(hf_models)} HuggingFace Hub models", style="dim")
+            else:
+                console.print("⚠️  Could not search HuggingFace Hub (network issue or missing dependencies)", style="yellow")
+                if search or tags:
+                    console.print("💡 Try using --registry-only to search LocalLab registry models only.", style="dim")
+
+        # Apply search filter to registry models if search is specified
+        if search and not hub_only:
+            search_lower = search.lower()
+            registry_filtered = [
+                m for m in all_models
+                if m.get("type") == "Registry" and (
+                    search_lower in m["name"].lower() or
+                    search_lower in m["description"].lower()
+                )
+            ]
+            # Keep HF models and filtered registry models
+            hf_models_in_list = [m for m in all_models if m.get("type") == "HuggingFace"]
+            all_models = registry_filtered + hf_models_in_list
 
         # Check which models are already cached
         cached_models = model_cache_manager.get_cached_models()
         cached_ids = {m["id"] for m in cached_models}
 
-        for model in available_models:
+        for model in all_models:
             model["is_cached"] = model["id"] in cached_ids
 
-        # Apply search filter
-        if search:
-            search_lower = search.lower()
-            available_models = [
-                m for m in available_models
-                if search_lower in m["name"].lower() or search_lower in m["description"].lower()
-            ]
+        # Sort models: Registry first, then by specified sort order
+        all_models.sort(key=lambda x: (
+            0 if x.get("type") == "Registry" else 1,  # Registry models first
+            -x.get("downloads", 0) if sort == "downloads" else 0,
+            -x.get("likes", 0) if sort == "likes" else 0,
+            x.get("updated_at", "") if sort == "recent" else ""
+        ))
 
-        # Limit results
-        available_models = available_models[:limit]
+        # Apply final limit
+        all_models = all_models[:limit]
 
         if output_format == 'json':
-            click.echo(json.dumps(available_models, indent=2))
+            click.echo(json.dumps(all_models, indent=2))
             return
 
-        if not available_models:
+        if not all_models:
             console.print("📭 No models found matching your criteria.", style="yellow")
+            if not registry_only:
+                console.print("💡 Try adjusting your search terms or check your internet connection.", style="dim")
             return
 
         # Create table
         table = Table(title="🌟 Available Models")
-        table.add_column("Model ID", style="cyan", no_wrap=True)
-        table.add_column("Name", style="green")
-        table.add_column("Size", style="magenta")
+        table.add_column("Model ID", style="cyan", no_wrap=True, max_width=30)
+        table.add_column("Name", style="green", max_width=20)
+        table.add_column("Size", style="magenta", justify="right")
         table.add_column("Type", style="blue")
-        table.add_column("Status", style="yellow")
-        table.add_column("Description", style="dim")
+        table.add_column("Downloads", style="yellow", justify="right")
+        table.add_column("Status", style="bright_green")
+        table.add_column("Description", style="dim", max_width=40)
 
-        for model in available_models:
+        for model in all_models:
             status = "✅ Cached" if model["is_cached"] else "📥 Available"
+            downloads_str = ""
+            if model.get("downloads", 0) > 0:
+                downloads = model["downloads"]
+                if downloads >= 1000000:
+                    downloads_str = f"{downloads/1000000:.1f}M"
+                elif downloads >= 1000:
+                    downloads_str = f"{downloads/1000:.1f}K"
+                else:
+                    downloads_str = str(downloads)
+
             table.add_row(
                 model["id"],
                 model["name"],
-                model["size"],
-                model["type"],
+                model.get("size", "Unknown"),
+                model.get("type", "Unknown"),
+                downloads_str,
                 status,
                 model["description"][:50] + "..." if len(model["description"]) > 50 else model["description"]
             )
@@ -277,14 +315,104 @@ def discover(search: Optional[str], limit: int, output_format: str):
         console.print(table)
 
         # Show summary
-        cached_count = sum(1 for m in available_models if m["is_cached"])
-        console.print(f"\n📊 Found {len(available_models)} models ({cached_count} cached, {len(available_models) - cached_count} available for download)")
+        cached_count = sum(1 for m in all_models if m["is_cached"])
+        registry_count = sum(1 for m in all_models if m.get("type") == "Registry")
+        hf_count = len(all_models) - registry_count
+
+        console.print(f"\n📊 Found {len(all_models)} models:")
+        console.print(f"   • {registry_count} LocalLab registry models")
+        console.print(f"   • {hf_count} HuggingFace Hub models")
+        console.print(f"   • {cached_count} already cached locally")
         console.print("\n💡 Use 'locallab models download <model_id>' to download a model locally.")
+
+        if not registry_only and hf_count > 0:
+            console.print("🔍 Use --search to find specific models or --tags to filter by categories.")
 
     except Exception as e:
         logger.error(f"Error discovering models: {e}")
         console.print(f"❌ Error discovering models: {str(e)}", style="red")
         sys.exit(1)
+
+def _get_registry_models():
+    """Get models from LocalLab registry"""
+    registry_models = []
+
+    for model_id, config in MODEL_REGISTRY.items():
+        model_info = {
+            "id": model_id,
+            "name": config.get("name", model_id),
+            "description": config.get("description", "LocalLab registry model"),
+            "size": config.get("size", "Unknown"),
+            "type": "Registry",
+            "downloads": 0,  # Registry models don't have download counts
+            "likes": 0,
+            "requirements": config.get("requirements", {}),
+            "is_cached": False,
+            "tags": [],
+            "author": "LocalLab",
+            "updated_at": ""
+        }
+        registry_models.append(model_info)
+
+    return registry_models
+
+def _get_huggingface_models(search: Optional[str], limit: int, sort: str, tags: Optional[str]):
+    """Get models from HuggingFace Hub"""
+    try:
+        # Parse tags if provided
+        tag_list = []
+        if tags:
+            tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+
+        # Convert sort parameter
+        hf_sort = "downloads"
+        if sort == "likes":
+            hf_sort = "likes"
+        elif sort == "recent":
+            hf_sort = "lastModified"
+
+        # Search HuggingFace Hub
+        if search:
+            hf_models, success = hf_searcher.search_models(
+                search_query=search, limit=limit, sort=hf_sort
+            )
+        elif tag_list:
+            hf_models, success = hf_searcher.search_models(
+                search_query=None, limit=limit, sort=hf_sort, filter_tags=tag_list
+            )
+        else:
+            hf_models, success = hf_searcher.search_models(
+                search_query=None, limit=limit, sort=hf_sort
+            )
+
+        if not success:
+            return [], False
+
+        # Convert to our format
+        converted_models = []
+        for hf_model in hf_models:
+            model_info = {
+                "id": hf_model.id,
+                "name": hf_model.name,
+                "description": hf_model.description,
+                "size": hf_model.size_formatted,
+                "type": "HuggingFace",
+                "downloads": hf_model.downloads,
+                "likes": hf_model.likes,
+                "is_cached": False,
+                "tags": hf_model.tags,
+                "author": hf_model.author,
+                "updated_at": hf_model.updated_at or "",
+                "pipeline_tag": hf_model.pipeline_tag,
+                "library_name": hf_model.library_name
+            }
+            converted_models.append(model_info)
+
+        return converted_models, True
+
+    except Exception as e:
+        logger.debug(f"Error getting HuggingFace models: {e}")
+        return [], False
 
 @models.command()
 @click.argument('model_id')

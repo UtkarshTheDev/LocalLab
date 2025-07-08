@@ -53,7 +53,7 @@ locallab models info microsoft/phi-2
 | `locallab models list` | List locally cached models | [Model Management](../guides/model-management.md#list-models) |
 | `locallab models download <model_id>` | Download a model locally | [Model Management](../guides/model-management.md#download-models) |
 | `locallab models remove <model_id>` | Remove a cached model | [Model Management](../guides/model-management.md#remove-models) |
-| `locallab models discover` | Discover available models | [Model Management](../guides/model-management.md#discover-models) |
+| `locallab models discover` | Discover models from registry and HuggingFace Hub | [Model Management](../guides/model-management.md#discover-models) |
 | `locallab models info <model_id>` | Show detailed model information | [Model Management](../guides/model-management.md#model-info) |
 | `locallab models clean` | Clean up orphaned cache files | [Model Management](../guides/model-management.md#cache-cleanup) |
 | `locallab logs` | View server logs | [CLI Guide](../guides/cli.md#view-logs) |
@@ -74,8 +74,8 @@ LocalLab includes comprehensive model management capabilities to help you downlo
 ### Common Workflows
 
 ```bash
-# Discover and download a new model
-locallab models discover --search "phi"
+# Discover models from registry and HuggingFace Hub
+locallab models discover --search "code generation"
 locallab models download microsoft/phi-2
 
 # Check model details before using

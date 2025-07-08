@@ -131,28 +131,47 @@ locallab models discover [OPTIONS]
 ```
 
 **Options:**
-- `--search <term>` - Search models by name or description
+- `--search <keywords>` - Search models by keywords, tags, or description
 - `--limit <number>` - Maximum number of models to show (default: 20)
 - `--format [table|json]` - Output format (default: table)
+- `--registry-only` - Show only LocalLab registry models
+- `--hub-only` - Show only HuggingFace Hub models
+- `--sort [downloads|likes|recent]` - Sort HuggingFace models by popularity or recency
+- `--tags <tags>` - Filter by comma-separated tags (e.g., "conversational,chat")
 
 **Examples:**
 ```bash
-# Discover all available models
+# Discover all available models (registry + HuggingFace Hub)
 locallab models discover
 
-# Search for specific models
-locallab models discover --search "dialog"
+# Search for specific models across all sources
+locallab models discover --search "code generation"
 
-# Limit results and export as JSON
-locallab models discover --limit 10 --format json
+# Search only in LocalLab registry
+locallab models discover --search "phi" --registry-only
+
+# Find models by tags
+locallab models discover --tags "conversational,chat" --limit 10
+
+# Get popular models sorted by downloads
+locallab models discover --sort downloads --limit 15
+
+# Export results as JSON for processing
+locallab models discover --format json --limit 5
 ```
 
 **Information shown:**
 - Model ID and name
-- Model size and type
+- Model size and type (Registry/HuggingFace)
+- Download count and popularity metrics
 - Cache status (cached/available)
 - Brief description
-- Download availability
+- Author information
+
+**Network Requirements:**
+- Registry models: Always available (offline)
+- HuggingFace Hub models: Requires internet connection
+- Graceful fallback when HuggingFace Hub is unavailable
 
 ### Model Information {#model-info}
 

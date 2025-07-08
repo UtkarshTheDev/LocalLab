@@ -125,8 +125,14 @@ LocalLab includes comprehensive model management capabilities to help you downlo
 ### Quick Examples
 
 ```bash
-# Discover available models
+# Discover models from registry and HuggingFace Hub
 locallab models discover
+
+# Search for specific types of models
+locallab models discover --search "code generation"
+
+# Filter by tags
+locallab models discover --tags "conversational,chat"
 
 # Download a model for faster startup
 locallab models download microsoft/phi-2
@@ -148,7 +154,7 @@ locallab models clean
 | `locallab models list` | List locally cached models |
 | `locallab models download <model_id>` | Download a model locally |
 | `locallab models remove <model_id>` | Remove a cached model |
-| `locallab models discover` | Discover available models |
+| `locallab models discover` | Discover models from registry and HuggingFace Hub |
 | `locallab models info <model_id>` | Show detailed model information |
 | `locallab models clean` | Clean up orphaned cache files |
 
