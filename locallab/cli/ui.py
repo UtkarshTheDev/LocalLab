@@ -5,7 +5,7 @@ Terminal UI utilities for LocalLab CLI chat interface
 import sys
 import os
 from typing import Optional, List, Dict, Any
-from rich.console import Console
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.text import Text
 from rich.prompt import Prompt
@@ -29,30 +29,60 @@ class ChatUI:
         self.message_count = 0
         
     def display_welcome(self, server_url: str, mode: str, model_info: Optional[Dict[str, Any]] = None):
-        """Display welcome message and connection info"""
-        # Create welcome panel
-        welcome_text = Text()
-        welcome_text.append("🎉 Welcome to LocalLab Chat Interface!\n", style="bold green")
-        welcome_text.append(f"📡 Connected to: {server_url}\n", style="cyan")
-        welcome_text.append(f"⚙️  Default mode: {mode}\n", style="yellow")
-        welcome_text.append("🎯 Use --stream, --chat, --batch, --simple to override per message\n", style="dim")
+        """Display enhanced welcome with ASCII banner and usage guide"""
+        # Clear any previous content and start fresh
+        self.console.clear()
 
-        if model_info and model_info.get('model_id'):
-            welcome_text.append(f"🤖 Active model: {model_info['model_id']}\n", style="magenta")
-        else:
-            welcome_text.append("⚠️  No model currently loaded\n", style="red")
+        # ASCII Art Banner with complete "LOCALLAB" text - no border, just bottom line
+        banner_lines = [
+            "",
+            "  ██╗      ██████╗  ██████╗ █████╗ ██╗     ██╗      █████╗ ██████╗",
+            "  ██║     ██╔═══██╗██╔════╝██╔══██╗██║     ██║     ██╔══██╗██╔══██╗",
+            "  ██║     ██║   ██║██║     ███████║██║     ██║     ███████║██████╔╝",
+            "  ██║     ██║   ██║██║     ██╔══██║██║     ██║     ██╔══██║██╔══██╗",
+            "  ███████╗╚██████╔╝╚██████╗██║  ██║███████╗███████╗██║  ██║██████╔╝",
+            "  ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝",
+            "",
+            "                           Chat Interface",
+            "",
+            "─────────────────────────────────────────────────────────────────"
+        ]
 
-        welcome_text.append("\n💬 Start typing your messages below!", style="bold blue")
-        
-        panel = Panel(
-            welcome_text,
-            title="LocalLab Chat",
-            border_style="green",
-            padding=(1, 2)
-        )
-        
-        self.console.print(panel)
-        self.console.print()
+        # Display banner with balanced color - lighter but not too dark
+        for line in banner_lines:
+            banner_text = Text()
+            banner_text.append(line, style="bright_blue")
+            self.console.print(banner_text)
+
+        # Connection status with modern styling and horizontal padding
+        status_text = Text()
+        status_text.append("    ●", style="bright_green")  # Added horizontal padding
+        status_text.append(" Connected", style="dim bright_white")
+
+        # Model info if available
+        if model_info and (model_info.get('model_id') or model_info.get('id')):
+            model_name = model_info.get('model_id') or model_info.get('id') or model_info.get('name')
+            display_name = model_name.split('/')[-1] if '/' in model_name else model_name
+            display_name = display_name.replace('-Instruct', '').replace('-Chat', '')
+            status_text.append(f" • {display_name}", style="dim bright_cyan")
+
+        self.console.print(status_text)
+
+        # Concise usage guide with horizontal padding
+        usage_text = Text()
+        usage_text.append("    Usage: ", style="dim bright_white")  # Added horizontal padding
+        usage_text.append("Type your message or use ", style="dim white")
+        usage_text.append("--stream", style="bright_cyan")
+        usage_text.append(", ", style="dim white")
+        usage_text.append("--chat", style="bright_cyan")
+        usage_text.append(", ", style="dim white")
+        usage_text.append("--batch", style="bright_cyan")
+        usage_text.append(", ", style="dim white")
+        usage_text.append("--simple", style="bright_cyan")
+        usage_text.append(" to override modes", style="dim white")
+
+        self.console.print(usage_text)
+        self.console.print()  # Single line break before chat starts
         
     def display_help(self):
         """Display help information"""
@@ -90,97 +120,119 @@ class ChatUI:
         self.console.print(panel)
         
     def get_user_input(self) -> Optional[str]:
-        """Get user input with a nice prompt"""
+        """Get user input with enhanced chat-style prompt"""
         try:
-            # Use rich prompt for better formatting
-            prompt_text = f"[bold cyan]You[/bold cyan] [dim]({self.message_count + 1})[/dim]"
+            # Enhanced chat-style prompt with better visual distinction
+            prompt_text = "[bold bright_white]You[/bold bright_white][dim white]:[/dim white]"
             user_input = Prompt.ask(prompt_text, console=self.console)
-            
+
             if user_input.strip():
                 self.message_count += 1
                 return user_input.strip()
             return None
-            
+
         except (KeyboardInterrupt, EOFError):
             return None
             
     def display_user_message(self, message: str):
-        """Display user message"""
+        """Display user message with enhanced chat-style formatting and horizontal padding"""
+        # Create a more chat-like user message display with padding
         user_text = Text()
-        user_text.append("You: ", style="bold cyan")
-        user_text.append(message, style="white")
-        
+        user_text.append("    You", style="bold bright_white")  # Added horizontal padding
+        user_text.append(": ", style="dim white")
+        user_text.append(message, style="bright_white")
+
         self.console.print(user_text)
-        self.console.print()
+        # No extra spacing after user message for tighter conversation flow
         
     def display_ai_response(self, response: str, model_name: Optional[str] = None):
-        """Display AI response with enhanced markdown formatting and syntax highlighting"""
-        # Create header
-        ai_label = model_name or "AI"
+        """Display AI response with enhanced chat-style formatting and horizontal padding"""
+        # Enhanced AI response header with better visual distinction and padding
+        ai_label = model_name.split('/')[-1] if model_name and '/' in model_name else (model_name or "AI")
+        ai_label = ai_label.replace('-Instruct', '').replace('-Chat', '')  # Clean up model name
+
         header = Text()
-        header.append(f"{ai_label}: ", style="bold green")
+        header.append("    " + ai_label, style="bold bright_cyan")  # Added horizontal padding
+        header.append(": ", style="dim white")
 
         self.console.print(header, end="")
 
-        # Enhanced markdown rendering with syntax highlighting
+        # Enhanced markdown rendering with subdued styling for better hierarchy
         try:
             rendered_content = self._render_enhanced_markdown(response)
             self.console.print(rendered_content)
         except Exception as e:
-            # Fallback to plain text if enhanced rendering fails
+            # Fallback to plain text with subdued styling (lighter than user text)
             self.console.print(response, style="white")
 
+        # Add spacing after AI response for better conversation flow
         self.console.print()
         
     def display_streaming_response(self, model_name: Optional[str] = None):
-        """Start displaying a streaming response with markdown post-processing"""
-        ai_label = model_name or "AI"
+        """Start displaying a streaming response with enhanced chat-style formatting and horizontal padding"""
+        ai_label = model_name.split('/')[-1] if model_name and '/' in model_name else (model_name or "AI")
+        ai_label = ai_label.replace('-Instruct', '').replace('-Chat', '')  # Clean up model name
+
         header = Text()
-        header.append(f"{ai_label}: ", style="bold green")
+        header.append("    " + ai_label, style="bold bright_cyan")  # Added horizontal padding
+        header.append(": ", style="dim white")
         self.console.print(header, end="")
 
         # Return a context manager for streaming with UI instance for markdown processing
         return StreamingDisplay(self.console, ui_instance=self)
         
-    def display_error(self, error_message: str):
-        """Display error message"""
+    def display_error(self, error_message: str, silent: bool = False):
+        """Display error message with professional chat-style formatting and horizontal padding"""
+        if silent:
+            # In silent mode, only log the error
+            logger.debug(f"Silent error: {error_message}")
+            return
+
         error_text = Text()
-        error_text.append("❌ Error: ", style="bold red")
-        error_text.append(error_message, style="red")
-        
-        panel = Panel(error_text, border_style="red")
-        self.console.print(panel)
+        error_text.append("    System", style="bold red")  # Added horizontal padding
+        error_text.append(": ", style="dim white")
+        error_text.append(error_message, style="bright_white")
+
+        self.console.print(error_text)
+        self.console.print()  # Add spacing after error
+
+    def display_connection_error(self, error_message: str, silent: bool = True):
+        """Display connection error with modern minimal handling"""
+        if silent:
+            # For connection errors, show a very subtle indicator
+            self.display_subtle_status("Connection issue", "dim yellow")
+            logger.debug(f"Connection error: {error_message}")
+        else:
+            self.display_error(error_message)
+
+    def display_subtle_status(self, message: str, style: str = "dim white"):
+        """Display a subtle status message with modern minimal styling"""
+        status_text = Text()
+        status_text.append(f"{message}", style=style)
+        self.console.print(status_text)
         
     def display_info(self, info_message: str):
-        """Display info message"""
+        """Display info message with modern minimal styling and horizontal padding"""
         info_text = Text()
-        info_text.append("ℹ️  ", style="blue")
-        info_text.append(info_message, style="blue")
-        
+        info_text.append("    " + info_message, style="dim white")  # Added horizontal padding
+
         self.console.print(info_text)
         
     def display_separator(self):
-        """Display a visual separator"""
-        self.console.print(Rule(style="dim"))
+        """Display a minimal separator"""
+        # Modern minimal separator - just a blank line
+        self.console.print()
         
     def clear_screen(self):
         """Clear the terminal screen"""
         os.system('cls' if os.name == 'nt' else 'clear')
         
     def display_goodbye(self):
-        """Display goodbye message"""
+        """Display minimal goodbye message with horizontal padding"""
         goodbye_text = Text()
-        goodbye_text.append("👋 Thanks for using LocalLab Chat!", style="bold green")
-        goodbye_text.append("\n   Have a great day!", style="green")
-        
-        panel = Panel(
-            goodbye_text,
-            title="Goodbye",
-            border_style="green",
-            padding=(1, 2)
-        )
-        
-        self.console.print(panel)
+        goodbye_text.append("    Goodbye", style="dim white")  # Added horizontal padding
+
+        self.console.print(goodbye_text)
         
     def _contains_markdown(self, text: str) -> bool:
         """Check if text contains markdown syntax"""
@@ -215,7 +267,7 @@ class ChatUI:
             # Use Rich's built-in markdown renderer for standard markdown
             return Markdown(text)
         else:
-            # Plain text
+            # Plain text with subdued styling for better hierarchy
             return Text(text, style="white")
 
     def _contains_code_blocks(self, text: str) -> bool:
