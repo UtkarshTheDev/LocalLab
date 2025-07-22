@@ -2,6 +2,24 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.11.2] - 2025-07-23
+
+### Enhanced
+- **CLI chat interface redesign** - Modern minimal aesthetic with ASCII banner, professional color scheme, and enhanced visual hierarchy
+- **Response generation reliability** - 3-retry logic with auto-reconnection, comprehensive format support, and special token cleaning
+- **Chat interface improvements** - Removed verbose startup info, optimized spacing, minimal shutdown messages, and horizontal padding
+- **ASCII art banner** - Complete "LOCALLAB" display with clean bottom-line design and balanced color brightness
+- **Visual distinction** - Enhanced user/AI message contrast with subdued AI response colors for better readability
+
+### Fixed
+- **Response parsing failures** - Robust handling of 120+ second generation times, Chinese text, and conversation end markers
+- **Connection recovery** - Automatic reconnection between retry attempts with exponential backoff delays
+- **Import error** - Added missing `Group` import in `locallab/cli/ui.py` for proper Rich component rendering
+
+### Technical Changes
+- Updated `locallab/cli/ui.py`, `locallab/cli/chat.py`, `locallab/cli/connection.py`
+- Enhanced error handling with comprehensive debug logging and response validation
+
 ## [0.11.1] - 2025-07-08
 
 ### Fixed
