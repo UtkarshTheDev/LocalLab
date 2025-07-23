@@ -413,11 +413,8 @@ class ChatInterface:
 
                 # Mode override handled silently for cleaner interface
 
-                # Enhanced chat-style loading indicator with horizontal padding
-                loading_text = Text()
-                loading_text.append("    Thinking", style="dim bright_white")  # Added horizontal padding
-                loading_text.append("...", style="dim bright_cyan")
-                self.ui.console.print(loading_text)
+                # Aesthetic minimal generating indicator
+                self._show_generating_indicator()
 
                 # Choose generation method based on active mode
                 if active_mode == GenerationMode.STREAM:
@@ -437,6 +434,7 @@ class ChatInterface:
                             if response_text:
                                 model_name = self.model_info.get('model_id', 'AI') if self.model_info else 'AI'
                                 logger.debug(f"Chat mode: extracted {len(response_text)} characters")
+                                self._clear_generating_indicator()
                                 self.ui.display_ai_response(response_text, model_name)
                             else:
                                 logger.error("Chat mode: failed to extract text from response")
@@ -466,6 +464,7 @@ class ChatInterface:
                             if response_text:
                                 model_name = self.model_info.get('model_id', 'AI') if self.model_info else 'AI'
                                 logger.debug(f"Simple generation: extracted {len(response_text)} characters")
+                                self._clear_generating_indicator()
                                 self.ui.display_ai_response(response_text, model_name)
                             else:
                                 logger.error("Simple generation: failed to extract text from response")
@@ -1314,7 +1313,21 @@ class ChatInterface:
         if self.model_info:
             model_name = self.model_info.get('model_id', 'Unknown')
             self.ui.display_info(f"  Model used: {model_name}")
-        
+
+    def _show_generating_indicator(self):
+        """Show aesthetic minimal generating indicator with text"""
+        from rich.text import Text
+        loading_text = Text()
+        loading_text.append("      ", style="dim white")  # 6 spaces for alignment
+        loading_text.append("◦ ◦ ◦", style="dim magenta")  # Aesthetic triple dots
+        loading_text.append(" generating...", style="dim white")  # Clear feedback text
+        self.ui.console.print(loading_text)
+
+    def _clear_generating_indicator(self):
+        """Clear the generating indicator by moving cursor up and clearing line"""
+        # Move cursor up one line and clear it
+        self.ui.console.print("\033[1A\033[K", end="")
+
 
 def validate_url(ctx, param, value):
     """Validate URL parameter"""

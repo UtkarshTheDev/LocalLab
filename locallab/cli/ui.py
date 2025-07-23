@@ -33,8 +33,8 @@ class ChatUI:
         # Clear any previous content and start fresh
         self.console.clear()
 
-        # ASCII Art Banner with complete "LOCALLAB" text - no border, just bottom line
-        banner_lines = [
+        # Perfect ASCII Art with proper visual hierarchy - smaller LOCALLAB, larger CHAT
+        locallab_lines = [
             "",
             "  ██╗      ██████╗  ██████╗ █████╗ ██╗     ██╗      █████╗ ██████╗",
             "  ██║     ██╔═══██╗██╔════╝██╔══██╗██║     ██║     ██╔══██╗██╔══██╗",
@@ -42,16 +42,29 @@ class ChatUI:
             "  ██║     ██║   ██║██║     ██╔══██║██║     ██║     ██╔══██║██╔══██╗",
             "  ███████╗╚██████╔╝╚██████╗██║  ██║███████╗███████╗██║  ██║██████╔╝",
             "  ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝",
-            "",
-            "                           Chat Interface",
-            "",
-            "─────────────────────────────────────────────────────────────────"
+            ""
         ]
 
-        # Display banner with balanced color - lighter but not too dark
-        for line in banner_lines:
+        chat_lines = [
+            "  ╔██████╗██╗  ██╗ █████╗ ████████╗",
+            "  ██╔════╝██║  ██║██╔══██╗╚══██╔══╝",
+            "  ██║     ███████║███████║   ██║   ",
+            "  ██║     ██╔══██║██╔══██║   ██║   ",
+            "  ╚██████╗██║  ██║██║  ██║   ██║   ",
+            "   ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ",
+            ""
+        ]
+
+        # Display LOCALLAB banner with bluish-purplish color
+        for line in locallab_lines:
             banner_text = Text()
-            banner_text.append(line, style="bright_blue")
+            banner_text.append(line, style="blue")  # Little bluish-purplish - elegant and sophisticated
+            self.console.print(banner_text)
+
+        # Display CHAT banner with purplish color
+        for line in chat_lines:
+            banner_text = Text()
+            banner_text.append(line, style="magenta")  # Purplish type - beautiful and distinctive
             self.console.print(banner_text)
 
         # Connection status with modern styling and horizontal padding
@@ -59,26 +72,26 @@ class ChatUI:
         status_text.append("    ●", style="bright_green")  # Added horizontal padding
         status_text.append(" Connected", style="dim bright_white")
 
-        # Model info if available
+        # Model info with warm, connection-building color
         if model_info and (model_info.get('model_id') or model_info.get('id')):
             model_name = model_info.get('model_id') or model_info.get('id') or model_info.get('name')
             display_name = model_name.split('/')[-1] if '/' in model_name else model_name
             display_name = display_name.replace('-Instruct', '').replace('-Chat', '')
-            status_text.append(f" • {display_name}", style="dim bright_cyan")
+            status_text.append(f" │ {display_name}", style="green")
 
         self.console.print(status_text)
 
-        # Concise usage guide with horizontal padding
+        # Modern usage guide with sophisticated styling
         usage_text = Text()
-        usage_text.append("    Usage: ", style="dim bright_white")  # Added horizontal padding
+        usage_text.append("    ▸ ", style="dim magenta")  # Modern arrow indicator
         usage_text.append("Type your message or use ", style="dim white")
-        usage_text.append("--stream", style="bright_cyan")
-        usage_text.append(", ", style="dim white")
-        usage_text.append("--chat", style="bright_cyan")
-        usage_text.append(", ", style="dim white")
-        usage_text.append("--batch", style="bright_cyan")
-        usage_text.append(", ", style="dim white")
-        usage_text.append("--simple", style="bright_cyan")
+        usage_text.append("--stream", style="cyan")
+        usage_text.append(" │ ", style="dim magenta")  # Elegant separator
+        usage_text.append("--chat", style="cyan")
+        usage_text.append(" │ ", style="dim magenta")
+        usage_text.append("--batch", style="cyan")
+        usage_text.append(" │ ", style="dim magenta")
+        usage_text.append("--simple", style="cyan")
         usage_text.append(" to override modes", style="dim white")
 
         self.console.print(usage_text)
@@ -120,10 +133,10 @@ class ChatUI:
         self.console.print(panel)
         
     def get_user_input(self) -> Optional[str]:
-        """Get user input with enhanced chat-style prompt"""
+        """Get user input with innovative aesthetic prompt"""
         try:
-            # Enhanced chat-style prompt with better visual distinction
-            prompt_text = "[bold bright_white]You[/bold bright_white][dim white]:[/dim white]"
+            # Modern prompt with sophisticated styling
+            prompt_text = "[dim magenta]▸[/dim magenta] [bold white]You[/bold white][dim white]:[/dim white]"
             user_input = Prompt.ask(prompt_text, console=self.console)
 
             if user_input.strip():
@@ -135,12 +148,13 @@ class ChatUI:
             return None
             
     def display_user_message(self, message: str):
-        """Display user message with enhanced chat-style formatting and horizontal padding"""
-        # Create a more chat-like user message display with padding
+        """Display user message with innovative aesthetic formatting"""
+        # Modern user message display with sophisticated elements
         user_text = Text()
-        user_text.append("    You", style="bold bright_white")  # Added horizontal padding
+        user_text.append("    ▸ ", style="dim magenta")  # Modern arrow indicator
+        user_text.append("You", style="bold white")
         user_text.append(": ", style="dim white")
-        user_text.append(message, style="bright_white")
+        user_text.append(message, style="white")
 
         self.console.print(user_text)
         # No extra spacing after user message for tighter conversation flow
@@ -152,29 +166,58 @@ class ChatUI:
         ai_label = ai_label.replace('-Instruct', '').replace('-Chat', '')  # Clean up model name
 
         header = Text()
-        header.append("    " + ai_label, style="bold bright_cyan")  # Added horizontal padding
+        header.append("    ◂ ", style="dim blue")  # Modern AI indicator (left arrow)
+        header.append(ai_label, style="green")  # Warm, connection-building color
         header.append(": ", style="dim white")
 
         self.console.print(header, end="")
 
-        # Enhanced markdown rendering with subdued styling for better hierarchy
+        # Enhanced rendering with guaranteed proper indentation
         try:
-            rendered_content = self._render_enhanced_markdown(response)
-            self.console.print(rendered_content)
+            # Check if response contains markdown that needs special handling
+            if self._contains_markdown(response) or self._contains_code_blocks(response):
+                # For markdown content, render first then add padding to preserve formatting
+                rendered_content = self._render_enhanced_markdown(response)
+                # Use Rich's Padding to ensure indentation is preserved
+                from rich.padding import Padding
+                padded_content = Padding(rendered_content, (0, 0, 0, 6))  # Left padding of 6
+                self.console.print(padded_content)
+            else:
+                # For plain text, add padding directly
+                indented_response = self._add_text_padding(response)
+                self.console.print(indented_response, style="white")
         except Exception as e:
-            # Fallback to plain text with subdued styling (lighter than user text)
-            self.console.print(response, style="white")
+            # Fallback to plain text with guaranteed indentation
+            indented_response = self._add_text_padding(response)
+            self.console.print(indented_response, style="white")
 
         # Add spacing after AI response for better conversation flow
         self.console.print()
-        
+
+    def _add_text_padding(self, text: str) -> str:
+        """Add consistent horizontal padding to plain text"""
+        # Add 6 spaces to each line for consistent indentation
+        lines = text.split('\n')
+        padded_lines = ['      ' + line for line in lines]  # 6 spaces for alignment
+        return '\n'.join(padded_lines)
+
+    def _contains_markdown(self, text: str) -> bool:
+        """Check if text contains markdown formatting"""
+        markdown_indicators = ['**', '*', '`', '#', '- ', '* ', '+ ', '1. ', '[', '](']
+        return any(indicator in text for indicator in markdown_indicators)
+
+    def _contains_code_blocks(self, text: str) -> bool:
+        """Check if text contains code blocks"""
+        return '```' in text or '`' in text
+
     def display_streaming_response(self, model_name: Optional[str] = None):
         """Start displaying a streaming response with enhanced chat-style formatting and horizontal padding"""
         ai_label = model_name.split('/')[-1] if model_name and '/' in model_name else (model_name or "AI")
         ai_label = ai_label.replace('-Instruct', '').replace('-Chat', '')  # Clean up model name
 
         header = Text()
-        header.append("    " + ai_label, style="bold bright_cyan")  # Added horizontal padding
+        header.append("    ◂ ", style="dim blue")  # Modern AI indicator (left arrow)
+        header.append(ai_label, style="green")  # Warm, connection-building color
         header.append(": ", style="dim white")
         self.console.print(header, end="")
 
@@ -189,9 +232,10 @@ class ChatUI:
             return
 
         error_text = Text()
-        error_text.append("    System", style="bold red")  # Added horizontal padding
+        error_text.append("    ⚠ ", style="dim red")  # Modern warning indicator
+        error_text.append("System", style="bold red")
         error_text.append(": ", style="dim white")
-        error_text.append(error_message, style="bright_white")
+        error_text.append(error_message, style="white")
 
         self.console.print(error_text)
         self.console.print()  # Add spacing after error
@@ -212,9 +256,10 @@ class ChatUI:
         self.console.print(status_text)
         
     def display_info(self, info_message: str):
-        """Display info message with modern minimal styling and horizontal padding"""
+        """Display info message with innovative aesthetic styling"""
         info_text = Text()
-        info_text.append("    " + info_message, style="dim white")  # Added horizontal padding
+        info_text.append("    ℹ ", style="dim blue")  # Modern info indicator
+        info_text.append(info_message, style="dim white")
 
         self.console.print(info_text)
         
@@ -228,9 +273,10 @@ class ChatUI:
         os.system('cls' if os.name == 'nt' else 'clear')
         
     def display_goodbye(self):
-        """Display minimal goodbye message with horizontal padding"""
+        """Display innovative aesthetic goodbye message"""
         goodbye_text = Text()
-        goodbye_text.append("    Goodbye", style="dim white")  # Added horizontal padding
+        goodbye_text.append("    ✓ ", style="dim magenta")  # Modern checkmark indicator
+        goodbye_text.append("Goodbye", style="dim white")
 
         self.console.print(goodbye_text)
         
