@@ -2,6 +2,36 @@
 
 All notable changes to LocalLab will be documented in this file.
 
+## [0.11.3] - 2025-07-23
+
+### Enhanced
+- **Perfect ASCII art formatting** - Fixed broken CHAT banner characters with clean, well-formed block display
+- **Enhanced loading indicator** - Added "generating..." text after triple dots (◦ ◦ ◦) with dynamic removal when AI responds
+- **AI response padding fix** - Implemented guaranteed 6-space left indentation under model name headers, eliminating flush-left margin issues
+- **Aesthetic ASCII art colors** - Beautiful purplish color scheme: blue for LOCALLAB (bluish-purplish) and magenta for CHAT (purplish)
+- **Visual hierarchy perfection** - CHAT banner as clearly dominant element with LOCALLAB as subtle secondary presence
+- **Loading behavior enhancement** - Smooth indicator appearance/removal with proper alignment matching AI response indentation
+
+### Fixed
+- **AI response alignment** - Resolved persistent issue where responses appeared flush against left margin instead of properly indented
+- **ASCII art malformation** - Repaired broken characters in CHAT banner ensuring perfect formatting across all terminals
+- **Loading indicator positioning** - Fixed alignment to match 6-space AI response padding for consistent visual structure
+- **Markdown rendering padding** - Enhanced dual approach: Rich Padding for complex content, direct padding for plain text
+
+### Technical Changes
+- **Enhanced `_show_generating_indicator()`** - Added "generating..." text with aesthetic triple dots and proper 6-space alignment
+- **Improved AI response rendering** - Dual approach handling both markdown and plain text with guaranteed indentation
+- **Updated `_add_text_padding()`** - Consistent 6-space padding for all content types with multi-line support
+- **ASCII art color optimization** - Implemented subtle, pleasant colors perfect for dark terminal backgrounds
+- **Dynamic indicator clearing** - ANSI escape codes for seamless loading indicator removal
+
+### User Experience
+- **Professional alignment** - All AI responses properly indented with consistent 6-space left padding
+- **Clear generation feedback** - Enhanced loading indicator with explicit "generating..." text for better user understanding
+- **Aesthetic appeal** - Beautiful purplish color scheme creating warm, inviting, and professional appearance
+- **Smooth interactions** - Dynamic loading behavior with seamless transitions from indicator to response
+- **Perfect formatting** - Flawless ASCII art display with proper visual hierarchy and clean character rendering
+
 ## [0.11.2] - 2025-07-23
 
 ### Enhanced
